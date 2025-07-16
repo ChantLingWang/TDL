@@ -1,11 +1,11 @@
 import asyncio
 
-from services.mongodb_service import MongoDBService
+from services.mongodb_service import MongoDBServiceManager
 
 
 async def main():
     #创建数据库服务实例
-    db_service = MongoDBService()
+    db_service = MongoDBServiceManager()
     try:
         #连接数据库
         await db_service.connect()
