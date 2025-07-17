@@ -12,4 +12,4 @@ class MongoDBUserService:
         """
         self.connection_name = "Users"
         self.db_manager = db_manager
-        self.collection_name = self.db_manager.get_collection(self.connection_name)
+        self.collection = self.db_manager.get_collection(self.connection_name)
