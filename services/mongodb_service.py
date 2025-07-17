@@ -2,13 +2,14 @@ import asyncio
 import ssl
 from typing import Optional
 from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase, AsyncIOMotorCollection
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging
 
 #配置日志
 logging.basicConfig(level=logging.INFO)#这是python的日志配置，其中level代表日志提示等级，DEBUG：详细的调试信息；INFO：一般信息；WARNING：警告信息；ERROR：错误信息；CRITICAL：严重错误
 logger = logging.getLogger(__name__)#创建日志记录器，使用logging.getLogger()方法，__name__表示为当前文件的name，如这里就是mongodb_service
+
 
 
 class MongoDBServiceManager:
@@ -123,16 +124,25 @@ class MongoDBServiceManager:
             raise ConnectionError(error_msg) from e
 
 
-    async def get_collection(self, collection_name: str):
-        if not self.is_connected:
-            raise Exception("数据库未连接！请先调用 connect() 方法")
+    #数据库的关闭逻辑
+    async def close(self):
+        if self.client:
+            self.client.close()
+            logger.info("MongoDB 数据库已关闭")
 
+    #检测数据库是否连接
+    async def test_connection(self):
+        try:
+            await self.client.admin.command('ping')
+            logger.info("数据库连接正常")
+            return True
+        except Exception as e:
+            logger.info("数据库连接不正常")
+            return False
+
+    def get_collection(self, collection_name: str):
+        if not self.database:
+            raise Exception("数据库未连接")
         return self.database[collection_name]
 
-
-    async def close(self):
-        if self.is_connected:
-            await self.client.close()
-            self.is_connected = False
-            logger.info("数据库已关闭")
-        return self.is_connected
+db_manager = MongoDBServiceManager()
