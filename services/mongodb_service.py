@@ -145,4 +145,9 @@ class MongoDBServiceManager:
             raise Exception("数据库未连接")
         return self.database[collection_name]
 
-db_manager = MongoDBServiceManager()
+
+async def main():
+    #创建实例化数据库db_manager
+    db_manager = MongoDBServiceManager()
+    #异步的启动数据库连接
+    await db_manager.connect()
