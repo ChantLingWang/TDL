@@ -1,8 +1,12 @@
+import logging
 from datetime import datetime, timezone
 from typing import Optional,Dict,List,Any
 from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识
 import bcrypt                                               # 密码哈希库，用于安全存储密码
 from services.mongodb_service import db_manager
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class MongoDBUserService:
     """用户集合操作封装"""
