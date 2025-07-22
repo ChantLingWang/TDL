@@ -18,7 +18,6 @@ class LoginOrRegisterRequest(BaseModel):
         summary="用户登录或注册",
         description="用户登录或注册接口",
         response_description="返回登录或注册结果",
-        tags=["用户认证"]
     )
 async def login_or_register(request:Request,data:LoginOrRegisterRequest):
     try:
@@ -32,7 +31,7 @@ async def login_or_register(request:Request,data:LoginOrRegisterRequest):
                 "message":"success",
                 "user":{
                     "email":user["email"],
-                    "username":user["username"]
+                    #"username":user["username"]
                 }
             }
         else:

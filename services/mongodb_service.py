@@ -103,7 +103,7 @@ class MongoDBServiceManager:
 
             # 记录连接信息
             if self.client:
-                server_info = self.client.server_info()
+                server_info = await self.client.server_info()   #异步服务器函数，不能使用同步方法，因为这得到了一个future对象（没有实现的对象，可能跳出事件循环了在等待完成）
                 logger.info(f"MongoDB 服务器版本: {server_info.get('version', 'unknown')}")
                 logger.info(f"连接池配置: 最大连接数={self.connection_config['maxPoolSize']}, "f"最小连接数={self.connection_config['minPoolSize']}")
             return True
@@ -147,15 +147,21 @@ class MongoDBServiceManager:
     #检测数据库是否连接
     async def test_connection(self):
         try:
+            if not self.client:
+                logger.error("数据库客户端为空")
+                return False
+            if not self.is_connected:
+                logger.error("连接状态标志为False")
+                return False
             await self.client.admin.command('ping')
             logger.info("数据库连接正常")
             return True
         except Exception as e:
-            logger.info("数据库连接不正常")
+            logger.error(f"数据库连接不正常: {str(e)}")
             return False
 
     def get_collection(self, collection_name: str):
-        if not self.database:
+        if self.database is None:       #MongoDB 的数据库对象不支持布尔值测试
             raise Exception("数据库未连接")
         return self.database[collection_name]
 

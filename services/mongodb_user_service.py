@@ -28,7 +28,7 @@ class MongoDBUserService:
 
             #这两个字段，如果data中没有，也会自动增加
             user_data.setdefault('created_at',current_time)    #创建用户的时间
-            user_data['updated_at'] = datetime.now(current_time)    #用户最后的更新时间
+            user_data['updated_at'] = datetime.now(timezone.utc)    #用户最后的更新时间
 
             #异步插入数据到 MongoDB 集合的操作，将user_data异步insert_one（mongo标准插入方法）插入到集合中
             result = await self.collection.insert_one(user_data)
