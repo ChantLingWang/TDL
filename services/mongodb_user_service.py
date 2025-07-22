@@ -80,7 +80,7 @@ class MongoDBUserService:
     #登陆用户，如果用户不存在，则注册用户
     async def login_or_register_user(self,email:str,password:str) -> Optional[Dict[str,Any]]:
         """
-        登陆用户
+        登陆或注册的数据库操作
         """
         try:
             #检查用户是否存在
