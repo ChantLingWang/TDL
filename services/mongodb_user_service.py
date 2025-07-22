@@ -4,6 +4,7 @@ from typing import Optional,Dict,List,Any
 from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识
 import bcrypt                                               # 密码哈希库，用于安全存储密码
 from services.mongodb_service import db_manager
+from pymongo.results import UpdateResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,3 +37,30 @@ class MongoDBUserService:
             return str(result.inserted_id)
         except Exception as e:
             raise Exception("创建用户失败")
+
+
+    async def get_user_by_email(self,user_id:str) -> Optional[Dict[str,Any]]:  #返回类型是字典，用户信息，也可以是None
+        """
+        根据用户id获取用户信息
+        """
+        try:
+            user = await self.collection.find_one(
+                {"_id":ObjectId(user_id)}       #使用user_id查询用户信息,将user_id转换为ObjectId类型
+            )
+            return user
+        except Exception as e:
+            raise Exception("获取用户信息失败")
+        
+        
+    async def update_user(self,user_id:str,update_data:Dict[str,Any]) -> UpdateResult:
+        """
+        根据用户id更新用户信息
+        """
+        try:
+            result = await self.collection.update_one(
+                {"_id":ObjectId(user_id)},   #查询条件
+                {"$set":update_data}         #更新数据
+            )   
+            return result
+        except Exception as e:
+            raise Exception("更新用户信息失败")
