@@ -2,7 +2,7 @@ import jwt
 import time
 import uuid
 from typing import Dict,Any,Optional
-from .secret_key import get_secret_key
+from ..core.secret_key import get_secret_key
 
 
 class JWTUtils:
@@ -39,4 +39,15 @@ class JWTUtils:
         )
         return token
     
-    
+    @classmethod
+    def verify_token(cls, token: str) -> Optional[Dict[str, Any]]:
+        try:
+            # 解码token，验证签名和有效期
+            payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]) #使用jwt库的decode方法解码token，SECRET_KEY：密钥，ALGORITHM：算法
+            return {"status": "success", "payload": payload}  # 返回有效的payload
+        except jwt.ExpiredSignatureError:
+            # 处理过期的token
+            return {"status": "error", "message": "Token已过期"}
+        except jwt.InvalidTokenError:
+            # 处理无效的token
+            return {"status": "error", "message": "无效的Token"}

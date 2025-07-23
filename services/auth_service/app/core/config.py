@@ -3,6 +3,7 @@ try:
 except ImportError:
     from pydantic import BaseSettings
 from typing import Optional
+from services.auth_service.app.core.secret_key import get_secret_key
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     database_name: str = "TDL_local_test_database"
     
     # JWT配置
-    secret_key: str = "your-secret-key-here"
+    secret_key: str = get_secret_key()
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 120
     
