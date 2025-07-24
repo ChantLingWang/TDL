@@ -14,11 +14,11 @@ from database.mongodb_service import db_manager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    print(f"🚀 启动 {settings.app_name}")
+    print(f"启动 {settings.app_name}")
     await db_manager.connect()
     yield
     # 关闭时执行
-    print(f"🛑 关闭 {settings.app_name}")
+    print(f"关闭 {settings.app_name}")
     await db_manager.close()
 
 def create_app() -> FastAPI:
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     
     # 添加CORS中间件
     app.add_middleware(
+        CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=settings.allowed_methods,

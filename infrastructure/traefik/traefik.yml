@@ -1,0 +1,47 @@
+# Traefik 主配置文件
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# API 和仪表板配置
+api:
+  dashboard: true
+  insecure: true  # 开发环境，生产环境请设置为false
+
+# 入口点配置
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+# 服务发现配置
+providers:
+  # Docker 服务发现
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "traefik-network"
+  
+  # 文件配置提供者
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+# 证书解析器（用于HTTPS）
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: your-email@example.com
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+# 日志配置
+log:
+  level: INFO
+  filePath: "/var/log/traefik.log"
+
+# 访问日志
+accessLog:
+  filePath: "/var/log/access.log" 

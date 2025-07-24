@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """应用配置"""
     # 应用基本信息
     app_name: str = "Auth Service"
-    description: str = "用户认证服务"
+    description: str = "用户登录或注册服务"
     version: str = "1.0.0"
     debug: bool = True
     
@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 120
     
     # CORS配置
-    allowed_origins: list = ["*"]
-    allowed_methods: list = ["*"]
-    allowed_headers: list = ["*"]
+    allowed_origins: list = ["*"]       #允许访问API的来源
+    allowed_methods: list = ["*"]       #允许访问API的方法
+    allowed_headers: list = ["*"]       #允许访问API的请求头
     
     class Config:
         env_file = ".env"

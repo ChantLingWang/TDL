@@ -1,0 +1,61 @@
+# Traefik 动态配置文件
+http:
+  # 路由配置
+  routers:
+    # Auth Service 路由
+    auth-service:
+      rule: "Host(`auth.localhost`) || PathPrefix(`/api/v1/auth`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - rate-limit
+    
+    # Auth Service HTTPS 路由
+    auth-service-secure:
+      rule: "Host(`auth.yourdomain.com`) || PathPrefix(`/api/v1/auth`)"
+      service: auth-service
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+
+  # 服务配置
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth-service:9030"
+        healthCheck:
+          path: "/api/v1/health"
+          interval: "30s"
+
+  # 中间件配置
+  middlewares:
+    # CORS 头部
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    # 速率限制
+    rate-limit:
+      rateLimit:
+        burst: 100
+        average: 50
+
+    # 重试机制
+    retry:
+      attempts: 3
+      initialInterval: 100ms 
