@@ -3,12 +3,13 @@ try:
 except ImportError:
     from pydantic import BaseSettings
 from typing import Optional
-from services.auth_service.app.core.secret_key import get_secret_key
+from .secret_key import get_secret_key
 
 class Settings(BaseSettings):
     """应用配置"""
     # 应用基本信息
     app_name: str = "Auth Service"
+    service_id: str = "auth_service"
     description: str = "用户登录或注册服务"
     version: str = "1.0.0"
     debug: bool = True
