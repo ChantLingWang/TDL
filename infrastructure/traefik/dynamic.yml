@@ -3,13 +3,12 @@ http:
   # 路由配置
   routers:
     # Auth Service 路由
-    auth-service:
-      rule: "Host(`auth.localhost`) || PathPrefix(`/api/v1/auth`)"
-      service: auth-service
-      entryPoints:
+    auth-service:                                                         # 定义路由的名称，auth-service是路由的名称
+      rule: "Host(`auth.yourdomain.com`) || PathPrefix(`/api/v1/auth`)"   # 定义路由的规则，使用Host和PathPrefix来匹配请求
+      entryPoints:                                                        # 定义路由的入口点，web是HTTP入口点
         - web
-      middlewares:
-        - cors-headers
+      middlewares:                                                        # 定义路由的中间件，cors-headers是中间件的名称
+        - redirect-to-https                                               # 使用cors-headers中间件来处理CORS请求   
         - rate-limit
     
     # Auth Service HTTPS 路由
@@ -20,16 +19,20 @@ http:
         - websecure
       tls:
         certResolver: letsencrypt
+      middlewares:
+        - cors-headers
+        - rate-limit
+        - retry
 
   # 服务配置
   services:
-    auth-service:
-      loadBalancer:
-        servers:
-          - url: "http://auth-service:9030"
-        healthCheck:
-          path: "/api/v1/health"
-          interval: "30s"
+    auth-service:                                                         # 定义服务的名称，auth-service是服务的名称，与路由中引用的服务名称对应
+      loadBalancer:                                                       # 配置负载均衡器，用于在多个后端服务器之间分发请求
+        servers:                                                          # 定义后端服务器列表，可以配置多个服务器实现负载均衡
+          - url: "http://auth-service:9030"                               # 后端服务器的URL，auth-service是服务主机名，9030是服务监听的端口
+        healthCheck:                                                      # 配置健康检查，用于监控后端服务的可用性
+          path: "/api/v1/health"                                          # 健康检查的路径，Traefik会定期向此路径发送请求检查服务状态
+          interval: "30s"                                                 # 健康检查的时间间隔，每30秒检查一次服务健康状态
 
   # 中间件配置
   middlewares:
@@ -40,8 +43,6 @@ http:
           - GET
           - POST
           - PUT
-          - DELETE
-          - OPTIONS
         accessControlAllowOriginList:
           - "*"
         accessControlAllowHeaders:
@@ -59,3 +60,9 @@ http:
     retry:
       attempts: 3
       initialInterval: 100ms 
+
+    # 重定向到HTTPS
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true

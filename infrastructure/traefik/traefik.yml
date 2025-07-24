@@ -1,47 +1,47 @@
 # Traefik 主配置文件
 global:
-  checkNewVersion: false
-  sendAnonymousUsage: false
+  checkNewVersion: false                    # 检查新版本
+  sendAnonymousUsage: false                 # 发送匿名使用情况
 
 # API 和仪表板配置
 api:
-  dashboard: true
-  insecure: true  # 开发环境，生产环境请设置为false
+  dashboard: true                           # 启用仪表板，可用浏览器访问Traefik的Web界面
+  insecure: true                            # 表示在开发环境中可以不使用 HTTPS 访问仪表板。在生产环境中，建议设置为 false，以提高安全性。
 
 # 入口点配置
 entryPoints:
   web:
-    address: ":80"
+    address: ":80"                          # 定义 HTTP 入口点，监听 80 端口。
   websecure:
-    address: ":443"
+    address: ":443"                         # 定义 HTTPS 入口点，监听 443 端口。
 
 # 服务发现配置
 providers:
   # Docker 服务发现
   docker:
-    endpoint: "unix:///var/run/docker.sock"
-    exposedByDefault: false
-    network: "traefik-network"
+    endpoint: "unix:///var/run/docker.sock" # 使用Docker的套接字
+    exposedByDefault: false                 # 表示默认情况下不暴露所有容器，只有显式标记的容器才会被 Traefik 处理。
+    network: "traefik-network"              # 指定 Traefik 使用的 Docker 网络。
   
   # 文件配置提供者
   file:
-    filename: /etc/traefik/dynamic.yml
-    watch: true
+    filename: /etc/traefik/dynamic.yml      # 指定动态配置文件的路径。
+    watch: true                             # 设置为 true，表示监视该动态文件的变化，自动更新配置。
 
-# 证书解析器（用于HTTPS）
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: your-email@example.com
-      storage: /letsencrypt/acme.json
-      httpChallenge:
-        entryPoint: web
+#配置证书解析器，用于自动获取和管理 HTTPS 证书。
+certificatesResolvers:  
+  letsencrypt:                              # 使用 Let's Encrypt 作为证书提供者。
+    acme:                                   # 使用 ACME 协议来获取和管理证书。
+      email: 809595872@qq.com               # 指定用于获取证书的电子邮件地址。
+      storage: /letsencrypt/acme.json       # 指定存储证书的文件路径，用于存储证书信息。
+      httpChallenge:                        # 使用 HTTP 挑战来获取证书，使用 HTTP 请求来验证域名的所有权，Traefik 会通过 HTTP 请求来验证域名的所有权，Traefik 会通过 HTTP 请求来验证域名的所有权。
+        entryPoint: web                     # 指定使用 HTTP 入口点来处理证书请求。
 
 # 日志配置
 log:
-  level: INFO
-  filePath: "/var/log/traefik.log"
+  level: INFO                               # 设置日志级别为 INFO。
+  filePath: "/var/log/traefik.log"          # 设置日志文件路径。
 
 # 访问日志
 accessLog:
-  filePath: "/var/log/access.log" 
+  filePath: "/var/log/access.log"           # 设置访问日志文件路径。
