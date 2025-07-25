@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     smtp_username: str = "your-email@example.com"
     smtp_password: str = "REPLACED-OLD-SMTP-CODE"
     
+    # Redis配置
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

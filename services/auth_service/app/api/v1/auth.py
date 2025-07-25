@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest
 from database.mongodb_user_service import MongoDBUserService,db_manager
-from utils.random_code import generate_secure_code
+from services.email_service import EmailService
 from utils.error_code import ErrorCodeEnum
 from fastapi import Request
 import bcrypt
@@ -22,10 +22,11 @@ async def get_user_service():
     summary="发送验证码",
     description="发送验证码接口，发送验证码到用户邮箱",
     response_description="返回发送结果"
-             )
+)
 async def send_code(request:Request,data: SendCodeRequest):
     """发送验证码接口"""
-    code = generate_secure_code()
+    email_service = EmailService()
+    email_service.send_email(data.email)
 
 
 
