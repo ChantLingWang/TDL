@@ -1,15 +1,18 @@
-class ErrorCode:
+from collections import UserDict
+
+
+class ErrorCode():
     def __init__(self,code:int,message:str):
-        self.code = code
-        self.message = message
+        self._code = code
+        self._message = message
 
     @property
     def code(self):
-        return self.code
+        return self._code
     
     @property
     def message(self):
-        return self.message
+        return self._message
 
 
 class ErrorCodeEnum:
