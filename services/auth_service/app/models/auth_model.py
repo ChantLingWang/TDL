@@ -9,3 +9,6 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr = Field(..., description="用户邮箱")
     password: str = Field(..., description="用户密码")
+    
+class SendCodeRequest(BaseModel):
+    email: EmailStr = Field(..., description="用户邮箱")
