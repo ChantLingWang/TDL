@@ -9,7 +9,7 @@ from core.config import settings
 from api.v1.auth import router as auth_router
 from api.v1.health import router as health_router
 from database.mongodb_service import db_manager
-from consul import Consul
+from consul import Consul, Check
 
 # 创建全局 Consul 客户端实例
 consul_client = Consul()
@@ -21,6 +21,9 @@ async def lifespan(app: FastAPI):
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
     
+    # 创建健康检查
+    health_check = Check.http(f"http://{settings.host}:{settings.port}/health", interval="30s", timeout="5s")
+    
     # 在consul服务注册发现中心注册服务
     consul_client.agent.service.register(
         name=settings.app_name,
@@ -28,7 +31,7 @@ async def lifespan(app: FastAPI):
         address=settings.host,
         port=settings.port,
         tags=["auth", "api"],
-        check=consul_client.agent.check.tcp(settings.host, settings.port, interval="30s", timeout="5s")
+        check=health_check
     )
     print(f"服务已注册到 Consul: {settings.service_id}")
     

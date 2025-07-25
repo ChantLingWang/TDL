@@ -16,6 +16,7 @@ async def get_user_service():
         raise HTTPException(status_code=500, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
     return MongoDBUserService(db_manager)
 
+
 @router.post("/register",
     summary="用户注册",
     description="用户注册接口，创建新用户账户",
