@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     await db_manager.connect()
     
     # 创建健康检查
-    health_check = Check.http(f"http://{settings.host}:{settings.port}/health", interval="30s", timeout="5s")
+    health_check = Check.http(f"http://{settings.host}:{settings.port}/api/v1/health", interval="30s", timeout="5s")
     
     # 在consul服务注册发现中心注册服务
     consul_client.agent.service.register(
