@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     allowed_methods: list = ["*"]       #允许访问API的方法
     allowed_headers: list = ["*"]       #允许访问API的请求头
     
+    # 邮箱配置
+    smtp_server: str = "smtp.qq.com"
+    smtp_port: int = 587
+    smtp_username: str = "809595872@qq.com"
+    smtp_password: str = "flvvqalxrcmlbdhj"
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
