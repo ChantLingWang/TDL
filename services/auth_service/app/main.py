@@ -9,7 +9,10 @@ from core.config import settings
 from api.v1.auth import router as auth_router
 from api.v1.health import router as health_router
 from database.mongodb_service import db_manager
-from consul import Consul,Check
+from consul import Consul
+
+# 创建全局 Consul 客户端实例
+consul_client = Consul()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,22 +20,27 @@ async def lifespan(app: FastAPI):
     # 启动时执行
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
-    consul = Consul()
-    #在consul服务注册发现中心注册服务
-    consul.agent.service.register(
+    
+    # 在consul服务注册发现中心注册服务
+    consul_client.agent.service.register(
         name=settings.app_name,
         service_id=settings.service_id,
         address=settings.host,
         port=settings.port,
-        tags=["auth","api"],
-        check=Check.tcp(settings.host,settings.port,interval="30s",timeout="5s")
+        tags=["auth", "api"],
+        check=consul_client.agent.check.tcp(settings.host, settings.port, interval="30s", timeout="5s")
     )
+    print(f"服务已注册到 Consul: {settings.service_id}")
+    
     yield
+    
     # 关闭时执行
     print(f"关闭 {settings.app_name}")
     await db_manager.close()
-    #在consul服务注册发现中心注销服务
-    await Consul.agent.service.deregister(settings.service_id)
+    
+    # 在consul服务注册发现中心注销服务
+    consul_client.agent.service.deregister(settings.service_id)
+    print(f"服务已从 Consul 注销: {settings.service_id}")
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
