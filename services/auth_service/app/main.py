@@ -11,7 +11,6 @@ from api.v1.health import router as health_router
 from database.mongodb_service import db_manager
 from consul import Consul, Check
 
-# 创建全局 Consul 客户端实例
 consul_client = Consul()
 
 @asynccontextmanager
@@ -22,7 +21,7 @@ async def lifespan(app: FastAPI):
     await db_manager.connect()
     
     # 创建健康检查
-    health_check = Check.http(f"http://{settings.host}:{settings.port}/api/v1/health", interval="30s", timeout="5s")
+    health_check = Check.http(f"http://host.docker.internal:{settings.port}/health", interval="30s", timeout="5s")
     
     # 在consul服务注册发现中心注册服务
     consul_client.agent.service.register(
@@ -66,7 +65,7 @@ def create_app() -> FastAPI:
     
     # 注册路由
     app.include_router(auth_router, prefix="/api/v1", tags=["认证"])
-    app.include_router(health_router, prefix="/api/v1", tags=["健康检查"])
+    app.include_router(health_router, tags=["健康检查"])
     
     # 根路径
     @app.get("/", tags=["根路径"])
@@ -86,7 +85,7 @@ app = create_app()
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host=settings.host,
+        host="0.0.0.0",
         port=settings.port,
         reload=settings.debug,
         log_level="info"
