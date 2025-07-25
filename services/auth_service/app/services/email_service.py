@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from email.utils import formataddr
+from app.database.redis_user_service import RedisUserService
 from app.core.config import settings
 
 class EmailService:
@@ -20,7 +21,7 @@ class EmailService:
         return ''.join(secrets.choice(characters) for _ in range(length))    
         
         
-    def send_email(self, to_email: str, subject: str, content: str = None):
+    def send_email(self, to_email: str, subject: str = None, content: str = None):
         #生成验证码
         code = self.generate_secure_code()
         # 发送邮件
@@ -48,5 +49,5 @@ class EmailService:
         server.quit()
         
         #将code存入redis，并设置TTL
-        redis_client = RedisClient()
-            
+        redis_client = RedisUserService()
+        redis_client.set_code(to_email, code, 600)

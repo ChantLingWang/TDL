@@ -8,5 +8,13 @@ class RedisClient:
             port=settings.redis_port,
             db=settings.redis_db
         )
+    
+    def set_update_data(self, key: str, value: str, ttl: int):
+        self.redis_client.set(key, value, ex=ttl)
         
+    def get_data(self, key: str, value: str):
+        if self.redis_client.exists(key,value):
+            return self.redis_client.get(key,value)
+        else:
+            return None        
         
