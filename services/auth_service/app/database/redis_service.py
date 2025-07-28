@@ -10,11 +10,11 @@ class RedisClient:
         )
     
     def set_update_data(self, key: str, value: str, ttl: int):
-        self.redis_client.set(key, value, ex=ttl)
+        self.redis_client.set(key, value,ex=ttl)
         
-    def get_data(self, key: str, value: str):
-        if self.redis_client.exists(key,value):
-            return self.redis_client.get(key,value)
+    def get_data(self, key: str):
+        if self.redis_client.exists(key):
+            return self.redis_client.get(key)
         else:
             return None        
         

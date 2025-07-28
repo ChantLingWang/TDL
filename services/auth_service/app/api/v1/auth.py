@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
-from models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest
+from models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest,VerifyCodeRequest
 from database.mongodb_user_service import MongoDBUserService,db_manager
+from database.redis_user_service import RedisUserService
 from services.email_service import EmailService
 from utils.error_code import ErrorCodeEnum
 from fastapi import Request
@@ -26,11 +27,37 @@ async def get_user_service():
 async def send_code(request:Request,data: SendCodeRequest):
     """发送验证码接口"""
     email_service = EmailService()
-    email_service.send_email(data.email)
+    try:
+        email_service.send_email(data.email)
+        
+        return{
+            "message": "验证码发送成功",
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=ErrorCodeEnum.EMAIL_SEND_ERROR.message)
 
 
-
-
+@router.post("/verify_code_register",
+    summary="验证注册验证码",
+    description="验证注册验证码接口，验证注册验证码",
+    response_description="返回验证结果"
+)
+async def verify_code_register(request:Request,data: VerifyCodeRequest):
+    """验证注册验证码接口"""
+    redis_client = RedisUserService()
+    code = redis_client.get_code(data.email)
+    if code is None:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+    if code != data.code:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+    return {
+        "message": "验证码验证成功",
+        "data": {
+            "email": data.email
+        }
+    }
+    
+    
 @router.post("/register",
     summary="用户注册",
     description="用户注册接口，创建新用户账户",
