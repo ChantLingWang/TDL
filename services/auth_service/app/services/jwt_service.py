@@ -10,6 +10,8 @@ class JWTUtils:
     SECRET_KEY = get_secret_key()
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 120
+    REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 # 30天
+    
     
     @classmethod
     def create_access_token(
@@ -25,19 +27,51 @@ class JWTUtils:
         payload = {
             "exp": time.time() + expire_minutes * 60,
             "iat": time.time(),
-            "jti": str(uuid.uuid4())
+            "jti": str(uuid.uuid4()),
+            "type": "access"
         }
         
         # 合并传入的用户payload
         payload.update(user_payload)
         
         # 生成token
-        token = jwt.encode(
+        access_token = jwt.encode(
             payload=payload,
             key=cls.SECRET_KEY,
             algorithm=cls.ALGORITHM
         )
-        return token
+        return access_token
+    
+    
+    @classmethod
+    def create_refresh_token(
+        cls,
+        user_payload: Dict[str, Any],
+        expire_minutes: int = None
+    ) -> str:
+        # 如果过期时间未提供，则使用默认值
+        if expire_minutes is None:
+            expire_minutes = cls.REFRESH_TOKEN_EXPIRE_MINUTES
+        
+        # 基础的payload信息传递，过期时间，创建时间，唯一标识
+        payload = {
+            "exp": time.time() + expire_minutes * 60,
+            "iat": time.time(),
+            "jti": str(uuid.uuid4()),
+            "type": "refresh"
+        }
+        
+        # 合并传入的用户payload
+        payload.update(user_payload)
+        
+        # 生成token
+        refresh_token = jwt.encode(
+            payload=payload,
+            key=cls.SECRET_KEY,
+            algorithm=cls.ALGORITHM
+        )
+        return refresh_token
+    
     
     @classmethod
     def verify_token(cls, token: str) -> Optional[Dict[str, Any]]:
