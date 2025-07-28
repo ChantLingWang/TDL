@@ -3,6 +3,7 @@ from models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest,Verif
 from database.mongodb_user_service import MongoDBUserService,db_manager
 from database.redis_user_service import RedisUserService
 from services.email_service import EmailService
+from services.jwt_service import JWTUtils
 from utils.error_code import ErrorCodeEnum
 from fastapi import Request
 import bcrypt
@@ -51,7 +52,7 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     if code != data.code:
         raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     return {
-        "message": "验证码验证成功",
+        "message": "success",
         "data": {
             "email": data.email
         }
@@ -112,12 +113,16 @@ async def login(request:Request,data: LoginRequest):
     if not bcrypt.checkpw(data.password.encode('utf-8'),user['password']):
         raise HTTPException(status_code=401, detail=ErrorCodeEnum.USER_PASSWORD_INCORRECT.message)
     
+    # 生成token
+    token = JWTUtils.create_access_token(user)
+    refresh_token = JWTUtils.create_refresh_token(user)
     return {
         "message": "success",
         "data": {
             "user": {
                 "email": user["email"],
                 "created_at": user.get("created_at"),
+                "token": token,
             }
         }
     }
