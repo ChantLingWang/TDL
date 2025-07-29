@@ -41,7 +41,7 @@ async def send_code(request:Request,data: SendCodeRequest):
 @router.post("/verify_code_register",
     summary="验证注册验证码",
     description="验证注册验证码接口，验证注册验证码",
-    response_description="返回验证结果"
+    response_description="返回用户字段和token"
 )
 async def verify_code_register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
@@ -76,17 +76,17 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     return {
         "message": "success",
         "data": {
-            "username": data.username,
-            "email": data.email,
+            "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token
         }
     }
 
+
 @router.post("/verify_code_login",
     summary="验证登录验证码",
     description="验证登录验证码接口，验证登录验证码",
-    response_description="返回验证结果"
+    response_description="返回用户字段和token"
 )
 async def verify_code_login(request:Request,data: VerifyCodeRequest):
     """验证登录验证码接口"""
@@ -126,7 +126,7 @@ async def verify_code_login(request:Request,data: VerifyCodeRequest):
 @router.post("/register",
     summary="用户注册",
     description="用户注册接口，创建新用户账户",
-    response_description="返回注册结果"
+    response_description="返回用户字段和token"
 )
 async def register(request:Request,data: RegisterRequest):
     """用户注册接口"""
@@ -153,21 +153,18 @@ async def register(request:Request,data: RegisterRequest):
     return {
         "message": "success",
         "data": {
-            "user": {
-                "username": user["username"],
-                "email": user["email"],
-                "created_at": user.get("created_at"),
-                "access_token": access_token,
-                "refresh_token": refresh_token
+            "user": user,
+            "created_at": user.get("created_at"),
+            "access_token": access_token,
+            "refresh_token": refresh_token
             }
         }
-    }
 
 
 @router.post("/login",
     summary="用户登录",
     description="用户登录接口，验证用户凭据",
-    response_description="返回登录结果"
+    response_description="返回用户字段和token"
 )
 async def login(request:Request,data: LoginRequest):
     """用户登录接口"""
@@ -189,12 +186,10 @@ async def login(request:Request,data: LoginRequest):
     return {
         "message": "success",
         "data": {
-            "user": {
-                "email": user["email"],
-                "created_at": user.get("created_at"),
-                "access_token": access_token,
-                "refresh_token": refresh_token
-            }
+            "user": user,
+            "created_at": user.get("created_at"),
+            "access_token": access_token,
+            "refresh_token": refresh_token
         }
     }
         
