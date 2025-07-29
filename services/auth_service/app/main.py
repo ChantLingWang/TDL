@@ -5,10 +5,10 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from core.config import settings
-from api.v1.auth import router as auth_router
-from api.v1.health import router as health_router
-from database.mongodb_service import db_manager
+from services.auth_service.app.core.config import settings
+from services.auth_service.app.api.v1.auth import router as auth_router
+from services.auth_service.app.api.v1.health import router as health_router
+from services.auth_service.app.database.mongodb_service import db_manager
 from consul import Consul, Check
 
 consul_client = Consul()
@@ -25,10 +25,10 @@ async def lifespan(app: FastAPI):
     
     # 在consul服务注册发现中心注册服务
     consul_client.agent.service.register(
-        name=settings.app_name,
-        service_id=settings.service_id,
-        address=settings.host,
-        port=settings.port,
+        name=settings.consul_service_name,
+        service_id=settings.consul_service_id,
+        address=settings.consul_service_address,
+        port=settings.consul_service_port,
         tags=["auth", "api"],
         check=health_check
     )
@@ -83,8 +83,8 @@ app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
+        "services.auth_service.app.main:app",
+        host=settings.host,
         port=settings.port,
         reload=settings.debug,
         log_level="info"

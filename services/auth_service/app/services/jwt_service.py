@@ -2,7 +2,7 @@ import jwt
 import time
 import uuid
 from typing import Dict,Any,Optional
-from ..core.secret_key import get_secret_key
+from services.auth_service.app.core.secret_key import get_secret_key
 
 
 class JWTUtils:

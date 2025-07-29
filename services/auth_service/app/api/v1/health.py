@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from database.mongodb_service import db_manager
-from .auth import get_user_service
+from services.auth_service.app.database.mongodb_service import db_manager
+from services.auth_service.app.api.v1.auth import get_user_service
 
 router = APIRouter()
 
