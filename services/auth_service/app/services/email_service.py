@@ -15,8 +15,8 @@ class EmailService:
         self.smtp_username = settings.smtp_username
         self.smtp_password = settings.smtp_password
         
-    def generate_secure_code(length=6):
-    # 大写字母 + 数字
+    def generate_secure_code(self, length=6):
+        # 大写字母 + 数字
         characters = string.ascii_uppercase + string.digits
         return ''.join(secrets.choice(characters) for _ in range(length))    
         
