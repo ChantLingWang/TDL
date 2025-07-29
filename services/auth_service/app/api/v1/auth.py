@@ -45,26 +45,78 @@ async def send_code(request:Request,data: SendCodeRequest):
 )
 async def verify_code_register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
-    redis_client = RedisUserService()
-    code = redis_client.get_code(data.email)
     
-    #创建载荷
-    user = {
+    redis_client = RedisUserService()
+    
+    user_service = await get_user_service()
+    
+    code = redis_client.get_code(data.email)#redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
+    
+    # 将bytes类型转换为字符串进行比较
+    code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
+    
+    if code is None:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+
+    if code_str != data.code:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+    
+    # 创建新用户
+    user_data = {
+        "username": data.username,
         "email": data.email,
+        "password": data.password
     }
+    user = await user_service.create_user(user_data)
     
     #生成token
     access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
     
-    if code is None:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
-    if code != data.code:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     return {
         "message": "success",
         "data": {
+            "username": data.username,
             "email": data.email,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
+    }
+
+@router.post("/verify_code_login",
+    summary="验证登录验证码",
+    description="验证登录验证码接口，验证登录验证码",
+    response_description="返回验证结果"
+)
+async def verify_code_login(request:Request,data: VerifyCodeRequest):
+    """验证登录验证码接口"""
+    
+    redis_client = RedisUserService()
+    
+    user_service = await get_user_service()
+    
+    user = await user_service.get_user_by_email(data.email)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+    
+    code = redis_client.get_code(data.email)
+    
+    code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
+    
+    if code is None:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+    
+    if code_str != data.code:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+    
+    access_token = JWTUtils.create_access_token(user)
+    refresh_token = JWTUtils.create_refresh_token(user)
+    
+    return{
+        "message": "success",
+        "data": {
+            "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token
         }
