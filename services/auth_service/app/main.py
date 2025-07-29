@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from services.auth_service.app.core.config import settings
+from services.auth_service.app.core.config_test import settings
 from services.auth_service.app.api.v1.auth import router as auth_router
 from services.auth_service.app.api.v1.health import router as health_router
 from services.auth_service.app.database.mongodb_service import db_manager
