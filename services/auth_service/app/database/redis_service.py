@@ -1,5 +1,5 @@
 from redis import Redis
-from services.auth_service.app.core.config import settings
+from services.auth_service.app.core.config_test import settings
 
 class RedisClient:
     def __init__(self):

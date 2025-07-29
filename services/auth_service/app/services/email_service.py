@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from email.utils import formataddr
 from services.auth_service.app.database.redis_user_service import RedisUserService
-from services.auth_service.app.core.config import settings
+from services.auth_service.app.core.config_test import settings
 
 class EmailService:
     def __init__(self):
