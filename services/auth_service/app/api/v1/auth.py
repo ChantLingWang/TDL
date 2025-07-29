@@ -47,6 +47,16 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
     redis_client = RedisUserService()
     code = redis_client.get_code(data.email)
+    
+    #创建载荷
+    user = {
+        "email": data.email,
+    }
+    
+    #生成token
+    access_token = JWTUtils.create_access_token(user)
+    refresh_token = JWTUtils.create_refresh_token(user)
+    
     if code is None:
         raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
     if code != data.code:
@@ -54,7 +64,9 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     return {
         "message": "success",
         "data": {
-            "email": data.email
+            "email": data.email,
+            "access_token": access_token,
+            "refresh_token": refresh_token
         }
     }
     
@@ -81,7 +93,11 @@ async def register(request:Request,data: RegisterRequest):
         "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt())
     }
     user = await user_service.create_user(user_data)
-        
+    
+    #生成token
+    access_token = JWTUtils.create_access_token(user)
+    refresh_token = JWTUtils.create_refresh_token(user)
+    
     return {
         "message": "success",
         "data": {
@@ -89,6 +105,8 @@ async def register(request:Request,data: RegisterRequest):
                 "username": user["username"],
                 "email": user["email"],
                 "created_at": user.get("created_at"),
+                "access_token": access_token,
+                "refresh_token": refresh_token
             }
         }
     }
@@ -114,7 +132,7 @@ async def login(request:Request,data: LoginRequest):
         raise HTTPException(status_code=401, detail=ErrorCodeEnum.USER_PASSWORD_INCORRECT.message)
     
     # 生成token
-    token = JWTUtils.create_access_token(user)
+    access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
     return {
         "message": "success",
@@ -122,7 +140,8 @@ async def login(request:Request,data: LoginRequest):
             "user": {
                 "email": user["email"],
                 "created_at": user.get("created_at"),
-                "token": token,
+                "access_token": access_token,
+                "refresh_token": refresh_token
             }
         }
     }
