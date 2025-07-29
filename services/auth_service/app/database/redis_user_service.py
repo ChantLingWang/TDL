@@ -1,4 +1,4 @@
-from redis_service import RedisClient
+from .redis_service import RedisClient
 
 class RedisUserService:
     def __init__(self):
