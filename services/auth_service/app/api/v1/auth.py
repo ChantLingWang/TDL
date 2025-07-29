@@ -1,10 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
-from models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest,VerifyCodeRequest
-from database.mongodb_user_service import MongoDBUserService,db_manager
-from database.redis_user_service import RedisUserService
-from services.email_service import EmailService
-from services.jwt_service import JWTUtils
-from utils.error_code import ErrorCodeEnum
+from services.auth_service.app.models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest,VerifyCodeRequest
+from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
+from services.auth_service.app.database.redis_user_service import RedisUserService
+from services.auth_service.app.services.email_service import EmailService
+from services.auth_service.app.services.jwt_service import JWTUtils
+from services.auth_service.app.utils.error_code import ErrorCodeEnum
 from fastapi import Request
 import bcrypt
 

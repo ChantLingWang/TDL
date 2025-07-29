@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional,Dict,List,Any
 from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识
 import bcrypt                                               # 密码哈希库，用于安全存储密码
-from .mongodb_service import MongoDBServiceManager,db_manager
+from services.auth_service.app.database.mongodb_service import MongoDBServiceManager,db_manager
 from pymongo.results import UpdateResult
 
 

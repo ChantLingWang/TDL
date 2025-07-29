@@ -1,0 +1,1 @@
+运行服务：PYTHONPATH=/Users/lianlinghao/PycharmProjects/Chant python -m services.auth_service.app.main

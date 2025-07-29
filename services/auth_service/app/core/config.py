@@ -3,7 +3,7 @@ try:
 except ImportError:
     from pydantic import BaseSettings
 from typing import Optional
-from .secret_key import get_secret_key
+from services.auth_service.app.core.secret_key import get_secret_key
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -15,8 +15,14 @@ class Settings(BaseSettings):
     debug: bool = True
     
     # 服务器配置
-    host: str = "127.0.0.1"
+    host: str = "0.0.0.0"
     port: int = 9030
+    
+    # Consul配置
+    consul_service_name: str = "auth_service"
+    consul_service_id: str = "auth_service"
+    consul_service_address: str = "127.0.0.1"
+    consul_service_port: int = 9030
     
     # 数据库配置
     mongodb_url: str = "mongodb://localhost:27017"
