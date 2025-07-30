@@ -17,7 +17,7 @@ async def get_user_service():
     """获取用户服务实例并检查数据库连接"""
     is_connected = await db_manager.test_connection()
     if not is_connected:
-        raise HTTPException(status_code=500, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
+        raise HTTPException(status_code=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.code, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
     return MongoDBUserService(db_manager)
 
 
@@ -36,7 +36,7 @@ async def send_code(request:Request,data: SendCodeRequest):
             "message": "验证码发送成功",
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=ErrorCodeEnum.EMAIL_SEND_ERROR.message)
+        raise HTTPException(status_code=ErrorCodeEnum.EMAIL_SEND_ERROR.code, detail=ErrorCodeEnum.EMAIL_SEND_ERROR.message)
 
 
 @router.post("/register",
@@ -63,10 +63,10 @@ async def register(request:Request,data: VerifyCodeRequest):
     user = await user_service.get_user_by_email(data.email)
     
     if user:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_ALREADY_EXISTS.code, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
     
     if code_str != data.code:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
     # 创建新用户
     user_data = {
@@ -107,14 +107,14 @@ async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
     user = await user_service.get_user_by_email(data.email)
     
     if not user:
-        raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
     code = redis_client.get_code(data.email)
     
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
 
     if code_str != data.code:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
     access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
@@ -142,11 +142,11 @@ async def login(request:Request,data: LoginRequest):
     # 获取包含密码的用户数据用于验证
     user_with_password = await user_service.get_user_by_email_with_password(data.email)
     if not user_with_password:
-        raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
     # 验证密码（密码现在是字符串，需要转换回bytes进行验证）
     if not bcrypt.checkpw(data.password.encode('utf-8'), user_with_password['password'].encode('utf-8')):
-        raise HTTPException(status_code=401, detail=ErrorCodeEnum.USER_PASSWORD_INCORRECT.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_PASSWORD_INCORRECT.code, detail=ErrorCodeEnum.USER_PASSWORD_INCORRECT.message)
     
     # 获取不含密码的用户数据用于JWT和返回
     user = await user_service.get_user_by_email(data.email)
@@ -179,27 +179,27 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     user_data = await user_service.get_user_by_email(data.email)
     
     if not user_data:
-        raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
     code = redis_service.get_code(data.email)
     
     if code is None:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
     
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
     
     if code_str != data.code:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
     new_password = bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
     
     if new_password == user_data['password']:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_PASSWORD_SAME.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_PASSWORD_SAME.code, detail=ErrorCodeEnum.USER_PASSWORD_SAME.message)
     
     result = await user_service.updata_user_password_by_email(data.email,new_password)
     
     if result.modified_count == 0:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.code, detail=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.message)
     
     return{
         "message": "success",
