@@ -23,16 +23,16 @@ class MongoDBUserService:
         创建用户
         """
         try:
-            #获取现在时间
-            current_time = datetime.now(timezone.utc)
+            #获取现在时间并转换为字符串格式
+            current_time = datetime.now(timezone.utc).isoformat()
 
             #这两个字段，如果data中没有，也会自动增加
-            user_data.setdefault('created_at',current_time)    #创建用户的时间
+            user_data.setdefault('created_at', current_time)    #创建用户的时间，存储为字符串
 
             #异步插入数据到 MongoDB 集合的操作，将user_data异步insert_one（mongo标准插入方法）插入到集合中
             result = await self.collection.insert_one(user_data)
 
-            return user_data
+            return str(result.inserted_id)
         except Exception as e:
             raise Exception("创建用户失败")
 
@@ -43,7 +43,8 @@ class MongoDBUserService:
         """
         try:
             user = await self.collection.find_one(
-                {"_id":ObjectId(user_id)}       #使用user_id查询用户信息,将user_id转换为ObjectId类型
+                {"_id":ObjectId(user_id)},
+                {"_id": 0, "password": 0}  # 排除_id和password字段（合并为一个字典）
             )
             return user
         except Exception as e:
@@ -70,7 +71,23 @@ class MongoDBUserService:
         根据用户邮箱获取用户信息
         """
         try:
-            user = await self.collection.find_one({"email":email})
+            user = await self.collection.find_one(
+                {"email":email},
+                {"_id": 0, "password": 0}, # 排除_id和password字段，确保安全
+            )
+            return user
+        except Exception as e:
+            raise Exception("根据邮箱获取用户信息失败")
+    
+    async def get_user_by_email_with_password(self, email: str) -> Optional[Dict[str, Any]]:
+        """
+        根据用户邮箱获取用户信息（包含密码，用于密码验证）
+        """
+        try:
+            user = await self.collection.find_one(
+                {"email": email},
+                {"_id": 0}  # 只排除_id，保留password用于验证
+            )
             return user
         except Exception as e:
             raise Exception("根据邮箱获取用户信息失败")

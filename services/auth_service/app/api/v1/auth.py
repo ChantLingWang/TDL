@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from services.auth_service.app.models.auth_model import RegisterRequest,LoginRequest,SendCodeRequest,VerifyCodeRequest
+from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
 from services.auth_service.app.services.email_service import EmailService
@@ -38,12 +38,12 @@ async def send_code(request:Request,data: SendCodeRequest):
         raise HTTPException(status_code=500, detail=ErrorCodeEnum.EMAIL_SEND_ERROR.message)
 
 
-@router.post("/verify_code_register",
+@router.post("/register",
     summary="验证注册验证码",
     description="验证注册验证码接口，验证注册验证码",
     response_description="返回用户字段和token"
 )
-async def verify_code_register(request:Request,data: VerifyCodeRequest):
+async def register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
     
     redis_client = RedisUserService()
@@ -52,12 +52,18 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     
     code = redis_client.get_code(data.email)#redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
     
+    # 检查验证码是否存在
+    if code is None:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+    
     # 将bytes类型转换为字符串进行比较
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
     
-    if code is None:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
-
+    user = await user_service.get_user_by_email(data.email)
+    
+    if user:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
+    
     if code_str != data.code:
         raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
@@ -65,9 +71,11 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     user_data = {
         "username": data.username,
         "email": data.email,
-        "password": data.password
+        "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')  # 转换为字符串
     }
-    user = await user_service.create_user(user_data)
+    user_id = await user_service.create_user(user_data)
+    
+    user = await user_service.get_user_by_id(user_id)
     
     #生成token
     access_token = JWTUtils.create_access_token(user)
@@ -88,7 +96,7 @@ async def verify_code_register(request:Request,data: VerifyCodeRequest):
     description="验证登录验证码接口，验证登录验证码",
     response_description="返回用户字段和token"
 )
-async def verify_code_login(request:Request,data: VerifyCodeRequest):
+async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
     """验证登录验证码接口"""
     
     redis_client = RedisUserService()
@@ -103,10 +111,7 @@ async def verify_code_login(request:Request,data: VerifyCodeRequest):
     code = redis_client.get_code(data.email)
     
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
-    
-    if code is None:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
-    
+
     if code_str != data.code:
         raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
@@ -121,44 +126,6 @@ async def verify_code_login(request:Request,data: VerifyCodeRequest):
             "refresh_token": refresh_token
         }
     }
-    
-    
-@router.post("/register",
-    summary="用户注册",
-    description="用户注册接口，创建新用户账户",
-    response_description="返回用户字段和token"
-)
-async def register(request:Request,data: RegisterRequest):
-    """用户注册接口"""
-    
-    user_service = await get_user_service()
-        
-    # 检查用户是否已存在
-    existing_user = await user_service.get_user_by_email(data.email)
-    if existing_user:
-        raise HTTPException(status_code=409, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
-        
-    # 创建新用户
-    user_data = {
-        "username": data.username,
-        "email": data.email,
-        "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt())
-    }
-    user = await user_service.create_user(user_data)
-    
-    #生成token
-    access_token = JWTUtils.create_access_token(user)
-    refresh_token = JWTUtils.create_refresh_token(user)
-    
-    return {
-        "message": "success",
-        "data": {
-            "user": user,
-            "created_at": user.get("created_at"),
-            "access_token": access_token,
-            "refresh_token": refresh_token
-            }
-        }
 
 
 @router.post("/login",
@@ -171,23 +138,26 @@ async def login(request:Request,data: LoginRequest):
     
     user_service = await get_user_service()
     
-    # 检查用户是否存在
-    user = await user_service.get_user_by_email(data.email)
-    if not user:
+    # 获取包含密码的用户数据用于验证
+    user_with_password = await user_service.get_user_by_email_with_password(data.email)
+    if not user_with_password:
         raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
-    # 验证密码
-    if not bcrypt.checkpw(data.password.encode('utf-8'),user['password']):
+    # 验证密码（密码现在是字符串，需要转换回bytes进行验证）
+    if not bcrypt.checkpw(data.password.encode('utf-8'), user_with_password['password'].encode('utf-8')):
         raise HTTPException(status_code=401, detail=ErrorCodeEnum.USER_PASSWORD_INCORRECT.message)
+    
+    # 获取不含密码的用户数据用于JWT和返回
+    user = await user_service.get_user_by_email(data.email)
     
     # 生成token
     access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
+    
     return {
         "message": "success",
         "data": {
             "user": user,
-            "created_at": user.get("created_at"),
             "access_token": access_token,
             "refresh_token": refresh_token
         }
