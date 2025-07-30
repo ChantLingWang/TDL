@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
-from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest
+from services.auth_service.app.database import redis_service
+from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
 from services.auth_service.app.services.email_service import EmailService
@@ -163,3 +164,46 @@ async def login(request:Request,data: LoginRequest):
         }
     }
         
+
+@router.post("/reset_password",
+    summary="重置密码",
+    description="重置密码接口，重置密码",
+    response_description="返回重置结果"
+)
+async def reset_password(request:Request,data: ResetPasswordRequest):
+    """重置密码接口"""
+    
+    redis_service = RedisUserService()
+    user_service = await get_user_service()
+    
+    user_data = await user_service.get_user_by_email(data.email)
+    
+    if not user_data:
+        raise HTTPException(status_code=404, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+    
+    code = redis_service.get_code(data.email)
+    
+    if code is None:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+    
+    code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
+    
+    if code_str != data.code:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+    
+    new_password = bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
+    
+    if new_password == user_data['password']:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_PASSWORD_SAME.message)
+    
+    result = await user_service.updata_user_password_by_email(data.email,new_password)
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.message)
+    
+    return{
+        "message": "success",
+        "data": {
+            "user": user_data,
+        }
+    }
