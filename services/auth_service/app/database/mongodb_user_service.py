@@ -91,4 +91,18 @@ class MongoDBUserService:
             return user
         except Exception as e:
             raise Exception("根据邮箱获取用户信息失败")
+    
+    
+    async def updata_user_password_by_email(self,email:str,password:str) -> UpdateResult:
+        """
+        根据用户邮箱更新用户密码
+        """
+        try:
+            result = await self.collection.update_one(
+                {"email":email},   #查询条件
+                {"$set":{"password":password}}         #更新数据
+            )   
+            return result
+        except Exception as e:
+            raise Exception("更新用户密码失败")
         

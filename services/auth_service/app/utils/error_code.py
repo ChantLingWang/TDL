@@ -29,3 +29,8 @@ class ErrorCodeEnum:
     #邮箱相关错误码
     EMAIL_SEND_ERROR = ErrorCode(30001,"邮件发送失败,请稍后重试")
     
+    #重置密码相关错误码
+    USER_PASSWORD_SAME = ErrorCode(40001,"新密码与旧密码相同")
+    USER_PASSWORD_RESET_FAILED = ErrorCode(40002,"密码重置失败")
+    
+    
