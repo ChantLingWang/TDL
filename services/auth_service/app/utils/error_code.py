@@ -17,7 +17,7 @@ class ErrorCode():
 
 class ErrorCodeEnum:
     #用户登录注册相关错误码
-    USER_NOT_FOUND = ErrorCode(10001,"用户不存在")
+    USER_NOT_FOUND = ErrorCode(10001,"邮箱错误")
     USER_ALREADY_EXISTS = ErrorCode(10002,"用户已存在")
     USER_PASSWORD_INCORRECT = ErrorCode(10003,"密码错误")
     USER_VERIFICATION_CODE_INCORRECT = ErrorCode(10004,"验证码错误")
