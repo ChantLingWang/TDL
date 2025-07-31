@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     
+    #grpc配置
+    grpc_host: str = "0.0.0.0"
+    grpc_port: int = 50051
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

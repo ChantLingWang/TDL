@@ -10,3 +10,8 @@ python-dotenv==1.0.0
 python-consul==1.1.0
 email-validator==2.1.0 
 redis==6.2.0
+
+# gRPC dependencies
+grpcio==1.74.0
+grpcio-tools==1.74.0
+protobuf==6.31.1
