@@ -163,7 +163,7 @@ async def login(request:Request,data: LoginRequest):
             "refresh_token": refresh_token
         }
     }
-        
+
 
 @router.post("/reset_password",
     summary="重置密码",
@@ -191,10 +191,10 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     if code_str != data.code:
         raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
-    new_password = bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
-    
-    if new_password == user_data['password']:
+    if bcrypt.checkpw(data.password.encode('utf-8'), user_data['password'].encode('utf-8')):
         raise HTTPException(status_code=ErrorCodeEnum.USER_PASSWORD_SAME.code, detail=ErrorCodeEnum.USER_PASSWORD_SAME.message)
+    
+    new_password = bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
     
     result = await user_service.updata_user_password_by_email(data.email,new_password)
     
@@ -204,6 +204,6 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     return{
         "message": "success",
         "data": {
-            "user": user_data,
+            "user": result,
         }
     }
