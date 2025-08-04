@@ -2,6 +2,7 @@ import asyncio
 import ssl
 from typing import Optional
 from datetime import datetime
+from app.core.config_test import Settings
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging
@@ -16,8 +17,8 @@ class MongoDBServiceManager:
     """数据库连接管理类"""
     def __init__(
         self,
-        connection_string:str="mongodb://localhost:27017",    #这里的链接应该为变量，在生产端时，要使用生产端数据库链接
-        database_name:str="TDL_local_test_database",          #初始化阶段，也就是构造函数，声明变量，明确初始化默认值和该属性类型
+        connection_string:str = Settings.mongodb_url,    #这里的链接应该为变量，在生产端时，要使用生产端数据库链接
+        database_name:str = Settings.database_name,          #初始化阶段，也就是构造函数，声明变量，明确初始化默认值和该属性类型
         
         #下面是连接池配置参数
         max_pool_size: int=10,

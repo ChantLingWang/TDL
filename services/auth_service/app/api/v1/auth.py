@@ -207,3 +207,13 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
             "user": result,
         }
     }
+    
+
+    @router.post("/refresh_token",
+    summary="刷新token",
+    description="刷新token接口，刷新token",
+    response_description="返回刷新后的token"
+    )
+    async def refresh_token(request:Request,data: RefreshTokenRequest):
+        """刷新token接口"""
+        user_service = await get_user_service()
