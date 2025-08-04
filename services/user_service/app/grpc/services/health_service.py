@@ -21,6 +21,17 @@ class HealthService(health_pb2_grpc.HealthServicer):
         self._status = {}  # 存储各个服务的健康状态
         logger.info("HealthService initialized")
     
+    
+    def refresh_status(self, service, status):
+        """刷新服务健康状态
+        
+        Args:
+            service: 服务名称
+            status: 健康状态值
+        """
+        self._status[service] = status
+        logger.info(f"Service {service} status updated to {status}")
+    
     def Check(self, request, context):
         """实现Check方法 - 单次健康检查
         
@@ -34,27 +45,14 @@ class HealthService(health_pb2_grpc.HealthServicer):
         service = request.service
         logger.info(f"Health check requested for service: {service}")
         
-        # 检查指定的服务
-        if not service:
-            # 如果service为空，检查整体服务状态
-            response = health_pb2.HealthCheckResponse()
-            response.status = health_pb2.HealthCheckResponse.SERVING
-            logger.info("Overall service health check: SERVING")
-            return response
+        # 使用get_service_status获取真实状态
+        status = self.get_service_status(service)
         
-        # 检查特定服务
-        if service in self._status:
-            response = health_pb2.HealthCheckResponse()
-            response.status = self._status[service]
-            logger.info(f"Service {service} status: {response.status}")
-            return response
-        else:
-            # 默认认为服务正常
-            response = health_pb2.HealthCheckResponse()
-            response.status = health_pb2.HealthCheckResponse.SERVING
-            logger.info(f"Service {service} not tracked, default to SERVING")
-            return response
-    
+        response = health_pb2.HealthCheckResponse()
+        response.status = status
+        logger.info(f"Service {service} status: {response.status}")
+        return response
+        
     def Watch(self, request, context):
         """实现Watch方法 - 流式健康检查
         
@@ -63,34 +61,23 @@ class HealthService(health_pb2_grpc.HealthServicer):
             context: gRPC调用上下文
             
         Yields:
-            HealthCheckResponse: 持续返回服务状态
-        """
+            HealthCheckResponse: 持续返回服务状态        """
         service = request.service
         logger.info(f"Health watch started for service: {service}")
         
-        # 简单的实现：立即返回当前状态
-        # 在实际应用中，这里可以实现状态变化的监听
+        # 获取当前状态
+        current_status = self.get_service_status(service)
+        
+        # 返回当前状态
         response = health_pb2.HealthCheckResponse()
-        
-        if not service:
-            response.status = health_pb2.HealthCheckResponse.SERVING
-        elif service in self._status:
-            response.status = self._status[service]
-        else:
-            response.status = health_pb2.HealthCheckResponse.SERVING
-        
+        response.status = current_status
         yield response
-        logger.info(f"Health watch completed for service: {service}")
-    
-    def set_service_status(self, service, status):
-        """设置指定服务的健康状态
         
-        Args:
-            service: 服务名称
-            status: 健康状态 (SERVING, NOT_SERVING, UNKNOWN)
-        """
-        self._status[service] = status
-        logger.info(f"Service {service} status set to: {status}")
+        # 在实际应用中，这里可以持续监控状态变化
+        # 例如：while not context.cancelled(): ...
+        
+        logger.info(f"Health watch completed for service: {service}")
+
     
     def get_service_status(self, service):
         """获取指定服务的健康状态
@@ -101,4 +88,26 @@ class HealthService(health_pb2_grpc.HealthServicer):
         Returns:
             int: 健康状态值
         """
-        return self._status.get(service, health_pb2.HealthCheckResponse.SERVING)
+        # 初学者版本：简单的健康检查逻辑
+        try:
+            # 1. 检查内存使用率（示例）
+            import psutil
+            memory_percent = psutil.virtual_memory().percent
+            if memory_percent > 90:
+                return health_pb2.HealthCheckResponse.NOT_SERVING
+            
+            # 2. 检查数据库连接（示例）
+            这里可以添加实际的数据库连接检查
+            if not self.check_database_connection():
+                return health_pb2.HealthCheckResponse.NOT_SERVING
+            
+            # 3. 检查特定服务状态
+            if service in self._status:
+                return self._status[service]
+            
+            # 默认认为服务正常
+            return health_pb2.HealthCheckResponse.SERVING
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return health_pb2.HealthCheckResponse.NOT_SERVING

@@ -15,3 +15,6 @@ redis==6.2.0
 grpcio==1.74.0
 grpcio-tools==1.74.0
 protobuf==6.31.1
+
+# Health check dependencies
+psutil==7.0.0
