@@ -9,3 +9,6 @@ class RedisUserService:
         
     def get_code(self, key: str):
         return self.redis_client.get_data(key)
+    
+    def delete_code(self, key: str):
+        self.redis_client.redis_client.delete(key)

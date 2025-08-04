@@ -51,13 +51,13 @@ class MongoDBUserService:
             raise Exception("获取用户信息失败")
         
         
-    async def update_user(self,user_id:str,update_data:Dict[str,Any]) -> UpdateResult:
+    async def update_user(self, email:str, update_data:Dict[str, Any]) -> UpdateResult:
         """
-        根据用户id更新用户信息
+        根据用户邮箱更新用户信息
         """
         try:
             result = await self.collection.update_one(
-                {"_id":ObjectId(user_id)},   #查询条件
+                {"email":email},   #查询条件
                 {"$set":update_data}         #更新数据
             )   
             return result

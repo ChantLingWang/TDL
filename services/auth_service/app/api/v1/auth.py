@@ -1,6 +1,6 @@
+from email import message
 from fastapi import APIRouter, HTTPException, Depends
-from services.auth_service.app.database import redis_service
-from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest
+from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
 from services.auth_service.app.services.email_service import EmailService
@@ -68,19 +68,23 @@ async def register(request:Request,data: VerifyCodeRequest):
     if code_str != data.code:
         raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     
+    #生成token
+    access_token = JWTUtils.create_access_token(user)
+    refresh_token = JWTUtils.create_refresh_token(user)
+    
     # 创建新用户
     user_data = {
         "username": data.username,
         "email": data.email,
-        "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')  # 转换为字符串
+        "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
+        "refresh_token": {
+            "refresh_token": refresh_token,
+            "is_valid": False
+        }
     }
     user_id = await user_service.create_user(user_data)
     
     user = await user_service.get_user_by_id(user_id)
-    
-    #生成token
-    access_token = JWTUtils.create_access_token(user)
-    refresh_token = JWTUtils.create_refresh_token(user)
     
     return {
         "message": "success",
@@ -104,27 +108,29 @@ async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
     
     user_service = await get_user_service()
     
-    user = await user_service.get_user_by_email(data.email)
+    user_data, code = await asyncio.gather(
+    user_service.get_user_by_email(data.email),
+    redis_client.get_code(data.email)
+    )
     
-    if not user:
+    if not user_data:
         raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
-    
-    code = redis_client.get_code(data.email)
     
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
 
     if code_str != data.code:
         raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
-    
-    access_token = JWTUtils.create_access_token(user)
-    refresh_token = JWTUtils.create_refresh_token(user)
+    else:
+        redis_client.delete_code(data.email)
+
+    access_token = JWTUtils.create_access_token(user_data)
     
     return{
         "message": "success",
         "data": {
-            "user": user,
+            "user": user_data,
             "access_token": access_token,
-            "refresh_token": refresh_token
+            "refresh_token": refresh_token,
         }
     }
 
@@ -209,11 +215,48 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     }
     
 
-    @router.post("/refresh_token",
-    summary="刷新token",
-    description="刷新token接口，刷新token",
-    response_description="返回刷新后的token"
-    )
-    async def refresh_token(request:Request,data: RefreshTokenRequest):
-        """刷新token接口"""
-        user_service = await get_user_service()
+@router.post("/refresh_token",
+summary="刷新token",
+description="刷新token接口，刷新token",
+response_description="返回刷新后的token"
+)
+async def refresh_token(request:Request,data: RefreshTokenRequest):
+    """刷新token接口"""
+    user_service = await get_user_service()
+    
+    user_data = await user_service.get_user_by_email(data.email)
+    
+    user_refresh_token = user_data['refresh_token']
+    
+    if user_refresh_token != data.refresh_token:
+        raise HTTPException(status_code=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.code, detail=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.message)
+    
+    #刷新token
+    new_access_token = JWTUtils.create_access_token(user_data)
+    
+    return{
+        "message": "success",
+        "data": {
+            "access_token": new_access_token,
+        }
+    }
+
+
+@router.post("/logout",
+summary="退出登录",
+description="退出登录接口，退出登录",
+response_description="返回退出登录结果"
+)
+async def logout(request:Request,data: LogoutRequest):
+    """退出登录接口"""
+    user_service = await get_user_service()
+    
+    await user_service.update_user(data.email,
+    {"refresh_token":{
+        "is_valid":False,
+        }
+    })
+    
+    return{
+        "message": "success",
+    }
