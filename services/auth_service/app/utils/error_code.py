@@ -33,4 +33,6 @@ class ErrorCodeEnum:
     USER_PASSWORD_SAME = ErrorCode(40001,"新密码与旧密码相同")
     USER_PASSWORD_RESET_FAILED = ErrorCode(40002,"密码重置失败")
     
+    #刷新token相关错误码
+    USER_REFRESH_TOKEN_INCORRECT = ErrorCode(50001,"刷新token错误")
     

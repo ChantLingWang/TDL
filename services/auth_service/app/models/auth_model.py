@@ -1,3 +1,4 @@
+import email
 from pydantic import BaseModel,Field,EmailStr
 
 class LoginRequest(BaseModel):
@@ -21,3 +22,11 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="用户邮箱")
     code: str = Field(..., min_length=6, max_length=6,description="验证码")
     password: str = Field(..., description="用户密码")
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., description="刷新token")
+    email: EmailStr = Field(..., description="用户邮箱")
+
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(..., description="刷新token")
+    email: EmailStr = Field(..., description="用户邮箱")
