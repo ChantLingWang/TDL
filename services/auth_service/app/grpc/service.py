@@ -3,9 +3,9 @@ from concurrent import futures      #提供线程池执行器，用于并发处�
 import logging
 import os
 import sys
-from app.grpc.services.health_service import HealthService
-from app.grpc.health import health_pb2_grpc
-from app.core.config_test import settings
+from services.auth_service.app.grpc.services.health_service import HealthService
+from services.auth_service.app.grpc.health import health_pb2_grpc
+from services.auth_service.app.core.config_test import settings
 
 
 logging.basicConfig(
@@ -23,10 +23,6 @@ class GRPCServer:
     def __init__(self, host=None, port=None):
         """
         初始化gRPC服务器
-        
-        Args:
-            host: 监听主机，默认0.0.0.0
-            port: 监听端口，默认50051
         """
         self.host = host or settings.grpc_host
         self.port = port or settings.grpc_port
