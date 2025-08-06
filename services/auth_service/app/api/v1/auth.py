@@ -1,3 +1,4 @@
+import asyncio
 from email import message
 from fastapi import APIRouter, HTTPException, Depends
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
@@ -51,11 +52,11 @@ async def register(request:Request,data: VerifyCodeRequest):
     
     user_service = await get_user_service()
     
-    code = redis_client.get_code(data.email)#redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
+    code = redis_client.get_code(data.email)    #redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
     
     # 检查验证码是否存在
     if code is None:
-        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
     
     # 将bytes类型转换为字符串进行比较
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
@@ -74,13 +75,14 @@ async def register(request:Request,data: VerifyCodeRequest):
     
     # 创建新用户
     user_data = {
+        "id": str(uuid.uuid4()),
         "username": data.username,
         "email": data.email,
         "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
         "refresh_token": {
             "refresh_token": refresh_token,
             "is_valid": False
-        }
+        },
     }
     user_id = await user_service.create_user(user_data)
     
@@ -252,7 +254,8 @@ async def logout(request:Request,data: LogoutRequest):
     user_service = await get_user_service()
     
     await user_service.update_user(data.email,
-    {"refresh_token":{
+    {
+        "refresh_token":{
         "is_valid":False,
         }
     })

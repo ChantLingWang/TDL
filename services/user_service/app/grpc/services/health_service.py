@@ -1,9 +1,8 @@
 import logging
 from concurrent import futures
+from services.user_service.app.database.mongodb_service import db_manager
 import grpc
 from grpc import StatusCode
-
-# 导入生成的protobuf类和grpc类
 from app.grpc.health import health_pb2
 from app.grpc.health import health_pb2_grpc
 
@@ -61,7 +60,8 @@ class HealthService(health_pb2_grpc.HealthServicer):
             context: gRPC调用上下文
             
         Yields:
-            HealthCheckResponse: 持续返回服务状态        """
+            HealthCheckResponse: 持续返回服务状态        
+        """
         service = request.service
         logger.info(f"Health watch started for service: {service}")
         
@@ -80,34 +80,30 @@ class HealthService(health_pb2_grpc.HealthServicer):
 
     
     def get_service_status(self, service):
-        """获取指定服务的健康状态
-        
-        Args:
-            service: 服务名称
-            
-        Returns:
-            int: 健康状态值
-        """
-        # 初学者版本：简单的健康检查逻辑
+        """获取指定服务的健康状态"""
         try:
-            # 1. 检查内存使用率（示例）
-            import psutil
-            memory_percent = psutil.virtual_memory().percent
-            if memory_percent > 90:
+            # 检查数据库连接
+            database_status = self.check_database_connection()
+            if database_status:
                 return health_pb2.HealthCheckResponse.NOT_SERVING
             
-            # 2. 检查数据库连接（示例）
-            这里可以添加实际的数据库连接检查
-            if not self.check_database_connection():
-                return health_pb2.HealthCheckResponse.NOT_SERVING
-            
-            # 3. 检查特定服务状态
+            # 检查特定服务状态
             if service in self._status:
-                return self._status[service]
-            
-            # 默认认为服务正常
-            return health_pb2.HealthCheckResponse.SERVING
+                return health_pb2.HealthCheckResponse.SERVING
             
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return health_pb2.HealthCheckResponse.NOT_SERVING
+    
+    def check_database_connection(self) -> bool:
+        """检查数据库连接"""
+        database_client = db_manager
+        if database_client.test_connection():
+            return True
+        return False
+
+    
+    def check_service_status(self, service) -> bool:
+        """检查特定服务状态"""
+        
+        return True
