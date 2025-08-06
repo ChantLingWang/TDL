@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional,Dict,List,Any
+from typing import Optional,Dict,Any
 from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识
 import bcrypt                                               # 密码哈希库，用于安全存储密码
 from services.auth_service.app.database.mongodb_service import MongoDBServiceManager,db_manager
@@ -26,7 +26,7 @@ class MongoDBUserService:
             #获取现在时间并转换为字符串格式
             current_time = datetime.now(timezone.utc).isoformat()
 
-            #这两个字段，如果data中没有，也会自动增加
+            #这个字段，如果data中没有，也会自动增加
             user_data.setdefault('created_at', current_time)    #创建用户的时间，存储为字符串
 
             #异步插入数据到 MongoDB 集合的操作，将user_data异步insert_one（mongo标准插入方法）插入到集合中
@@ -37,14 +37,20 @@ class MongoDBUserService:
             raise Exception("创建用户失败")
 
 
-    async def get_user_by_id(self,user_id:str) -> Optional[Dict[str,Any]]:  #返回类型是字典，用户信息，也可以是None
+    async def get_user_by_id(self,user_id:str, fields: Optional[Dict[str, int]] = None) -> Optional[Dict[str,Any]]:
         """
         根据用户id获取用户信息
+        
+        Args:
+            user_id: 用户ID
+            fields: 字段投影配置，例如：{"_id": 0, "password": 0, "email": 1}
+                   不传则使用默认配置（排除_id和password）
         """
         try:
+            projection = fields or {"_id": 0, "password": 0}
             user = await self.collection.find_one(
                 {"_id":ObjectId(user_id)},
-                {"_id": 0, "password": 0}  # 排除_id和password字段（合并为一个字典）
+                projection
             )
             return user
         except Exception as e:
@@ -57,23 +63,43 @@ class MongoDBUserService:
         """
         try:
             result = await self.collection.update_one(
-                {"email":email},   #查询条件
+                {"email":email},             #查询条件
                 {"$set":update_data}         #更新数据
             )   
             return result
         except Exception as e:
             raise Exception("更新用户信息失败")
+    
+    
+    async def check_uid(self,user_id:str) -> bool:
+        """
+        检查用户id是否存在
+        """
+        try:
+            user_id_status = await self.collection.find_one(
+                {"user_id":str(user_id)},
+                {"user_id": 1},
+            )
+            return user_id_status is not None
+        except Exception as e:
+            raise Exception("检查用户id失败")
         
         
     #扩展方法
-    async def get_user_by_email(self,email:str) -> Optional[Dict[str,Any]]:
+    async def get_user_by_email(self,email:str, fields: Optional[Dict[str, int]] = None) -> Optional[Dict[str,Any]]:
         """
         根据用户邮箱获取用户信息
+        
+        Args:
+            email: 用户邮箱
+            fields: 字段投影配置，例如：{"_id": 0, "password": 0, "email": 1}
+                   不传则使用默认配置（排除_id和password）
         """
         try:
+            projection = fields or {"_id": 0, "password": 0}
             user = await self.collection.find_one(
                 {"email":email},
-                {"_id": 0, "password": 0}, # 排除_id和password字段，确保安全
+                projection
             )
             return user
         except Exception as e:

@@ -71,8 +71,6 @@ class GRPCServer:
             #日志消息
             logger.info("✅ gRPC服务器启动成功！")
             logger.info(f"🌐 监听地址: {self.host}:{self.port}")
-            logger.info("📋 已注册服务:")
-            logger.info("  - health.Health (健康检查)")
             return True
         except Exception as e:
             logger.error(f"❌ 启动gRPC服务器失败: {e}")
