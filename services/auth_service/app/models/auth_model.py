@@ -19,6 +19,7 @@ class VerifyCodeLoginRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6,description="验证码")
 
 class ResetPasswordRequest(BaseModel):
+    user_id: str = Field(..., description="用户id")
     email: EmailStr = Field(..., description="用户邮箱")
     code: str = Field(..., min_length=6, max_length=6,description="验证码")
     password: str = Field(..., description="用户密码")
