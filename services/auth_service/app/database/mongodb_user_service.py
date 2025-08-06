@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
 from typing import Optional,Dict,Any
-from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识
-import bcrypt                                               # 密码哈希库，用于安全存储密码
-from services.auth_service.app.database.mongodb_service import MongoDBServiceManager,db_manager
+from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识                                          # 密码哈希库，用于安全存储密码
 from pymongo.results import UpdateResult
+from app.database.mongodb_service import db_manager
 
 
 class MongoDBUserService:
     """用户集合操作封装"""
-    def __init__(self,db_manager):
+    def __init__(
+        self,
+        db_manager = db_manager
+    ):
         """
         初始化用户集合管理器
         """
@@ -57,13 +59,13 @@ class MongoDBUserService:
             raise Exception("获取用户信息失败")
         
         
-    async def update_user(self, email:str, update_data:Dict[str, Any]) -> UpdateResult:
+    async def update_user_by_id(self, user_id:str, update_data:Dict[str, Any]) -> UpdateResult:
         """
-        根据用户邮箱更新用户信息
+        根据用户id更新用户信息
         """
         try:
             result = await self.collection.update_one(
-                {"email":email},             #查询条件
+                {"user_id":user_id},         #查询条件
                 {"$set":update_data}         #更新数据
             )   
             return result
@@ -119,16 +121,40 @@ class MongoDBUserService:
             raise Exception("根据邮箱获取用户信息失败")
     
     
-    async def updata_user_password_by_email(self,email:str,password:str) -> UpdateResult:
+    async def updata_user_password_by_id(self, user_id:str, password:str) -> UpdateResult:
         """
-        根据用户邮箱更新用户密码
+        根据用户id更新用户密码
         """
         try:
             result = await self.collection.update_one(
-                {"email":email},   #查询条件
+                {"user_id":user_id},   #查询条件
                 {"$set":{"password":password}}         #更新数据
             )   
             return result
         except Exception as e:
             raise Exception("更新用户密码失败")
         
+    async def get_next_value(self,sequence_name: str) -> int:
+        """
+        获取下一个序列值
+        """
+        try:
+            result = await self.collection.find_one_and_update(
+                {"_id": sequence_name},
+                {"$inc": {"sequence_value": 1}},
+                {"_id": 0, "sequence_value": 1},
+                upsert=True
+            )
+            return result["sequence_value"]
+        except Exception as e:
+            raise Exception("获取下一个序列值失败")
+    
+    
+    async def get_next_user_id(self) -> int:
+        """
+        获取下一个用户id（纯数字，从1开始递增）
+        """
+        try:
+            return await self.get_next_value("user_id_sequence")
+        except Exception as e:
+            raise Exception("获取下一个用户id失败")
