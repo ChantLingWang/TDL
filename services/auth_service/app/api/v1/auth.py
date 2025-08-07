@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
+from services.auth_service.app.database.mongodb_user_token_service import MongoDBUserTokenService
 from services.auth_service.app.services.email_service import EmailService
 from services.auth_service.app.services.jwt_service import JWTUtils
 from services.auth_service.app.utils.error_code import ErrorCodeEnum
@@ -47,66 +48,69 @@ async def send_code(request:Request,data: SendCodeRequest):
 )
 async def register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
-    
-    redis_client = RedisUserService()
-    
-    user_service = await get_user_service()
-    
-    code = redis_client.get_code(data.email)    #redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
-    
-    # 检查验证码是否存在
-    if code is None:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
-    
-    # 将bytes类型转换为字符串进行比较
-    code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
-    
-    user = await user_service.get_user_by_email(data.email)
-    
-    if user:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_ALREADY_EXISTS.code, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
-    
-    if code_str != data.code:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
-    
-    #生成token
-    access_token = JWTUtils.create_access_token(user)
-    refresh_token = JWTUtils.create_refresh_token(user)
-    
-    # 创建新用户
-    user_id = await user_service.get_next_user_id()
-    user_data = {
-        "user_id": user_id,
-        "username": data.username,
-        "email": data.email,
-        "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
-        "refresh_token": {
-            "refresh_token": refresh_token,
-            "is_valid": False
-        },
-    }
-    await user_service.create_user(user_data)
-    
-    # 从数据库中获取完整的用户数据
-    user = await user_service.get_user_by_id(user_id,
-        {
-            "_id": 0,
-            "user_id": 1, 
-            "username": 1, 
-            "email": 1, 
-            "access_token": 1,
-            "refresh_token": 1,
-            "create_time": 1,
-            "password": 0
+    try:
+        redis_client = RedisUserService()
+        
+        user_service = await get_user_service()
+        
+        code = redis_client.get_code(data.email)    #redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
+        
+        # 检查验证码是否存在
+        if code is None:
+            raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+        
+        # 将bytes类型转换为字符串进行比较
+        code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
+        
+        redis_client.delete_code(data.email)
+        
+        user = await user_service.get_user_by_email(data.email)
+        
+        if user:
+            raise HTTPException(status_code=ErrorCodeEnum.USER_ALREADY_EXISTS.code, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
+        
+        if code_str != data.code:
+            raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        
+        # 创建新用户
+        user_id = await user_service.get_next_user_id()
+        user_data = {
+            "user_id": user_id,
+            "username": data.username,
+            "email": data.email,
+            "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
         }
-    )
-    
-    return {
-        "message": "success",
-        "data": {
-            "user": user,
+        await user_service.create_user(user_data)
+        
+        # 从数据库中获取完整的用户数据
+        user = await user_service.get_user_by_id(user_id,
+            {
+                "_id": 0,
+                "user_id": 1, 
+                "username": 1, 
+                "email": 1, 
+                "create_time": 1,
+                "password": 0
+            }
+        )
+        
+        #生成token
+        access_token = JWTUtils.create_access_token(user)
+        refresh_token = await MongoDBUserTokenService.create_user_token(user)
+        
+        return {
+            "message": "success",
+            "data": {
+                "user": user,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+            }
         }
-    }
+        #事务补偿，当用户创建但token创建失败时，或者其他操作失败时，需要回滚用户创建操作
+    except Exception as e:
+        if user_id:
+            await user_service.delete_user_by_id(user_id)
+        raise HTTPException(status_code=ErrorCodeEnum.USER_REGISTER_ERROR.code, detail=ErrorCodeEnum.USER_REGISTER_ERROR.message)
 
 
 @router.post("/verify_code_login",
