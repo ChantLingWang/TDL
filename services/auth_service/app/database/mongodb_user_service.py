@@ -19,7 +19,7 @@ class MongoDBUserService:
         self.collection = self.db_manager.get_collection(self.connection_name)
         
         
-    #三个基础方法：创建用户，根据用户id获取用户信息，根据用户id更新用户信息
+    #基础方法：创建用户，根据用户id获取用户信息，根据用户id更新用户信息，根据用户id删除用户
     async def create_user(self,user_data: Dict[str,Any]) -> str:
         """
         创建用户
@@ -85,6 +85,19 @@ class MongoDBUserService:
             return user_id_status is not None
         except Exception as e:
             raise Exception("检查用户id失败")
+            
+    
+    async def delete_user_by_id(self, user_id:str) -> UpdateResult:
+        """
+        根据用户id删除用户信息
+        """
+        try:
+            result = await self.collection.delete_one(
+                {"user_id":user_id},         #查询条件
+            )   
+            return result
+        except Exception as e:
+            raise Exception("删除用户信息失败")
         
         
     #扩展方法
@@ -136,7 +149,7 @@ class MongoDBUserService:
         
     async def get_next_value(self,sequence_name: str) -> int:
         """
-        获取下一个序列值
+        获取自增序列值
         """
         try:
             result = await self.collection.find_one_and_update(
@@ -147,7 +160,7 @@ class MongoDBUserService:
             )
             return result["sequence_value"]
         except Exception as e:
-            raise Exception("获取下一个序列值失败")
+            raise Exception("获取自增序列值失败")
     
     
     async def get_next_user_id(self) -> int:
@@ -158,3 +171,4 @@ class MongoDBUserService:
             return await self.get_next_value("user_id_sequence")
         except Exception as e:
             raise Exception("获取下一个用户id失败")
+            

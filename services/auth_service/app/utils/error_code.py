@@ -23,6 +23,7 @@ class ErrorCodeEnum:
     USER_VERIFICATION_CODE_INCORRECT = ErrorCode(10004,"验证码错误")
     USER_VERIFICATION_CODE_EXPIRED = ErrorCode(10005,"验证码已过期或不存在")
     USER_ID_INCORRECT = ErrorCode(10006,"用户id错误")
+    USER_REGISTER_ERROR = ErrorCode(10007,"用户注册失败")
     
     #数据库相关错误码
     DATABASE_CONNECTION_ERROR = ErrorCode(20001,"数据库连接失败")
