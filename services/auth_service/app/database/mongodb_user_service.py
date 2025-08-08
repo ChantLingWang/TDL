@@ -134,7 +134,7 @@ class MongoDBUserService:
             raise Exception("根据邮箱获取用户信息失败")
     
     
-    async def updata_user_password_by_id(self, user_id:str, password:str) -> UpdateResult:
+    async def update_user_password_by_id(self, user_id:str, password:str) -> UpdateResult:
         """
         根据用户id更新用户密码
         """
