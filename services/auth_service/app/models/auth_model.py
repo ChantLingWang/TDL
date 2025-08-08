@@ -25,9 +25,10 @@ class ResetPasswordRequest(BaseModel):
     password: str = Field(..., description="用户密码")
 
 class RefreshTokenRequest(BaseModel):
+    user_id: str = Field(..., description="用户id")
     refresh_token: str = Field(..., description="刷新token")
     email: EmailStr = Field(..., description="用户邮箱")
 
 class LogoutRequest(BaseModel):
+    user_id: str = Field(..., description="用户id")
     refresh_token: str = Field(..., description="刷新token")
-    email: EmailStr = Field(..., description="用户邮箱")

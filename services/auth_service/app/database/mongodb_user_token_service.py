@@ -66,3 +66,31 @@ class MongoDBUserTokenService:
         except Exception as e:
             raise Exception("更新用户refresh_token失败")
     
+    
+    async def get_user_token_by_user_id(self,user_id: str,projection: Dict[str, int] = None) -> Optional[Dict[str,Any]]:
+        """
+        获取用户token
+        """
+        try:
+            user_token_data = await self.collection.find_one(
+                {"user_id":user_id},   #查询条件
+                projection,   #投影操作
+            )
+            return user_token_data
+        except Exception as e: 
+            raise Exception("获取用户token失败")
+    
+    
+    async def update_user_token_is_valid(self, user_id: str, is_valid: bool) -> UpdateResult:
+        """
+        更新用户token是否有效
+        """
+        try:
+            result = await self.collection.update_one(
+                {"user_id":user_id},   #查询条件
+                {"$set":{"is_valid":is_valid}},   #更新操作
+            )
+            return result
+        except Exception as e:
+            raise Exception("更新用户token是否有效失败")
+    
