@@ -177,6 +177,7 @@ async def login(request:Request,data: LoginRequest):
     # 生成token
     access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
+
     
     return {
         "message": "success",
@@ -239,7 +240,7 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     new_password = bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
     
     #更新数据库中的密码
-    result = await user_service.update_user_password_by_email(data.email,new_password)
+    result = await user_service.update_user_password_by_id(data.user_id,new_password)
     
     if result.modified_count == 0:
         raise HTTPException(status_code=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.code, detail=ErrorCodeEnum.USER_PASSWORD_RESET_FAILED.message)

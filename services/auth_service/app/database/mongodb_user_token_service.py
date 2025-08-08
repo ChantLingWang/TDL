@@ -52,3 +52,17 @@ class MongoDBUserTokenService:
         except Exception as e:
             raise Exception("创建用户token失败")
     
+    
+    async def update_user_refresh_token(self,user_id:str,refresh_token:str) -> UpdateResult:
+        """
+        更新用户refresh_token
+        """
+        try:
+            result = await self.collection.update_one(
+                {"user_id":user_id},   #查询条件
+                {"$set":{"refresh_token":refresh_token}},   #更新操作
+            )
+            return result
+        except Exception as e:
+            raise Exception("更新用户refresh_token失败")
+    
