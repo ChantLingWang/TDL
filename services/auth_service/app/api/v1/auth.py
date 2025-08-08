@@ -1,6 +1,7 @@
 import asyncio
 from email import message
 from fastapi import APIRouter, HTTPException, Depends
+from jwt import jwks_client
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
@@ -21,6 +22,13 @@ async def get_user_service():
     if not is_connected:
         raise HTTPException(status_code=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.code, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
     return MongoDBUserService(db_manager)
+
+async def get_user_token_service():
+    """获取用户服务实例并检查数据库连接"""
+    is_connected = await db_manager.test_connection()
+    if not is_connected:
+        raise HTTPException(status_code=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.code, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
+    return MongoDBUserTokenService(db_manager)
 
 
 @router.post("/send_code",
@@ -254,32 +262,72 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     
 
 @router.post("/refresh_token",
-summary="刷新token",
-description="刷新token接口，刷新token",
-response_description="返回刷新后的token"
+summary="刷新access_token",
+description="刷新access_token接口，刷新access_token",
+response_description="返回刷新后的access_token"
 )
 async def refresh_token(request:Request,data: RefreshTokenRequest):
-    """刷新token接口"""
+    """刷新access_token接口"""
     user_service = await get_user_service()
+    user_token_service = await get_user_token_service()
     
-    user_data = await user_service.get_user_by_email(data.email)
+    # 从token数据库中查询用户信息
+    user_token_data = await user_token_service.get_user_token_by_user_id(data.user_id,
+    {
+        "_id": 0,
+        "user_id": 1, 
+        "email": 1, 
+        "refresh_token": 1,
+        "is_valid": 1,
+    })
     
-    user_refresh_token = user_data['refresh_token']
-    
-    if user_refresh_token != data.refresh_token:
+    #检查token是否存在
+    if not user_token_data:
         raise HTTPException(status_code=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.code, detail=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.message)
     
-    #刷新token
-    new_access_token = JWTUtils.create_access_token(user_data)
+    #取出token
+    payload = JWTUtils.verify_token(data.refresh_token)
     
-    return{
+    #检查token是否有效
+    if payload.get('status') == 'error':
+        raise HTTPException(status_code=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.code, detail=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.message)
+    
+    if user_token_data.get('is_valid') == False:
+        raise HTTPException(status_code=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.code, detail=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.message)
+    
+    token_user_data = payload.get('payload')
+    
+    #检查token中的用户id是否与请求中的用户id一致
+    if token_user_data.get('user_id') != data.user_id:
+        raise HTTPException(status_code=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.code, detail=ErrorCodeEnum.USER_REFRESH_TOKEN_INCORRECT.message)
+    
+    #从用户数据库中获取用户
+    user_id_data = await user_service.get_user_by_id(data.user_id,
+    {
+        "user_id": 1, 
+    })
+    
+    #检查用户是否存在
+    if not user_id_data:
+        raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
+    
+    # 生成新的token
+    new_access_token = JWTUtils.create_access_token(user_id_data)
+    new_refresh_token = JWTUtils.create_refresh_token(user_id_data)
+    
+    # 更新用户token
+    await user_token_service.update_user_refresh_token(data.user_id, new_refresh_token)
+    
+    return {
         "message": "success",
         "data": {
-            "access_token": new_access_token,
+            "user": user_id_data,
+            "access_token": new_access_token, 
+            "refresh_token": new_refresh_token,
         }
     }
-
-
+        
+         
 @router.post("/logout",
 summary="退出登录",
 description="退出登录接口，退出登录",
@@ -287,14 +335,12 @@ response_description="返回退出登录结果"
 )
 async def logout(request:Request,data: LogoutRequest):
     """退出登录接口"""
-    user_service = await get_user_service()
+    user_token_service = await get_user_token_service()
     
-    await user_service.update_user(data.email,
+    await user_token_service.update_user_token_is_valid(data.user_id,False)
     {
-        "refresh_token":{
         "is_valid":False,
-        }
-    })
+    }
     
     return{
         "message": "success",
