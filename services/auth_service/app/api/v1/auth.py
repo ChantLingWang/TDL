@@ -2,6 +2,7 @@ import asyncio
 from email import message
 from fastapi import APIRouter, HTTPException, Depends
 from jwt import jwks_client
+from services import user_service
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
@@ -132,6 +133,7 @@ async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
     redis_client = RedisUserService()
     
     user_service = await get_user_service()
+    user_token_service = await get_user_token_service()
     
     user_data, code = await asyncio.gather(
     user_service.get_user_by_email(data.email),
@@ -149,6 +151,10 @@ async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
         redis_client.delete_code(data.email)
 
     access_token = JWTUtils.create_access_token(user_data)
+    
+    refresh_token = JWTUtils.create_refresh_token(user_data)
+    
+    await user_token_service.update_user_refresh_token(user_data['user_id'], refresh_token)
     
     return{
         "message": "success",
@@ -217,12 +223,14 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
             "password": 1
         }
     )
+    if not user_data:
+        raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
     # 检查用户id是否匹配,防止串改id或邮箱，保证安全
     if user_data['user_id'] != data.user_id:
         raise HTTPException(status_code=ErrorCodeEnum.USER_ID_INCORRECT.code, detail=ErrorCodeEnum.USER_ID_INCORRECT.message)
     
-    #检查用户是否存在于数据库中，若不在直接报错给前端
+    # 检查用户是否存在于数据库中
     if not user_data:
         raise HTTPException(status_code=ErrorCodeEnum.USER_NOT_FOUND.code, detail=ErrorCodeEnum.USER_NOT_FOUND.message)
     
@@ -239,6 +247,8 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     #检验验证码是否正确，若不正确直接报错
     if code_str != data.code:
         raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+    else:
+        redis_service.delete_code(data.email)
     
     # 检查新密码是否与旧密码相同
     if bcrypt.checkpw(data.password.encode('utf-8'), user_data['password'].encode('utf-8')):
@@ -255,11 +265,8 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     
     return{
         "message": "success",
-        "data": {
-            "user": result,
-        }
     }
-    
+
 
 @router.post("/refresh_token",
 summary="刷新access_token",
@@ -335,13 +342,24 @@ response_description="返回退出登录结果"
 )
 async def logout(request:Request,data: LogoutRequest):
     """退出登录接口"""
+    user_service = await get_user_service()
     user_token_service = await get_user_token_service()
     
-    await user_token_service.update_user_token_is_valid(data.user_id,False)
+    # 验证用户是否存在
+    user_data = await user_service.get_user_by_id(data.user_id,
     {
-        "is_valid":False,
-    }
+        "user_id": 1, 
+    })
     
-    return{
+    if not user_data:
+        # 用户不存在或被删除，直接返回成功
+        return {
+            "message": "success",
+        }
+    
+    # 撤销用户的refresh token，无论是否成功都返回成功
+    await user_token_service.update_user_token_is_valid(data.user_id, False)
+    
+    return {
         "message": "success",
     }
