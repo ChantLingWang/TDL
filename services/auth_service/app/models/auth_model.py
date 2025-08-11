@@ -15,6 +15,7 @@ class VerifyCodeRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6,description="验证码")
 
 class VerifyCodeLoginRequest(BaseModel):
+    user_id: str = Field(..., description="用户id")
     email: EmailStr = Field(..., description="用户邮箱")
     code: str = Field(..., min_length=6, max_length=6,description="验证码")
 
