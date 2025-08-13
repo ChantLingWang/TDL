@@ -23,4 +23,10 @@ class RedisClient:
             return self.redis_client.get(key)
         else:
             return None
-        
+    
+    def test_connection(self):
+        try:
+            self.redis_client.ping()
+            return True
+        except:
+            return False

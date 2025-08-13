@@ -12,3 +12,6 @@ class RedisUserService:
     
     def delete_code(self, key: str):
         self.redis_client.redis_client.delete(key)
+    
+    def test_connection(self):
+        return self.redis_client.test_connection()
