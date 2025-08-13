@@ -38,4 +38,7 @@ class ErrorCodeEnum:
     #刷新token相关错误码
     USER_REFRESH_TOKEN_INCORRECT = ErrorCode(50001,"刷新token错误")
     
+    #redis相关错误码
+    REDIS_CONNECTION_ERROR = ErrorCode(60001,"redis连接失败")
+    
     

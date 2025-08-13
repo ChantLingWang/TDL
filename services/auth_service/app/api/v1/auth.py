@@ -1,8 +1,6 @@
 import asyncio
 from email import message
 from fastapi import APIRouter, HTTPException, Depends
-from jwt import jwks_client
-from services import user_service
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
 from services.auth_service.app.database.redis_user_service import RedisUserService
@@ -25,10 +23,10 @@ async def get_user_service():
     return MongoDBUserService(db_manager)
 
 async def get_user_token_service():
-    """获取用户服务实例并检查数据库连接"""
-    is_connected = await db_manager.test_connection()
+    """获取token服务实例并检查数据库连接"""
+    is_connected = await RedisUserService.test_connection()
     if not is_connected:
-        raise HTTPException(status_code=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.code, detail=ErrorCodeEnum.DATABASE_CONNECTION_ERROR.message)
+        raise HTTPException(status_code=ErrorCodeEnum.REDIS_CONNECTION_ERROR.code, detail=ErrorCodeEnum.REDIS_CONNECTION_ERROR.message)
     return MongoDBUserTokenService(db_manager)
 
 
@@ -102,7 +100,7 @@ async def register(request:Request,data: VerifyCodeRequest):
                 "password": 0
             }
         )
-        
+
         #生成token
         access_token = JWTUtils.create_access_token(user)
         refresh_token = await MongoDBUserTokenService.create_user_token(user)
