@@ -10,6 +10,7 @@ from services.auth_service.app.api.v1.auth import router as auth_router
 from services.auth_service.app.api.v1.health import router as health_router
 from services.auth_service.app.database.mongodb_service import db_manager
 from consul import Consul, Check
+from services.auth_service.app.grpc.service import GRPCServer
 
 consul_client = Consul()
 
@@ -19,6 +20,13 @@ async def lifespan(app: FastAPI):
     # 启动时执行
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
+    
+    # 启动gRPC服务器
+    grpc_server = GRPCServer()
+    if await grpc_server.start():
+        print(f"✅ gRPC服务器启动成功，监听地址: {settings.grpc_host}:{settings.grpc_port}")
+    else:
+        print("❌ gRPC服务器启动失败")
     
     # 创建健康检查
     health_check = Check.http(f"http://host.docker.internal:{settings.port}/api/v1/health", interval="30s", timeout="5s")
@@ -39,6 +47,10 @@ async def lifespan(app: FastAPI):
     # 关闭时执行
     print(f"关闭 {settings.app_name}")
     await db_manager.close()
+    
+    # 停止gRPC服务器
+    await grpc_server.stop()
+    print("✅ gRPC服务器已关闭")
     
     # 在consul服务注册发现中心注销服务
     consul_client.agent.service.deregister(settings.service_id)
