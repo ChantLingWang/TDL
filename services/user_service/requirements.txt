@@ -1,11 +1,11 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.116.1
+uvicorn[standard]==0.30.1
 motor==3.3.2
 pymongo==4.6.0
 bcrypt==4.1.2
 PyJWT==2.8.0
-pydantic==2.5.0
-pydantic-settings==2.10.1
+pydantic==2.11.7
+pydantic-settings==2.1.0
 python-dotenv==1.0.0
 python-consul==1.1.0
 email-validator==2.1.0
@@ -18,3 +18,7 @@ protobuf==6.31.1
 
 # Health check dependencies
 psutil==7.0.0
+
+# Kafka dependencies
+confluent-kafka==2.3.0
+avro-python3==1.10.2
