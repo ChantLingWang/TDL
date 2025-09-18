@@ -29,7 +29,6 @@ def publish_user_register_event(
         标准化响应结果
     """
 
-    # 参数验证由Pydantic模型自动处理，无需手动验证
     try:
         # 生成唯一事件ID（便于追踪）
         event_id = str(uuid4())
