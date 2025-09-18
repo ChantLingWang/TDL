@@ -119,7 +119,6 @@ async def register(request:Request,data: VerifyCodeRequest):
             user_id=str(user_id),
             username=data.username,
             email=data.email,
-            metadata={"ip": request.client.host}
         )
         
         return {
