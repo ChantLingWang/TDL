@@ -80,9 +80,9 @@ async def register(request:Request,data: VerifyCodeRequest):
         # 将bytes类型转换为字符串进行比较
         code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
         
-        user = await user_service.get_user_by_email(data.email)
+        user_exist = await user_service.get_user_by_email(data.email)
         
-        if user:
+        if user_exist:
             raise HTTPException(status_code=ErrorCodeEnum.USER_ALREADY_EXISTS.code, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
         
         if code_str != data.code:
