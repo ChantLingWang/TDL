@@ -3,14 +3,17 @@ from email import message
 from fastapi import APIRouter, HTTPException, Depends
 from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
+import logging
 from services.auth_service.app.database.redis_user_service import RedisUserService
 from services.auth_service.app.database.mongodb_user_token_service import MongoDBUserTokenService
 from services.auth_service.app.services.email_service import EmailService
 from services.auth_service.app.services.jwt_service import JWTUtils
 from services.auth_service.app.utils.error_code import ErrorCodeEnum
+from services.auth_service.app.api.v1.auth_events.auth_event import publish_user_register_event
 from fastapi import Request
 import bcrypt
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -44,8 +47,16 @@ async def send_code(request:Request,data: SendCodeRequest):
         return{
             "message": "验证码发送成功",
             }
+    except HTTPException:
+        # 重新抛出已知的HTTP异常
+        raise
     except Exception as e:
-        raise HTTPException(status_code=ErrorCodeEnum.EMAIL_SEND_ERROR.code, detail=ErrorCodeEnum.EMAIL_SEND_ERROR.message)
+        # 记录详细的错误日志，便于问题排查
+        logger.error(f"发送验证码失败 - 邮箱: {data.email}, 错误类型: {type(e).__name__}, 错误信息: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=ErrorCodeEnum.EMAIL_SEND_ERROR.code, 
+            detail=f"{ErrorCodeEnum.EMAIL_SEND_ERROR.message}: {str(e)[:100]}"
+        )
 
 
 @router.post("/register",
@@ -69,8 +80,6 @@ async def register(request:Request,data: VerifyCodeRequest):
         # 将bytes类型转换为字符串进行比较
         code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
         
-        redis_client.delete_code(data.email)
-        
         user = await user_service.get_user_by_email(data.email)
         
         if user:
@@ -79,31 +88,39 @@ async def register(request:Request,data: VerifyCodeRequest):
         if code_str != data.code:
             raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
         
-        # 创建新用户
+        # 获取下一个用户ID
         user_id = await user_service.get_next_user_id()
-        user_data = {
+        
+        # 删除redis中的验证码
+        redis_client.delete_code(data.email)
+        
+        # 先构建核心用户信息（用于token生成和事件发布）
+        user = {
             "user_id": user_id,
             "username": data.username,
             "email": data.email,
+        }
+        
+        # 构建完整用户数据
+        user_data = {
+            **user,
             "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
         }
+
+        # 创建用户
         await user_service.create_user(user_data)
         
-        # 从数据库中获取完整的用户数据
-        user = await user_service.get_user_by_id(user_id,
-            {
-                "_id": 0,
-                "user_id": 1, 
-                "username": 1, 
-                "email": 1, 
-                "create_time": 1,
-                "password": 0
-            }
-        )
-
-        #生成token
+        # 生成token（如果失败会抛出异常，整个注册流程就会失败）
         access_token = JWTUtils.create_access_token(user)
         refresh_token = await MongoDBUserTokenService.create_user_token(user)
+        
+        # 发布用户注册事件
+        publish_user_register_event(
+            user_id=str(user_id),
+            username=data.username,
+            email=data.email,
+            metadata={"ip": request.client.host}
+        )
         
         return {
             "message": "success",
@@ -113,11 +130,15 @@ async def register(request:Request,data: VerifyCodeRequest):
                 "refresh_token": refresh_token,
             }
         }
-        #事务补偿，当用户创建但token创建失败时，或者其他操作失败时，需要回滚用户创建操作
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        if user_id:
-            await user_service.delete_user_by_id(user_id)
-        raise HTTPException(status_code=ErrorCodeEnum.USER_REGISTER_ERROR.code, detail=ErrorCodeEnum.USER_REGISTER_ERROR.message)
+        logger.error(f"用户注册失败 - 错误类型: {type(e).__name__}, 错误信息: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=ErrorCodeEnum.USER_REGISTER_ERROR.code, 
+            detail=f"{ErrorCodeEnum.USER_REGISTER_ERROR.message}: {str(e)[:100]}"
+        )
 
 
 @router.post("/verify_code_login",
