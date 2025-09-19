@@ -10,15 +10,9 @@ class Settings(BaseSettings):
     version: str = "1.0.0"
     debug: bool = True
     
-    # 服务器配置
+    # 服务器配置 - 云原生版本
     host: str = "0.0.0.0"
     port: int = 9030
-    
-    # Consul配置
-    consul_service_name: str = "auth_service"
-    consul_service_id: str = "auth_service"
-    consul_service_address: str = "127.0.0.1"
-    consul_service_port: int = 9030
     
     # 数据库配置
     mongodb_url: str = "mongodb://localhost:27017"
@@ -53,4 +47,4 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = False
 
-settings = Settings() 
+settings = Settings()

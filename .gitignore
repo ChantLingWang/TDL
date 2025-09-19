@@ -1,1 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Istio - 不提交完整的Istio安装目录
+istio-*/
+
+# 但保留项目专用的Istio配置
+!k8s/istio/
+!k8s/istio/*.yaml
+!k8s/istio/*.yml
+!k8s/istio/README.md
+
+# 只保留必要的Istio配置（可选）
+# !istio-configs/
+# !k8s/istio/
+
+# Kubernetes secrets and configs with sensitive data
+*k8s/secrets/
+*k8s/configs/sensitive*
+
+# Docker volumes
+docker-volumes/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
