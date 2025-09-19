@@ -30,8 +30,8 @@ class KafkaConfig(BaseSettings):
     """SSL客户端私钥文件路径"""
     
     # 主题配置
-    KAFKA_TOPIC_AUTH_EVENTS: str = "auth-events"
-    """认证事件主题名称"""
+    KAFKA_TOPIC_REGISTER_EVENTS: str = "register_events"
+    """注册事件主题名称"""
     
     # 生产者配置
     KAFKA_PRODUCER_ACKS: str = "all"

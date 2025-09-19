@@ -3,7 +3,6 @@ from services.auth_service.app.core.secret_key import get_secret_key
 
 class Settings(BaseSettings):
     """应用配置"""
-    # 应用基本信息
     app_name: str = "User Service"
     service_id: str = "user_service"
     description: str = "用户信息处理服务"
@@ -13,12 +12,6 @@ class Settings(BaseSettings):
     # 服务器配置
     host: str = "0.0.0.0"
     port: int = 9040
-    
-    # Consul配置
-    consul_service_name: str = "user_service"
-    consul_service_id: str = "user_service"
-    consul_service_address: str = "127.0.0.1"
-    consul_service_port: int = 9030
     
     # 数据库配置
     mongodb_url: str = "mongodb://localhost:27017"
@@ -47,4 +40,4 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = False
 
-settings = Settings() 
+settings = Settings()

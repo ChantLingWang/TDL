@@ -23,11 +23,11 @@ providers:
     exposedByDefault: false                 # 表示默认情况下不暴露所有容器，只有显式标记的容器才会被 Traefik 处理。
     network: "traefik-network"              # 指定 Traefik 使用的 Docker 网络。
   
-  # Consul 服务发现
-  consul:
-    endpoint: "127.0.0.1:8500"              # Consul 服务器地址
-    exposedByDefault: false                  # 默认不暴露所有服务
-    prefix: "traefik"                       # Consul 中 Traefik 配置的前缀
+  # K8s Service 发现（云原生版本）
+  # consul:
+  #   endpoint: "127.0.0.1:8500"              # Consul 服务器地址
+  #   exposedByDefault: false                  # 默认不暴露所有服务
+  #   prefix: "traefik"                       # Consul 中 Traefik 配置的前缀
   
   # 文件配置提供者
   file:

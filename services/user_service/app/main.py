@@ -1,43 +1,24 @@
 from fastapi import FastAPI
 from app.core.config_test import settings
-from consul import Consul, Check
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 
-consul_client = Consul()
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
+    """应用生命周期管理 """
     # 启动时执行
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
-    
-    # 创建健康检查
-    health_check = Check.http(f"http://host.docker.internal:{settings.port}/api/v1/health", interval="30s", timeout="5s")
-    
-    # 在consul服务注册发现中心注册服务
-    consul_client.agent.service.register(
-        name=settings.consul_service_name,
-        service_id=settings.consul_service_id,
-        address=settings.consul_service_address,
-        port=settings.consul_service_port,
-        tags=["auth", "api"],
-        check=health_check
-    )
-    print(f"服务已注册到 Consul: {settings.service_id}")
+    print(f"服务已启动，监听端口: {settings.port}")
     
     yield
     
     # 关闭时执行
     print(f"关闭 {settings.app_name}")
     await db_manager.close()
-    
-    # 在consul服务注册发现中心注销服务
-    consul_client.agent.service.deregister(settings.service_id)
-    print(f"服务已从 Consul 注销: {settings.service_id}")
+    print(f"服务已关闭")
     
     
 def create_app() -> FastAPI:

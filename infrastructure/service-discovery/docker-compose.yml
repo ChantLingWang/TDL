@@ -1,0 +1,16 @@
+# 云原生版本 - 移除Consul服务发现
+# 使用K8s Service和CoreDNS进行服务发现
+version: '3.8'
+services:
+  # 占位服务 - 用于演示K8s服务发现
+  placeholder:
+    image: busybox:latest
+    container_name: service-discovery-placeholder
+    command: echo "Consul服务发现已移除，使用K8s Service和CoreDNS"
+    networks:
+      - infrastructure-net
+    restart: "no"
+
+networks:
+  infrastructure-net:
+    external: true

@@ -9,10 +9,7 @@ from services.auth_service.app.core.config_test import settings
 from services.auth_service.app.api.v1.auth import router as auth_router
 from services.auth_service.app.api.v1.health import router as health_router
 from services.auth_service.app.database.mongodb_service import db_manager
-from consul import Consul, Check
 from services.auth_service.app.grpc.service import GRPCServer
-
-consul_client = Consul()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,19 +25,7 @@ async def lifespan(app: FastAPI):
     else:
         print("❌ gRPC服务器启动失败")
     
-    # 创建健康检查
-    health_check = Check.http(f"http://host.docker.internal:{settings.port}/api/v1/health", interval="30s", timeout="5s")
-    
-    # 在consul服务注册发现中心注册服务
-    consul_client.agent.service.register(
-        name=settings.consul_service_name,
-        service_id=settings.consul_service_id,
-        address=settings.consul_service_address,
-        port=settings.consul_service_port,
-        tags=["auth", "api"],
-        check=health_check
-    )
-    print(f"服务已注册到 Consul: {settings.service_id}")
+    print(f"🚀 {settings.app_name} 启动完成")
     
     yield
     
@@ -51,10 +36,6 @@ async def lifespan(app: FastAPI):
     # 停止gRPC服务器
     await grpc_server.stop()
     print("✅ gRPC服务器已关闭")
-    
-    # 在consul服务注册发现中心注销服务
-    consul_client.agent.service.deregister(settings.service_id)
-    print(f"服务已从 Consul 注销: {settings.service_id}")
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
