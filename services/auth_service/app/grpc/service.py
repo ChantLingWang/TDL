@@ -4,9 +4,9 @@ import logging
 import os
 import sys
 import asyncio
-from services.auth_service.app.grpc.services.health_service import HealthService
-from services.auth_service.app.grpc.health import health_pb2_grpc
-from services.auth_service.app.core.config_test import settings
+from app.grpc.services.health_service import HealthService
+from app.grpc.health import health_pb2_grpc
+from app.core.config_test import settings
 
 
 logging.basicConfig(

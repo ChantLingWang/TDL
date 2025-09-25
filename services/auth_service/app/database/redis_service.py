@@ -1,5 +1,5 @@
 from redis import Redis, ConnectionPool
-from services.auth_service.app.core.config_test import settings
+from app.core.config_test import settings
 
 # 创建全局连接池
 redis_pool = ConnectionPool(

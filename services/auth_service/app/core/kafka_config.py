@@ -9,8 +9,15 @@ from functools import lru_cache
 class KafkaConfig(BaseSettings):
     """Kafka配置类"""
     
-    # Kafka连接配置
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:8092"
+    # 基础配置
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    """运行环境"""
+    
+    # Kafka连接配置 - 使用K8s Service发现
+    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv(
+        "KAFKA_BOOTSTRAP_SERVERS", 
+        "kafka-service.kafka-system.svc.cluster.local:9092"  # 使用K8s Service名称
+    )
     """Kafka集群地址，格式: host1:port1,host2:port2,..."""
     
     # 安全认证配置

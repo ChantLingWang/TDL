@@ -5,11 +5,11 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from services.auth_service.app.core.config_test import settings
-from services.auth_service.app.api.v1.auth import router as auth_router
-from services.auth_service.app.api.v1.health import router as health_router
-from services.auth_service.app.database.mongodb_service import db_manager
-from services.auth_service.app.grpc.service import GRPCServer
+from app.core.config_test import settings
+from app.api.v1.auth import router as auth_router
+from app.api.v1.health import router as health_router
+from app.database.mongodb_service import db_manager
+from app.grpc.service import GRPCServer
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -76,7 +76,7 @@ app = create_app()
 
 if __name__ == "__main__":
     uvicorn.run(
-        "services.auth_service.app.main:app",
+        "app.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,

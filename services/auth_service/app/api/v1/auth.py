@@ -1,15 +1,15 @@
 import asyncio
 from email import message
 from fastapi import APIRouter, HTTPException, Depends
-from services.auth_service.app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
-from services.auth_service.app.database.mongodb_user_service import MongoDBUserService,db_manager
+from app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
+from app.database.mongodb_user_service import MongoDBUserService,db_manager
 import logging
-from services.auth_service.app.database.redis_user_service import RedisUserService
-from services.auth_service.app.database.mongodb_user_token_service import MongoDBUserTokenService
-from services.auth_service.app.services.email_service import EmailService
-from services.auth_service.app.services.jwt_service import JWTUtils
-from services.auth_service.app.utils.error_code import ErrorCodeEnum
-from services.auth_service.app.api.v1.auth_events.auth_event import publish_user_register_event
+from app.database.redis_user_service import RedisUserService
+from app.database.mongodb_user_token_service import MongoDBUserTokenService
+from app.services.email_service import EmailService
+from app.services.jwt_service import JWTUtils
+from app.utils.error_code import ErrorCodeEnum
+from app.api.v1.auth_events.auth_event import publish_user_register_event
 from fastapi import Request
 import bcrypt
 

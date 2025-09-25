@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from services.auth_service.app.core.secret_key import get_secret_key
+from app.core.secret_key import get_secret_key
 
 class Settings(BaseSettings):
     """应用配置"""
