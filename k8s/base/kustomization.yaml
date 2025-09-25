@@ -1,0 +1,65 @@
+# Kustomization配置 - 定义如何填充模板
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 基础资源
+resources:
+- deployment-template.yaml
+- service-template.yaml
+- configmap-template.yaml
+
+# 通用标签
+commonLabels:
+  project: chant
+  managed-by: kustomize
+
+# 通用注释
+commonAnnotations:
+  description: "Chant微服务平台"
+  managed-by: "platform-team"
+
+# 变量替换定义
+vars:
+- name: SERVICE_NAME
+  objref:
+    kind: Deployment
+    name: placeholder  # 会被实际服务名替换
+    apiVersion: apps/v1
+  fieldref:
+    fieldpath: metadata.name
+
+# 配置项
+configMapGenerator:
+- name: service-config
+  literals:
+  - SERVICE_NAME=auth-service
+  - VERSION=v1.0.0
+  - REPLICAS=3
+  - CPU_REQUEST=500m
+  - MEMORY_REQUEST=1Gi
+  - CPU_LIMIT=1
+  - MEMORY_LIMIT=2Gi
+  - CONTAINER_PORT=8080
+  - SERVICE_PORT=80
+  - LOG_LEVEL=info
+  - ENVIRONMENT=production
+
+# 密钥生成器
+secretGenerator:
+- name: service-secret
+  literals:
+  - DB_PASSWORD=your-secret-password
+  - JWT_SECRET_KEY=your-jwt-secret
+  - REDIS_PASSWORD=redis-password
+
+# 镜像替换
+images:
+- name: auth-service
+  newName: your-registry/chant/auth-service
+  newTag: v1.0.0
+- name: user-service  
+  newName: your-registry/chant/user-service
+  newTag: v1.0.0
+- name: collaboration-service
+  newName: your-registry/chant/collaboration-service
+  newTag: v1.0.0

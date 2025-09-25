@@ -2,7 +2,7 @@ import asyncio
 import ssl
 from typing import Optional
 from datetime import datetime
-from app.core.config_test import Settings
+from app.core.config_test import settings
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging
@@ -17,8 +17,8 @@ class MongoDBServiceManager:
     """数据库连接管理类"""
     def __init__(
         self,
-        connection_string:str = Settings.mongodb_url,    #这里的链接应该为变量，在生产端时，要使用生产端数据库链接
-        database_name:str = Settings.database_name,          #初始化阶段，也就是构造函数，声明变量，明确初始化默认值和该属性类型
+        connection_string:str = None,    #这里的链接应该为变量，在生产端时，要使用生产端数据库链接
+        database_name:str = None,          #初始化阶段，也就是构造函数，声明变量，明确初始化默认值和该属性类型
         
         #下面是连接池配置参数
         max_pool_size: int=10,
@@ -38,8 +38,9 @@ class MongoDBServiceManager:
         ssl_ca_certs: str = None,                             # CA 证书路径
     ):
         #细看代码，将我们定义的两个字段赋值给我们self属性
-        self.connection_string = connection_string
-        self.database_name = database_name
+        # 如果参数为None，使用settings中的默认值
+        self.connection_string = connection_string or settings.mongodb_url
+        self.database_name = database_name or settings.database_name
 
         #下面这段是连接状态的一些属性
         # 其实下面这句代码等于 self.client: Union[AsyncIOMotorClient, None] = None，意思是这个字段可以是AsyncIOMotorClient也可以是None，但默认是None
@@ -162,7 +163,7 @@ class MongoDBServiceManager:
             return False
 
     def get_collection(self, collection_name: str):
-        if self.database is None:       #MongoDB 的数据库对象不支持布尔值测试
+        if self.database is None:
             raise Exception("数据库未连接")
         return self.database[collection_name]
 

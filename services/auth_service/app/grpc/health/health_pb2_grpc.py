@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from health import health_pb2 as health_dot_health__pb2
+from app.grpc.health import health_pb2 as health_dot_health__pb2
 
 GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__

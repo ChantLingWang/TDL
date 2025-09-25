@@ -16,7 +16,7 @@ class KafkaConfig(BaseSettings):
     # Kafka服务器配置 - 使用K8s Service发现
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv(
         "KAFKA_BOOTSTRAP_SERVERS", 
-        "kafka-service:9092"  # 使用K8s Service名称
+        "kafka-service.kafka-system.svc.cluster.local:9092"  # 使用完整的K8s Service名称
     )
     
     # 安全配置

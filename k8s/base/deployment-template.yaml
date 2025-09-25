@@ -1,0 +1,80 @@
+# Deployment模板 - 定义你的微服务如何运行
+# 这是一个通用模板，通过Kustomize替换变量
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${SERVICE_NAME}  # 服务名称，会被Kustomize替换
+  namespace: ${NAMESPACE} # 命名空间
+  labels:
+    app: ${SERVICE_NAME}
+    version: ${VERSION}
+spec:
+  replicas: ${REPLICAS}  # 副本数量
+  selector:
+    matchLabels:
+      app: ${SERVICE_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${SERVICE_NAME}
+        version: ${VERSION}
+      annotations:
+        prometheus.io/scrape: "true"  # 监控指标采集
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: ${SERVICE_NAME}
+        image: ${IMAGE_REGISTRY}/${SERVICE_NAME}:${VERSION}  # 镜像地址
+        imagePullPolicy: Always
+        ports:
+        - containerPort: ${CONTAINER_PORT}
+          name: http
+          protocol: TCP
+        env:
+        - name: SERVICE_NAME
+          value: ${SERVICE_NAME}
+        - name: SERVICE_VERSION
+          value: ${VERSION}
+        - name: LOG_LEVEL
+          value: ${LOG_LEVEL}
+        - name: CONFIG_PATH
+          value: "/etc/config"
+        resources:
+          requests:  # 最小资源需求
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+          limits:    # 最大资源限制
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+        livenessProbe:  # 存活检查
+          httpGet:
+            path: ${HEALTH_PATH:/health}
+            port: ${CONTAINER_PORT}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:  # 就绪检查
+          httpGet:
+            path: ${READINESS_PATH:/ready}
+            port: ${CONTAINER_PORT}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ${SERVICE_NAME}-config
+      - name: tmp-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
