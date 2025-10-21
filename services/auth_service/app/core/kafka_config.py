@@ -13,10 +13,10 @@ class KafkaConfig(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     """运行环境"""
     
-    # Kafka连接配置 - 使用K8s Service发现
+    # Kafka连接配置
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv(
         "KAFKA_BOOTSTRAP_SERVERS", 
-        "kafka-service.kafka-system.svc.cluster.local:9092"  # 使用K8s Service名称
+        "localhost:9092"  # 本地Kafka服务器
     )
     """Kafka集群地址，格式: host1:port1,host2:port2,..."""
     
