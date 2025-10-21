@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 class KafkaConfig(BaseSettings):
     """Kafka配置类 - 云原生版本"""
     
-    # Kafka服务器配置 - 使用K8s Service发现
+    # Kafka服务器配置
     KAFKA_BOOTSTRAP_SERVERS: str = os.getenv(
         "KAFKA_BOOTSTRAP_SERVERS", 
-        "kafka-service.kafka-system.svc.cluster.local:9092"  # 使用完整的K8s Service名称
+        "localhost:9092"  # 本地Kafka服务器
     )
     
     # 安全配置
