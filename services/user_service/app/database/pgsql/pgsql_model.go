@@ -4,7 +4,7 @@ import "gorm.io/gorm"
 
 // User 用户模型
 type User struct {
-	ID       string `gorm:"primaryKey"`
+	UserID       string `gorm:"primaryKey"`
 	Username string `gorm:"not null"`
 	Email    string `gorm:"uniqueIndex;not null"`
 	// 可以根据需要添加其他用户字段
@@ -12,8 +12,10 @@ type User struct {
 
 // Group 组群模型
 type Group struct {
-	ID   string `gorm:"primaryKey"`
+	GroupID string `gorm:"primaryKey"`
 	Name string `gorm:"not null"`
+	MessageHistory string `gorm:"foreignKey:GroupID;references:GroupID"`
+	Users []User `gorm:"many2many:user_groups;"`
 	// 可以根据需要添加其他组群字段
 }
 

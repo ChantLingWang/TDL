@@ -16,13 +16,22 @@ type ServerCfg struct {
 	Port string
 }
 
-// 数据库配置
+// PostgreSQL数据库配置
 var DataBaseConfig = DBConfig{
-	Host:     "localhost",
+	Host:     "127.0.0.1",
 	Port:     "5432",
-	User:     "chant",
-	Password: "107827135",
-	DBName:   "user_group",
+	User:     "lianlinghao",
+	Password: "",
+	DBName:   "User",
+	SSLMode:  "disable",
+	TimeZone: "Asia/Shanghai",
+}
+
+// MongoDB数据库配置
+var MongoDBConfig = DBConfig{
+	Host:     "127.0.0.1",
+	Port:     "27017",
+	DBName:   "User_Database",
 	SSLMode:  "disable",
 	TimeZone: "Asia/Shanghai",
 }
