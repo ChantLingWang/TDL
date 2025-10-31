@@ -3,12 +3,10 @@ package database
 import (
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 
 	"chant/user_service/app/core"
 )
@@ -24,7 +22,7 @@ var (
 	once     sync.Once
 )
 
-// GetDBManager 获取数据库管理器实例（单例模式）
+// GetDBManager 获取数据库管理器实例
 func GetDBManager() *DBManager {
 	once.Do(func() {
 		instance = &DBManager{}
@@ -45,19 +43,12 @@ func (manager *DBManager) Connect() error {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		host, user, password, dbname, port, core.DataBaseConfig.SSLMode, core.DataBaseConfig.TimeZone)
 	
-	// 配置GORM日志级别
-	newLogger := logger.New(
-		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
-		logger.Config{
-			LogLevel: logger.Info, // Log level
-			Colorful: true,        // 彩色打印
-		},
-	)
-
-	// 连接数据库
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: newLogger,
-	})
+	// Gorm框架提供的用于初始化数据库连接的主要函数，接受两个参数，
+	// 第一个参数是数据库驱动的Dialector，第二个参数是Gorm配置选项
+	// 该函数返回两个值：
+	// 第一个值是 *gorm.DB 类型的数据库实例，用于执行数据库操作
+	// 第二个值是 err
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -82,6 +73,9 @@ func (manager *DBManager) Connect() error {
 }
 
 // Close 关闭数据库连接
+// 注意sqlDB和db的区别
+// sqlDB是 *sql.DB 类型，用于执行原始的SQL查询和操作
+// db是 *gorm.DB 类型，提供了GORM框架的所有功能，包括ORM映射、事务管理等
 func (manager *DBManager) Close() error {
 	if manager.db != nil {
 		sqlDB, err := manager.db.DB()

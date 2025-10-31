@@ -87,8 +87,8 @@ func (ugs *UserGroupService) RemoveUserFromGroup(userID, groupID string) error {
 // CreateGroup 创建新的组群
 func (ugs *UserGroupService) CreateGroup(groupID, groupName string) (*Group, error) {
 	group := &Group{
-		ID:   groupID,
-		Name: groupName,
+		GroupID: groupID,
+		Name:    groupName,
 	}
 	
 	result := ugs.dbManager.GetDB().Create(group)
