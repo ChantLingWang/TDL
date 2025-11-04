@@ -1,4 +1,4 @@
-package database
+package pgsql
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"chant/user_service/app/core"
+	"user_service/app/core"
 )
 
 // DBManager 数据库管理器结构体

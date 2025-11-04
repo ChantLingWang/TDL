@@ -135,7 +135,6 @@ func (c *Client) writePump() {
 	// 连接的关闭由 readPump 统一管理。
 	defer func() {
 		ticker.Stop()
-		// 注意：这里不再调用 c.Conn.Close()，因为 readPump 会负责
 		log.Println("writePump exited.")
 	}()
 

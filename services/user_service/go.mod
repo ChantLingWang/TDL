@@ -1,4 +1,4 @@
-module chant/user_service
+module user_service
 
 go 1.25.0
 

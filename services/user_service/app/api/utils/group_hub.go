@@ -68,18 +68,17 @@ func (h *Hub) handleRegister(client *Client) {
 	h.clients[client] = true
 
 	// 如果客户端指定了组群ID，则将其添加到对应的组群中
-		if client.GroupID != "" {
-			// 如果组群存在，则将客户端添加到组群中
-			if group, exists := h.groupID[client.GroupID]; exists {
-				group[client] = true
-				log.Printf("Client registered to group %s", client.GroupID)
-			} else {
-				// 如果组群不存在，记录警告日志
-				log.Printf("Warning: Group %s does not exist, client not added to group", client.GroupID)
-			}
+	if client.GroupID != "" {
+		// 如果组群存在，则将客户端添加到组群中
+		if group, exists := h.groupID[client.GroupID]; exists {
+			group[client] = true
 		} else {
-			log.Printf("Client registered without group")
+			// 如果组群不存在，创建新组群
+			h.groupID[client.GroupID] = make(map[*Client]bool)
+			h.groupID[client.GroupID][client] = true
+			log.Printf("Client created and joined group %s", client.GroupID)
 		}
+	}
 }
 
 // handleUnregister 处理客户端注销
@@ -132,6 +131,7 @@ func (h *Hub) handleBroadcast(message []byte) {
 		}
 	}
 }
+
 
 // BroadcastToGroup 向指定房间内的所有客户端广播消息
 func (h *Hub) BroadcastToGroup(groupID string, message []byte) {
