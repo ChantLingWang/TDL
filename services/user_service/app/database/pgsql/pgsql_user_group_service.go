@@ -1,4 +1,4 @@
-package database
+package pgsql
 
 import (
 	"fmt"
@@ -84,11 +84,12 @@ func (ugs *UserGroupService) RemoveUserFromGroup(userID, groupID string) error {
 	return nil
 }
 
+
 // CreateGroup 创建新的组群
 func (ugs *UserGroupService) CreateGroup(groupID, groupName string) (*Group, error) {
 	group := &Group{
 		GroupID: groupID,
-		Name:    groupName,
+		GroupName: groupName,
 	}
 	
 	result := ugs.dbManager.GetDB().Create(group)
@@ -98,6 +99,7 @@ func (ugs *UserGroupService) CreateGroup(groupID, groupName string) (*Group, err
 	
 	return group, nil
 }
+
 
 // DeleteGroup 删除组群
 func (ugs *UserGroupService) DeleteGroup(groupID string) error {

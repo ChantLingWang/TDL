@@ -1,23 +1,34 @@
-package database
+package pgsql
 
-import "gorm.io/gorm"
+import (
+	"time"
+	
+	"gorm.io/gorm"
+)
+
 
 // User 用户模型
 type User struct {
+	RegisterTime time.Time `gorm:"not null"`
 	UserID       string `gorm:"primaryKey"`
 	Username string `gorm:"not null"`
 	Email    string `gorm:"uniqueIndex;not null"`
-	// 可以根据需要添加其他用户字段
+	Groups   []Group `gorm:"many2many:user_groups;"`
+	Tempchat []TempChat `gorm:"foreignKey:UserID;references:UserID"`
+	PrivateChat []PrivateChat `gorm:"foreignKey:UserID;references:UserID"`
 }
+
 
 // Group 组群模型
 type Group struct {
+	CreateTime time.Time `gorm:"not null"`
 	GroupID string `gorm:"primaryKey"`
-	Name string `gorm:"not null"`
-	MessageHistory string `gorm:"foreignKey:GroupID;references:GroupID"`
+	GroupName string `gorm:"not null"`
 	Users []User `gorm:"many2many:user_groups;"`
-	// 可以根据需要添加其他组群字段
+	CreateByUserID []User `gorm:"not null"`
+	ManagerUserID []User `gorm:"not null"`
 }
+
 
 // UserGroup 用户组群关联模型（多对多关系）
 type UserGroup struct {
@@ -25,6 +36,21 @@ type UserGroup struct {
 	GroupID string `gorm:"primaryKey"`
 	// 可以根据需要添加其他关联字段，如加入时间等
 }
+
+
+// 定义私有chat模型
+type PrivateChat struct {
+	UserID string `gorm:"primaryKey"`
+	AddTime time.Time `gorm:"primaryKey"`
+}
+
+
+// 定义临时chat模型
+type TempChat struct {
+	UserID string `gorm:"primaryKey"`
+	Source string `gorm:"primaryKey"`
+}
+
 
 // TableName 指定User表名
 func (User) TableName() string {
@@ -41,7 +67,17 @@ func (UserGroup) TableName() string {
 	return "user_groups"
 }
 
+// TableName 指定PrivateChat表名
+func (PrivateChat) TableName() string {
+	return "private_chats"
+}
+
+// TableName 指定TempChat表名
+func (TempChat) TableName() string {
+	return "temp_chats"
+}
+
 // AutoMigrate 自动迁移数据库表结构
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&User{}, &Group{}, &UserGroup{})
+	return db.AutoMigrate(&User{}, &Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{})
 }

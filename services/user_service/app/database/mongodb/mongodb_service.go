@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
-	"chant/user_service/app/core"
+	"user_service/app/core"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
 // 继承自mongo.Client go为组合形式
 type MongoDBManager struct {
 	client *mongo.Client
 }
+
 // 定义单例模式确保只有一个数据库实例
 var (
 	instance *MongoDBManager
@@ -38,8 +41,16 @@ func (manager *MongoDBManager) Connect() error {
 	uri := fmt.Sprintf("mongodb://%s:%s/%s?sslmode=%s&timezone=%s",
 		host, port, dbname, core.MongoDBConfig.SSLMode, core.MongoDBConfig.TimeZone)
 
-	// 创建客户端选项对象，将uri传入后，配置客户端选项
+	// 创建客户端选项对象，配置连接池参数
 	clientOptions := options.Client().ApplyURI(uri)
+	
+	// 设置连接池配置参数
+	clientOptions.SetMaxPoolSize(uint64(core.MongoDBConfig.MaxPoolSize))
+	clientOptions.SetMinPoolSize(uint64(core.MongoDBConfig.MinPoolSize))
+	clientOptions.SetConnectTimeout(time.Duration(core.MongoDBConfig.ConnectTimeoutMS) * time.Millisecond)
+	clientOptions.SetSocketTimeout(time.Duration(core.MongoDBConfig.SocketTimeoutMS) * time.Millisecond)
+	clientOptions.SetServerSelectionTimeout(time.Duration(core.MongoDBConfig.ServerSelectionTimeoutMS) * time.Millisecond)
+	clientOptions.SetMaxConnIdleTime(time.Duration(core.MongoDBConfig.MaxIdleTimeMS) * time.Millisecond)
 
 	// 连接到MongoDB，传入上面配置的客户端选项
 	client, err := mongo.Connect(context.Background(), clientOptions)
