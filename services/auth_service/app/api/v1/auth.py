@@ -1,6 +1,6 @@
 import asyncio
-from email import message
-from fastapi import APIRouter, HTTPException, Depends
+from datetime import datetime
+from fastapi import APIRouter, HTTPException
 from app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from app.database.mongodb_user_service import MongoDBUserService,db_manager
 import logging
@@ -9,9 +9,12 @@ from app.database.mongodb_user_token_service import MongoDBUserTokenService
 from app.services.email_service import EmailService
 from app.services.jwt_service import JWTUtils
 from app.utils.error_code import ErrorCodeEnum
-from app.api.v1.auth_events.auth_event import publish_user_register_event
+from app.infrastructure.kafka.event_publisher import event_publisher
+from app.models.events import UserRegisteredEvent
 from fastapi import Request
 import bcrypt
+from app.api.v1.const import Status
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -94,35 +97,58 @@ async def register(request:Request,data: VerifyCodeRequest):
         # 删除redis中的验证码
         redis_client.delete_code(data.email)
         
+        # 添加创建时间字段，用于同步给其他微服务
+        current_time = datetime.now(datetime.timezone.utc).isoformat()
+        
+        # 缓存 SagaID -> UserID 的映射，用于后续 Saga 完成/失败时的回调处理
+        event_id = str(uuid4())
+        redis_client.set_code(f"saga:{event_id}:user_id", str(user_id), 3600)
+        
         # 先构建核心用户信息（用于token生成和事件发布）
         user = {
             "user_id": user_id,
             "username": data.username,
             "email": data.email,
+            "created_at": current_time,
+            "status": Status.PENDING, # 初始状态为 pending (准备中/中间态)
         }
         
-        # 构建完整用户数据
+        # 构建完整用户数据（包含密码和其他字段，用于存放数据库）
         user_data = {
             **user,
             "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
         }
 
-        # 创建用户
-        await user_service.create_user(user_data)
-        
         # 生成token（如果失败会抛出异常，整个注册流程就会失败）
         access_token = JWTUtils.create_access_token(user)
         refresh_token = await MongoDBUserTokenService.create_user_token(user)
         
-        # 发布用户注册事件
-        publish_user_register_event(
-            user_id=str(user_id),
-            username=data.username,
-            email=data.email,
+        # 构建用户注册事件的数据
+        # 将数据按步骤Topic组织，以便Orchestrator能精确匹配
+        # 这里 "sync_user_fields" 对应 user_register_sync.yaml 中的步骤 topic
+        steps_data = {
+            "sync_user_fields": {
+                "user_id": str(user_id),
+                "username": data.username,
+                "email": data.email,
+                "created_at": current_time,
+            }
+        }
+        
+        event = UserRegisteredEvent(
+            event_id = event_id,
+            execution_mode = Status.PARALLEL,
+            user_data = steps_data
         )
+    
+        # 发送 Kafka 消息 (Start Saga)
+        event_publisher.publish_user_registered_event(event)
+
+        # 发送完毕后，直接保存到数据库中即可，后续kafka传来事务后，可以直接按event_id关联的user_id查，若有直接返回成功，若无直接返回失败，拒绝后续操作，然后标记其字段为实效
+        user_service.create_user(user_data)
         
         return {
-            "message": "success",
+            "message": Status.SUCCESS,
             "data": {
                 "user": user,
                 "access_token": access_token,

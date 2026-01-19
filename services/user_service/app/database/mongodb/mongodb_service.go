@@ -52,7 +52,7 @@ func (manager *MongoDBManager) Connect() error {
 	clientOptions.SetServerSelectionTimeout(time.Duration(core.MongoDBConfig.ServerSelectionTimeoutMS) * time.Millisecond)
 	clientOptions.SetMaxConnIdleTime(time.Duration(core.MongoDBConfig.MaxIdleTimeMS) * time.Millisecond)
 
-	// 连接到MongoDB，传入上面配置的客户端选项
+	// 连接到MongoDB，传入配置的客户端选项
 	client, err := mongo.Connect(context.Background(), clientOptions)
 	if err != nil {
 		log.Printf("Failed to connect to MongoDB: %v", err)

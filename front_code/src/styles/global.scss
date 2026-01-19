@@ -1,0 +1,28 @@
+:root {
+  --ak-bg-primary: #121212;
+  --ak-bg-secondary: #1f1f1f;
+  --ak-text-primary: #ffffff;
+  --ak-text-secondary: #a0a0a0;
+  --ak-accent: #00c8ff;
+  --ak-accent-hover: #00b4e6;
+  --ak-warning: #ffe600;
+  --ak-error: #ff4d4d;
+  
+  --ak-font-main: 'Roboto', 'Helvetica Neue', sans-serif;
+  --ak-font-mono: 'Roboto Mono', 'Courier New', monospace;
+  
+  --ak-border-width: 1px;
+  --ak-corner-size: 10px;
+}
+
+body {
+  background-color: var(--ak-bg-primary);
+  color: var(--ak-text-primary);
+  font-family: var(--ak-font-main);
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}

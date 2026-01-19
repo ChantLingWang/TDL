@@ -10,5 +10,8 @@ python-dotenv==1.0.0
 email-validator==2.1.0 
 redis==6.2.0
 
-#
+# Kafka依赖
+confluent-kafka
+
+# Avro序列化
 avro-python3==1.10.2

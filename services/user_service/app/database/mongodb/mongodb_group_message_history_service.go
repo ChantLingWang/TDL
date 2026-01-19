@@ -96,7 +96,6 @@ func (service *GroupMessageHistoryService) AddGroupMessageByUser(groupID string,
 		"$setOnInsert": bson.M{
 			"group_id":   groupID,
 			"date_identifier":  getGroupMessageHistoryDocTime(),
-			"messages":   []Message{},
 		},
 		"$push": bson.M{
 			"messages":    *message,

@@ -2,7 +2,6 @@ package pgsql
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"gorm.io/driver/postgres"
@@ -43,11 +42,7 @@ func (manager *DBManager) Connect() error {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		host, user, password, dbname, port, core.DataBaseConfig.SSLMode, core.DataBaseConfig.TimeZone)
 	
-	// Gorm框架提供的用于初始化数据库连接的主要函数，接受两个参数，
-	// 第一个参数是数据库驱动的Dialector，第二个参数是Gorm配置选项
-	// 该函数返回两个值：
-	// 第一个值是 *gorm.DB 类型的数据库实例，用于执行数据库操作
-	// 第二个值是 err
+	// Gorm框架提供的用于初始化数据库连接的主要函数
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
@@ -59,7 +54,6 @@ func (manager *DBManager) Connect() error {
 		return fmt.Errorf("failed to get database instance: %w", err)
 	}
 
-	// 设置连接池
 	// 设置空闲连接池中连接的最大数量
 	sqlDB.SetMaxIdleConns(10)
 	// 设置数据库连接最大生存时间
@@ -68,14 +62,10 @@ func (manager *DBManager) Connect() error {
 	sqlDB.SetMaxOpenConns(100)
 
 	manager.db = db
-	log.Println("Successfully connected to the database")
 	return nil
 }
 
 // Close 关闭数据库连接
-// 注意sqlDB和db的区别
-// sqlDB是 *sql.DB 类型，用于执行原始的SQL查询和操作
-// db是 *gorm.DB 类型，提供了GORM框架的所有功能，包括ORM映射、事务管理等
 func (manager *DBManager) Close() error {
 	if manager.db != nil {
 		sqlDB, err := manager.db.DB()

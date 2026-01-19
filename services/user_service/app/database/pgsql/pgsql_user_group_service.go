@@ -39,19 +39,19 @@ func (ugs *UserGroupService) GetUserGroups(userID string) ([]Group, error) {
 func (ugs *UserGroupService) AddUserToGroup(userID, groupID string) error {
 	// 检查用户和组群是否存在
 	var user User
-	if err := ugs.dbManager.GetDB().First(&user, "id = ?", userID).Error; err != nil {
+	if err := ugs.dbManager.GetDB().First(&user, "user_id = ?", userID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return fmt.Errorf("user not found: %s", userID)
 		}
-		return fmt.Errorf("failed to find user: %w", err)
+		return err
 	}
 	
 	var group Group
-	if err := ugs.dbManager.GetDB().First(&group, "id = ?", groupID).Error; err != nil {
+	if err := ugs.dbManager.GetDB().First(&group, "group_id = ?", groupID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return fmt.Errorf("group not found: %s", groupID)
 		}
-		return fmt.Errorf("failed to find group: %w", err)
+		return err
 	}
 	
 	// 创建用户组群关联
@@ -63,7 +63,7 @@ func (ugs *UserGroupService) AddUserToGroup(userID, groupID string) error {
 	// 使用FirstOrCreate避免重复添加
 	result := ugs.dbManager.GetDB().Where(UserGroup{UserID: userID, GroupID: groupID}).FirstOrCreate(&userGroup)
 	if result.Error != nil {
-		return fmt.Errorf("failed to add user to group: %w", result.Error)
+		return result.Error
 	}
 	
 	return nil
@@ -125,7 +125,7 @@ func (ugs *UserGroupService) DeleteGroup(groupID string) error {
 // GetGroupByID 根据ID获取组群信息
 func (ugs *UserGroupService) GetGroupByID(groupID string) (*Group, error) {
 	var group Group
-	result := ugs.dbManager.GetDB().First(&group, "id = ?", groupID)
+	result := ugs.dbManager.GetDB().First(&group, "group_id = ?", groupID)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("group not found: %s", groupID)
@@ -133,4 +133,21 @@ func (ugs *UserGroupService) GetGroupByID(groupID string) (*Group, error) {
 		return nil, fmt.Errorf("failed to get group: %w", result.Error)
 	}
 	return &group, nil
+}
+
+// GetGroupMembers 获取组群的所有成员ID
+func (ugs *UserGroupService) GetGroupMembers(groupID string) ([]string, error) {
+	var userGroups []UserGroup
+	// 查询 user_groups 表中所有 group_id = ? 的记录
+	err := ugs.dbManager.GetDB().Where("group_id = ?", groupID).Find(&userGroups).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group members: %w", err)
+	}
+
+	// 提取用户ID
+	var memberIDs []string
+	for _, ug := range userGroups {
+		memberIDs = append(memberIDs, ug.UserID)
+	}
+	return memberIDs, nil
 }

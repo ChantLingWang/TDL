@@ -1,0 +1,14 @@
+# 用户注册字段同步事务模板
+name: "user_register_sync"
+topic: "user_register_sync"
+description: "用户注册字段同步事务模板"
+enabled: true
+steps:
+  - topic: "sync_user_fields"
+    name: "Sync User Fields"
+    compensate_action: "undo_sync_user_fields"
+    max_retries: 3
+    timeout_ms: 5000
+    data:
+      sync_mode: "immediate"
+      data_format: "json"

@@ -21,12 +21,12 @@ type User struct {
 
 // Group 组群模型
 type Group struct {
-	CreateTime time.Time `gorm:"not null"`
-	GroupID string `gorm:"primaryKey"`
-	GroupName string `gorm:"not null"`
-	Users []User `gorm:"many2many:user_groups;"`
-	CreateByUserID []User `gorm:"not null"`
-	ManagerUserID []User `gorm:"not null"`
+	CreateTime    time.Time `gorm:"not null"`
+	GroupID       string    `gorm:"primaryKey"`
+	GroupName     string    `gorm:"not null"`
+	Users         []User    `gorm:"many2many:user_groups;"`
+	CreateByUserID string   `gorm:"not null"` // 创建者ID (单人)
+	Managers      []User    `gorm:"many2many:group_managers;"` // 管理员列表 (多人)
 }
 
 

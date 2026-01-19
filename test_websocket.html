@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket测试</title>
+    <style>
+        body { font-family: sans-serif; max-width: 1200px; margin: 20px auto; padding: 20px; background-color: #f4f4f9; }
+        h2 { text-align: center; color: #333; }
+        
+        /* 布局 */
+        .dashboard { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .user-panel { 
+            flex: 1; 
+            min-width: 300px; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 15px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 标题栏 */
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .user-name { font-weight: bold; font-size: 1.1em; color: #2c3e50; }
+        .status { font-size: 0.8em; padding: 3px 8px; border-radius: 10px; background: #eee; }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+
+        /* 聊天区域 */
+        .chat-area { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 300px; }
+        
+        /* 消息记录 */
+        .messages { 
+            flex: 1; 
+            height: 300px; 
+            overflow-y: auto; 
+            background: #f8f9fa; 
+            border: 1px solid #e9ecef; 
+            border-radius: 4px; 
+            padding: 10px;
+            font-size: 0.9em;
+        }
+        .msg-item { margin-bottom: 8px; padding: 5px; border-radius: 4px; background: #fff; border-left: 3px solid transparent; }
+        .msg-item.sent { border-left-color: #007bff; background: #e7f1ff; }
+        .msg-item.received { border-left-color: #28a745; background: #e6ffed; }
+        .msg-item.system { border-left-color: #6c757d; color: #666; font-style: italic; font-size: 0.8em; }
+        .msg-time { font-size: 0.7em; color: #999; margin-left: 5px; }
+
+        /* 控制区 */
+        .controls { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .input-group { display: flex; gap: 5px; }
+        select, input { padding: 6px; border: 1px solid #ced4da; border-radius: 4px; }
+        input { flex: 1; }
+        button { padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #0056b3; }
+        button.connect-btn { width: 100%; margin-bottom: 10px; background: #28a745; }
+        button.disconnect-btn { width: 100%; margin-bottom: 10px; background: #dc3545; display: none; }
+    </style>
+</head>
+<body>
+    <h2>系统测试台</h2>
+    
+    <div class="dashboard">
+        <!-- 用户1 面板 -->
+        <div class="user-panel" id="panel-user1">
+            <div class="panel-header">
+                <span class="user-name">User 1</span>
+                <span class="status disconnected" id="status-user1">未连接</span>
+            </div>
+            <button class="connect-btn" onclick="connect('user1')">上线 (Connect)</button>
+            <button class="disconnect-btn" onclick="disconnect('user1')">下线 (Disconnect)</button>
+            
+            <div class="chat-area">
+                <div class="messages" id="log-user1"></div>
+                
+                <div class="controls">
+                    <div class="input-group">
+                        <select id="type-user1">
+                            <option value="private_chat">私聊</option>
+                            <option value="group_chat">群聊</option>
+                        </select>
+                        <input type="text" id="target-user1" placeholder="目标ID (如 user2 或 group1)" style="width: 120px;">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="msg-user1" placeholder="输入消息...">
+                        <button onclick="send('user1')" id="send-user1" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户2 面板 -->
+        <div class="user-panel" id="panel-user2">
+            <div class="panel-header">
+                <span class="user-name">User 2</span>
+                <span class="status disconnected" id="status-user2">未连接</span>
+            </div>
+            <button class="connect-btn" onclick="connect('user2')">上线 (Connect)</button>
+            <button class="disconnect-btn" onclick="disconnect('user2')">下线 (Disconnect)</button>
+            
+            <div class="chat-area">
+                <div class="messages" id="log-user2"></div>
+                
+                <div class="controls">
+                    <div class="input-group">
+                        <select id="type-user2">
+                            <option value="private_chat">私聊</option>
+                            <option value="group_chat">群聊</option>
+                        </select>
+                        <input type="text" id="target-user2" placeholder="目标ID (如 user1)" style="width: 120px;" value="user1">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="msg-user2" placeholder="输入消息...">
+                        <button onclick="send('user2')" id="send-user2" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户3 面板 -->
+        <div class="user-panel" id="panel-user3">
+            <div class="panel-header">
+                <span class="user-name">User 3</span>
+                <span class="status disconnected" id="status-user3">未连接</span>
+            </div>
+            <button class="connect-btn" onclick="connect('user3')">上线 (Connect)</button>
+            <button class="disconnect-btn" onclick="disconnect('user3')">下线 (Disconnect)</button>
+            
+            <div class="chat-area">
+                <div class="messages" id="log-user3"></div>
+                
+                <div class="controls">
+                    <div class="input-group">
+                        <select id="type-user3">
+                            <option value="private_chat">私聊</option>
+                            <option value="group_chat">群聊</option>
+                        </select>
+                        <input type="text" id="target-user3" placeholder="目标ID (如 group1)" style="width: 120px;" value="group1">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="msg-user3" placeholder="输入消息...">
+                        <button onclick="send('user3')" id="send-user3" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WS_BASE_URL = "ws://localhost:8080/api/v1/ws";
+        const connections = {}; // 存储所有 WebSocket 连接
+
+        // 辅助函数：添加日志
+        function addLog(userId, msg, type = 'system') {
+            const logDiv = document.getElementById(`log-${userId}`);
+            const time = new Date().toLocaleTimeString();
+            
+            let content = msg;
+            if (typeof msg === 'object') {
+                content = JSON.stringify(msg);
+            }
+
+            const div = document.createElement('div');
+            div.className = `msg-item ${type}`;
+            div.innerHTML = `<span>${content}</span><span class="msg-time">${time}</span>`;
+            
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 连接函数
+        function connect(userId) {
+            if (connections[userId]) return;
+
+            const url = `${WS_BASE_URL}?user_id=${userId}`;
+            addLog(userId, `正在连接到服务器...`, 'system');
+
+            try {
+                const ws = new WebSocket(url);
+                connections[userId] = ws;
+
+                ws.onopen = () => {
+                    addLog(userId, `连接成功`, 'system');
+                    updateStatus(userId, true);
+                };
+
+                ws.onmessage = (event) => {
+                    // 解析收到的消息
+                    try {
+                        const data = JSON.parse(event.data);
+                        let displayMsg = "";
+                        
+                        if (data.type === 'private_chat') {
+                            displayMsg = `[私聊] ${data.sender}: ${data.content}`;
+                        } else if (data.type === 'group_chat') {
+                            displayMsg = `[群聊 ${data.group_id}] ${data.sender}: ${data.content}`;
+                        } else {
+                            displayMsg = event.data;
+                        }
+                        
+                        addLog(userId, displayMsg, 'received');
+                    } catch (e) {
+                        addLog(userId, event.data, 'received');
+                    }
+                };
+
+                ws.onclose = (event) => {
+                    addLog(userId, `连接断开 (Code: ${event.code})`, 'system');
+                    updateStatus(userId, false);
+                    delete connections[userId];
+                };
+
+                ws.onerror = (error) => {
+                    addLog(userId, `连接发生错误`, 'system');
+                };
+
+            } catch (e) {
+                addLog(userId, `连接异常: ${e.message}`, 'system');
+            }
+        }
+
+        // 断开连接
+        function disconnect(userId) {
+            if (connections[userId]) {
+                connections[userId].close();
+                // cleanup will be handled in onclose
+            }
+        }
+
+        // 发送消息
+        function send(userId) {
+            const ws = connections[userId];
+            if (!ws) return;
+
+            const type = document.getElementById(`type-${userId}`).value;
+            const target = document.getElementById(`target-${userId}`).value;
+            const content = document.getElementById(`msg-user1`) || document.getElementById(`msg-${userId}`); // Fix copy paste error if any
+            const input = document.getElementById(`msg-${userId}`);
+            const text = input.value;
+
+            if (!text) return;
+            if (!target) {
+                alert("请输入目标ID (用户ID或群组ID)");
+                return;
+            }
+
+            let msgObj = {
+                type: type,
+                content: {}
+            };
+
+            if (type === 'private_chat') {
+                msgObj.content = {
+                    target_id: target,
+                    text: text
+                };
+            } else {
+                msgObj.content = {
+                    group_id: target,
+                    text: text
+                };
+            }
+
+            const jsonStr = JSON.stringify(msgObj);
+            ws.send(jsonStr);
+            
+            // 本地显示发送记录
+            addLog(userId, `我 -> ${target}: ${text}`, 'sent');
+            input.value = ''; // 清空输入框
+        }
+
+        // 更新UI状态
+        function updateStatus(userId, isConnected) {
+            const statusSpan = document.getElementById(`status-${userId}`);
+            const connectBtn = document.querySelector(`#panel-${userId} .connect-btn`);
+            const disconnectBtn = document.querySelector(`#panel-${userId} .disconnect-btn`);
+            const sendBtn = document.getElementById(`send-${userId}`);
+
+            if (isConnected) {
+                statusSpan.textContent = "在线";
+                statusSpan.className = "status connected";
+                connectBtn.style.display = "none";
+                disconnectBtn.style.display = "block";
+                sendBtn.disabled = false;
+            } else {
+                statusSpan.textContent = "离线";
+                statusSpan.className = "status disconnected";
+                connectBtn.style.display = "block";
+                disconnectBtn.style.display = "none";
+                sendBtn.disabled = true;
+            }
+        }
+    </script>
+</body>
+</html>
