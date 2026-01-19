@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  # 编排器服务 (我们的应用)
+  orchestrator-service:
+    build: . # 使用当前目录下的 Dockerfile 构建镜像
+    restart: always # 崩溃后自动重启
+    environment:
+      # 连接到共享网络中的 kafka 服务
+      # 注意端口是 29092 (内部监听端口)
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_GROUP_ID=orchestrator-group
+      - KAFKA_TOPIC=saga-events
+      - TZ=Asia/Shanghai
+    networks:
+      - chant-shared-network
+
+networks:
+  chant-shared-network:
+    external: true

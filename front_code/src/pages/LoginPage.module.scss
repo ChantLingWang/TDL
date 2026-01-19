@@ -1,0 +1,131 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #0a0a0a;
+  background-image: 
+    linear-gradient(rgba(0, 200, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 200, 255, 0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  position: relative;
+  overflow: hidden;
+}
+
+.loginBox {
+  width: 400px;
+  padding: 40px;
+  background-color: rgba(30, 30, 30, 0.9);
+  border: 1px solid #333;
+  position: relative;
+  backdrop-filter: blur(10px);
+  
+  /* Cut corners */
+  clip-path: polygon(
+    20px 0, 100% 0, 
+    100% calc(100% - 20px), calc(100% - 20px) 100%, 
+    0 100%, 0 20px
+  );
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--ak-accent), transparent);
+  }
+}
+
+.header {
+  margin-bottom: 10px;
+  border-left: 4px solid var(--ak-accent);
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.title {
+  font-family: var(--ak-font-mono);
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--ak-text-primary);
+  letter-spacing: 2px;
+}
+
+.subtitle {
+  font-family: var(--ak-font-mono);
+  font-size: 12px;
+  color: var(--ak-text-secondary);
+  margin: 5px 0 0;
+}
+
+.backButton {
+  font-family: var(--ak-font-mono);
+  font-size: 14px;
+  color: var(--ak-text-secondary);
+  cursor: pointer;
+  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+
+  &:hover {
+    color: var(--ak-accent);
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.codeRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  
+  .codeInput {
+    flex: 1;
+    margin-bottom: 0;
+  }
+  
+  button {
+    height: 42px; // Match input height approx
+    margin-bottom: 0;
+  }
+}
+
+.bottomLinks {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 15px;
+  padding: 0 5px;
+}
+
+.linkItem {
+  color: var(--ak-text-secondary);
+  font-size: 12px;
+  font-family: var(--ak-font-mono);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.3s ease;
+
+  &:hover {
+    color: var(--ak-accent);
+  }
+}
+
+.footer {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ak-text-secondary);
+  font-family: var(--ak-font-mono);
+  line-height: 1.5;
+}

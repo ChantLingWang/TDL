@@ -25,12 +25,6 @@ class MongoDBUserService:
         创建用户
         """
         try:
-            #获取现在时间并转换为字符串格式
-            current_time = datetime.now(timezone.utc).isoformat()
-
-            #这个字段，如果data中没有，也会自动增加
-            user_data.setdefault('created_at', current_time)    #创建用户的时间，存储为字符串
-
             #异步插入数据到 MongoDB 集合的操作，将user_data异步insert_one（mongo标准插入方法）插入到集合中
             result = await self.collection.insert_one(user_data)
 
@@ -171,4 +165,52 @@ class MongoDBUserService:
             return await self.get_next_value("user_id_sequence")
         except Exception as e:
             raise Exception("获取下一个用户id失败")
+    
+
+    async def sync_user_fields(self, user_data: Dict[str, Any]) -> None:
+        """
+        同步用户字段到数据库
+        """
+        try:
+            await self.collection.insert_one(user_data)
+        except Exception as e:
+            raise Exception("同步用户字段失败")
+
+    async def update_user_status(self, user_id: str, status: str) -> bool:
+        """
+        更新用户状态
+        
+        Args:
+            user_id: 用户ID
+            status: 新状态 (active/pending/error)
             
+        Returns:
+            bool: 是否更新成功
+        """
+        try:
+            result = await self.collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            raise Exception(f"更新用户状态失败: {e}")
+
+    async def get_user_status(self, user_id: str) -> Optional[str]:
+        """
+        获取用户状态
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            str: 用户状态 (active/pending/error) 或 None
+        """
+        try:
+            user = await self.collection.find_one(
+                {"user_id": user_id},
+                {"status": 1, "_id": 0}
+            )
+            return user.get("status") if user else None
+        except Exception as e:
+            raise Exception(f"获取用户状态失败: {e}")

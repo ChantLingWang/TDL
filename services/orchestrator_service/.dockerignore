@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build output
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+orchestrator-service
+
+# Mac
+.DS_Store

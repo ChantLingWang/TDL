@@ -1,0 +1,52 @@
+.akButton {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--ak-bg-secondary);
+  color: var(--ak-text-primary);
+  border: none;
+  padding: 12px 24px;
+  font-family: var(--ak-font-mono);
+  font-size: 14px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  clip-path: polygon(
+    10px 0, 100% 0, 
+    100% calc(100% - 10px), calc(100% - 10px) 100%, 
+    0 100%, 0 10px
+  );
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background-color: var(--ak-accent);
+    transition: width 0.3s ease;
+    z-index: -1;
+  }
+  
+  &:hover {
+    background-color: var(--ak-accent);
+    color: #000;
+    
+    &::before {
+      width: 100%;
+    }
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--ak-bg-secondary);
+    color: var(--ak-text-secondary);
+    
+    &:hover::before {
+      width: 4px;
+    }
+  }
+}

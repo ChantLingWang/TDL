@@ -1,0 +1,65 @@
+.inputWrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: relative;
+}
+
+.label {
+  font-family: var(--ak-font-mono);
+  font-size: 12px;
+  color: var(--ak-text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  
+  &::before {
+    content: '>';
+    margin-right: 5px;
+    color: var(--ak-accent);
+  }
+}
+
+.input {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-bottom: 1px solid var(--ak-text-secondary);
+  color: var(--ak-text-primary);
+  padding: 10px 15px;
+  font-family: var(--ak-font-main);
+  font-size: 16px;
+  outline: none;
+  transition: all 0.3s ease;
+  
+  &:focus {
+    background-color: rgba(0, 200, 255, 0.1);
+    border-bottom: 1px solid var(--ak-accent);
+    padding-left: 20px;
+  }
+  
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    transition: opacity 0.3s ease;
+  }
+  
+  &:focus::placeholder {
+    opacity: 0;
+  }
+}
+
+.decoration {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid var(--ak-accent);
+  border-right: 2px solid var(--ak-accent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.input:focus ~ .decoration {
+  opacity: 1;
+}
