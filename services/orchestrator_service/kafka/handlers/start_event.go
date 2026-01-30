@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
-	consumer_model "orchestrator_service/kafka/consumer/model"
 	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
 	"orchestrator_service/templates"
@@ -32,7 +30,13 @@ func mergeData(templateData map[string]any, inputData map[string]any) map[string
 }
 
 // HandleSagaStartEvent 处理Saga启动事件
-func HandleSagaStartEvent(ctx context.Context, businessEvent *consumer_model.BusinessEvent, kafkaProducer *producer.KafkaProducer, sagas map[string]*saga.Saga, sagasMutex *sync.RWMutex) error {
+func HandleSagaStartEvent(sagaCtx *SagaEventHandlerContext) error {
+	ctx := sagaCtx.Ctx
+	businessEvent := sagaCtx.BusinessEvent
+	kafkaProducer := sagaCtx.KafkaProducer
+	sagas := sagaCtx.Sagas
+	sagasMutex := sagaCtx.SagasMutex
+
 	// 解析为字典格式，key为步骤topic/name，value为步骤数据
 	var dataMap map[string]map[string]any
 	// 尝试解析为 map[string]map[string]any

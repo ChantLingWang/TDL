@@ -1,18 +1,21 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 
-	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
 )
 
 // HandleStepRecoverySuccessEvent 处理步骤补偿成功事件
-func HandleStepRecoverySuccessEvent(ctx context.Context, data []byte, globalKafkaProducer *producer.KafkaProducer, sagas map[string]*saga.Saga, sagasMutex *sync.RWMutex) error {
+func HandleStepRecoverySuccessEvent(sagaCtx *SagaEventHandlerContext) error {
+	ctx := sagaCtx.Ctx
+	data := sagaCtx.EventData
+	globalKafkaProducer := sagaCtx.KafkaProducer
+	sagas := sagaCtx.Sagas
+	sagasMutex := sagaCtx.SagasMutex
+
 	var result saga.StepResultData
 	if err := json.Unmarshal(data, &result); err != nil {
 		log.Printf("❌ Failed to unmarshal step compensation success event: %v", err)

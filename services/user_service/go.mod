@@ -7,12 +7,16 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/segmentio/kafka-go v0.4.49
 	go.mongodb.org/mongo-driver v1.17.6
-	gorm.io/driver/postgres v1.6.0
-	gorm.io/gorm v1.31.1
+	gorm.io/driver/postgres v1.5.7
+	gorm.io/gen v0.3.25
+	gorm.io/gorm v1.25.7
+	gorm.io/plugin/dbresolver v1.5.0
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -27,6 +31,11 @@ require (
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	golang.org/x/mod v0.28.0 // indirect
+	golang.org/x/tools v0.37.0 // indirect
+	gorm.io/datatypes v1.2.0 // indirect
+	gorm.io/driver/mysql v1.5.6 // indirect
+	gorm.io/hints v1.1.0 // indirect
 )
 
 require (
