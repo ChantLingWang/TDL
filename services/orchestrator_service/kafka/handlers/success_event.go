@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"orchestrator_service/kafka/producer"
@@ -13,7 +12,13 @@ import (
 )
 
 // HandleStepSuccessEvent 处理步骤成功事件
-func HandleStepSuccessEvent(ctx context.Context, data []byte, globalKafkaProducer *producer.KafkaProducer, sagas map[string]*saga.Saga, sagasMutex *sync.RWMutex) error {
+func HandleStepSuccessEvent(sagaCtx *SagaEventHandlerContext) error {
+	ctx := sagaCtx.Ctx
+	data := sagaCtx.EventData
+	globalKafkaProducer := sagaCtx.KafkaProducer
+	sagas := sagaCtx.Sagas
+	sagasMutex := sagaCtx.SagasMutex
+
 	var result saga.StepResultData
 	if err := json.Unmarshal(data, &result); err != nil {
 		log.Printf("❌ Failed to unmarshal step success event: %v", err)

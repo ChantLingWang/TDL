@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"user_service/app/database/pgsql"
+	"user_service/app/database/pgsql/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -49,8 +50,8 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":   "Group created successfully",
-		"group_id":  group.GroupID,
+		"message":    "Group created successfully",
+		"group_id":   group.GroupID,
 		"group_name": group.GroupName,
 		"created_at": group.CreateTime,
 	})
@@ -105,8 +106,8 @@ func InitTestUser(c *gin.Context) {
 	}
 
 	db := pgsql.GetDBManager().GetDB()
-	
-	user := pgsql.User{
+
+	user := model.User{
 		UserID:       userID,
 		Username:     username,
 		Email:        userID + "@example.com",
@@ -114,7 +115,7 @@ func InitTestUser(c *gin.Context) {
 	}
 
 	// FirstOrCreate
-	if err := db.Where(pgsql.User{UserID: userID}).FirstOrCreate(&user).Error; err != nil {
+	if err := db.Where(model.User{UserID: userID}).FirstOrCreate(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

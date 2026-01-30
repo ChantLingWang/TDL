@@ -8,6 +8,8 @@ import (
 	"gorm.io/gorm"
 
 	"user_service/app/core"
+	"user_service/app/database/pgsql/model"
+	"user_service/app/database/pgsql/query"
 )
 
 // DBManager 数据库管理器结构体
@@ -41,7 +43,7 @@ func (manager *DBManager) Connect() error {
 	// 构建DSN (Data Source Name)
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		host, user, password, dbname, port, core.DataBaseConfig.SSLMode, core.DataBaseConfig.TimeZone)
-	
+
 	// Gorm框架提供的用于初始化数据库连接的主要函数
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -62,6 +64,10 @@ func (manager *DBManager) Connect() error {
 	sqlDB.SetMaxOpenConns(100)
 
 	manager.db = db
+
+	// 设置 GEN 的默认数据库连接
+	query.SetDefault(db)
+
 	return nil
 }
 
@@ -87,6 +93,6 @@ func (manager *DBManager) Initialize() error {
 	if manager.db == nil {
 		return fmt.Errorf("database not connected")
 	}
-	
-	return AutoMigrate(manager.db)
+
+	return model.AutoMigrate(manager.db)
 }

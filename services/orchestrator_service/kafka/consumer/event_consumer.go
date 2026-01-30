@@ -72,58 +72,43 @@ func (bh *BaseEventHandler) ConsumeEvents(ctx context.Context) error {
 			}
 
 			// 事务协调分发逻辑 - 编排器接收启动事件和服务反馈消息
+			// 组装 SagaContext
+			sagaCtx := &handlers.SagaEventHandlerContext{
+				Ctx:           ctx,
+				EventData:     businessEvent.Data,
+				BusinessEvent: businessEvent,
+				KafkaProducer: bh.orchestrator.GetKafkaProducer(),
+				Sagas:         *bh.orchestrator.GetSagas(),
+				SagasMutex:    bh.orchestrator.GetSagasMutex(),
+			}
+
 			switch businessEvent.CommonParams.EventType {
 			case saga.EventTypeSagaStart:
-				if err := handlers.HandleSagaStartEvent(
-					ctx,
-					businessEvent,
-					bh.orchestrator.GetKafkaProducer(),
-					*bh.orchestrator.GetSagas(),
-					bh.orchestrator.GetSagasMutex()); err != nil {
+				if err := handlers.HandleSagaStartEvent(sagaCtx); err != nil {
 					log.Printf("❌ Failed to process saga start event: %v", err)
 					continue
 				}
 
 			case saga.EventTypeStepSuccess:
-				if err := handlers.HandleStepSuccessEvent(
-					ctx,
-					businessEvent.Data,
-					bh.orchestrator.GetKafkaProducer(),
-					*bh.orchestrator.GetSagas(),
-					bh.orchestrator.GetSagasMutex()); err != nil {
+				if err := handlers.HandleStepSuccessEvent(sagaCtx); err != nil {
 					log.Printf("❌ Failed to process step success event: %v", err)
 					continue
 				}
 
 			case saga.EventTypeStepFailed:
-				if err := handlers.HandleStepFailureEvent(
-					ctx,
-					businessEvent.Data,
-					bh.orchestrator.GetKafkaProducer(),
-					*bh.orchestrator.GetSagas(),
-					bh.orchestrator.GetSagasMutex()); err != nil {
+				if err := handlers.HandleStepFailureEvent(sagaCtx); err != nil {
 					log.Printf("❌ Failed to process step failure event: %v", err)
 					continue
 				}
 
 			case saga.EventTypeStepRecoveryFail:
-				if err := handlers.HandleStepRecoveryFailureEvent(
-					ctx,
-					businessEvent.Data,
-					bh.orchestrator.GetKafkaProducer(),
-					*bh.orchestrator.GetSagas(),
-					bh.orchestrator.GetSagasMutex()); err != nil {
+				if err := handlers.HandleStepRecoveryFailureEvent(sagaCtx); err != nil {
 					log.Printf("❌ Failed to process step compensation failure event: %v", err)
 					continue
 				}
 
 			case saga.EventTypeStepRecoverySuccess:
-				if err := handlers.HandleStepRecoverySuccessEvent(
-					ctx,
-					businessEvent.Data,
-					bh.orchestrator.GetKafkaProducer(),
-					*bh.orchestrator.GetSagas(),
-					bh.orchestrator.GetSagasMutex()); err != nil {
+				if err := handlers.HandleStepRecoverySuccessEvent(sagaCtx); err != nil {
 					log.Printf("❌ Failed to process step compensation success event: %v", err)
 					continue
 				}

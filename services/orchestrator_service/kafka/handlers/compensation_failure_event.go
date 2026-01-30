@@ -5,16 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"orchestrator_service/kafka/deadlinequeue"
-	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
 )
 
 // HandleStepRecoveryFailureEvent 处理步骤补偿失败事件
-func HandleStepRecoveryFailureEvent(ctx context.Context, data []byte, globalKafkaProducer *producer.KafkaProducer, sagas map[string]*saga.Saga, sagasMutex *sync.RWMutex) error {
+func HandleStepRecoveryFailureEvent(sagaCtx *SagaEventHandlerContext) error {
+	ctx := sagaCtx.Ctx
+	_ = ctx
+	data := sagaCtx.EventData
+	globalKafkaProducer := sagaCtx.KafkaProducer
+	sagas := sagaCtx.Sagas
+	sagasMutex := sagaCtx.SagasMutex
+
 	var result saga.StepResultData
 	if err := json.Unmarshal(data, &result); err != nil {
 		log.Printf("❌ Failed to unmarshal step compensation failure event: %v. Data: %s", err, string(data))
