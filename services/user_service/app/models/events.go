@@ -21,3 +21,9 @@ type UserRegisteredEvent struct {
 	CreatedAt string                 `json:"created_at"`
 	Data      map[string]interface{} `json:"data,omitempty"`
 }
+
+// KickUserData 定义踢人事件的具体数据结构
+type KickUserData struct {
+	UserID string `json:"user_id"`
+	Reason string `json:"reason"`
+}

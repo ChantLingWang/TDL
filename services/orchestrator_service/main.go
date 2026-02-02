@@ -8,11 +8,12 @@ import (
 	"syscall"
 	"time"
 
-	"orchestrator_service/kafka"
 	"orchestrator_service/kafka/consumer"
 	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator"
 	"orchestrator_service/templates"
+
+	sdk_kafka "infrastructure_sdk/kafka"
 )
 
 func main() {
@@ -29,20 +30,22 @@ func main() {
 	groupID := GlobalConfig.Kafka.GroupID
 
 	// 初始化Kafka连接和生产者
-	kafkaConn := kafka.NewKafkaConnection(brokers, topic, groupID)
+	kafkaConn, err := sdk_kafka.NewKafkaConnection(brokers, topic, groupID)
+	if err != nil {
+		log.Fatalf("Failed to create Kafka connection: %v", err)
+	}
 	kafkaProducer := producer.NewKafkaProducer(kafkaConn)
 
 	// 初始化带Kafka的编排器
 	orchestrator := orchestrator.NewSagaOrchestratorWithKafka(kafkaProducer)
 
-	// 初始化事件消费者，传入编排器
-	eventConsumer := consumer.NewBaseEventHandler(kafkaConn, orchestrator)
+	// 初始化 SDK 消费者
+	eventConsumer := sdk_kafka.NewBaseConsumer(kafkaConn)
 
-	// 启动Kafka消费者
+	// 启动Kafka消费者 (使用主动拉取循环)
 	go func() {
-
-		if err := eventConsumer.ConsumeEvents(context.Background()); err != nil {
-			log.Printf("Event consumer error: %v", err)
+		if err := consumer.Start(context.Background(), eventConsumer, orchestrator); err != nil {
+			log.Printf("Saga consumer error: %v", err)
 		}
 	}()
 
@@ -69,7 +72,7 @@ func startSagaExecutor(orchestrator *orchestrator.SagaOrchestratorWithKafka) {
 			// 执行超时检查
 			timeoutThreshold := 10 * time.Second
 			orchestrator.CheckTimeouts(timeoutThreshold)
-			
+
 			time.Sleep(1 * time.Second)
 		}
 	}
