@@ -7,7 +7,6 @@ import (
 	"log"
 	"user_service/app/api/utils"
 	"user_service/app/infrastructure/kafka"
-	"user_service/app/infrastructure/kafka/model"
 	"user_service/app/models"
 )
 
@@ -35,7 +34,7 @@ func GetMessageService() *MessageService {
 
 // HandleUserKickEvent 处理 Kafka 收到的踢人事件
 func HandleUserKickEvent(ctx context.Context, data json.RawMessage) error {
-	var kickData model.KickUserData
+	var kickData models.KickUserData
 	if err := json.Unmarshal(data, &kickData); err != nil {
 		return fmt.Errorf("解析踢人数据失败: %v", err)
 	}

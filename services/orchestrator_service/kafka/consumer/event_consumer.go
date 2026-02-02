@@ -2,16 +2,14 @@ package consumer
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"sync"
-	"time"
 
-	"orchestrator_service/kafka"
-	consumer_model "orchestrator_service/kafka/consumer/model"
 	"orchestrator_service/kafka/handlers"
 	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
+
+	sdk_kafka "infrastructure_sdk/kafka"
 )
 
 // SagaOrchestratorInterface Saga编排器接口
@@ -21,101 +19,56 @@ type SagaOrchestratorInterface interface {
 	GetSagasMutex() *sync.RWMutex
 }
 
-// BaseEventHandler 基础事件处理器，封装通用消费逻辑
-type BaseEventHandler struct {
-	connection   *kafka.KafkaConnection
+// SagaEventHandler Saga事件处理器
+type SagaEventHandler struct {
 	orchestrator SagaOrchestratorInterface
 }
 
-// NewBaseEventHandler 创建基础事件处理器
-func NewBaseEventHandler(connection *kafka.KafkaConnection, orchestrator SagaOrchestratorInterface) *BaseEventHandler {
-	return &BaseEventHandler{
-		connection:   connection,
+// NewSagaEventHandler 创建Saga事件处理器
+func NewSagaEventHandler(orchestrator SagaOrchestratorInterface) *SagaEventHandler {
+	return &SagaEventHandler{
 		orchestrator: orchestrator,
 	}
 }
 
-// parseOuterStructure 解析外层结构（通用逻辑）
-func (bh *BaseEventHandler) parseOuterStructure(msg []byte) (*consumer_model.BusinessEvent, error) {
-	var businessEvent consumer_model.BusinessEvent
-	if err := json.Unmarshal(msg, &businessEvent); err != nil {
-		return nil, err
+// 负责分发 Saga 相关的业务事件
+func (h *SagaEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.BusinessEvent) error {
+	// 组装 SagaContext
+	sagaCtx := &handlers.SagaEventHandlerContext{
+		Ctx:           ctx,
+		EventData:     event.Data,
+		BusinessEvent: event,
+		KafkaProducer: h.orchestrator.GetKafkaProducer(),
+		Sagas:         *h.orchestrator.GetSagas(),
+		SagasMutex:    h.orchestrator.GetSagasMutex(),
 	}
-	return &businessEvent, nil
+
+	var processErr error
+	switch event.CommonParams.EventType {
+	case saga.EventTypeSagaStart:
+		processErr = handlers.HandleSagaStartEvent(sagaCtx)
+	case saga.EventTypeStepSuccess:
+		processErr = handlers.HandleStepSuccessEvent(sagaCtx)
+	case saga.EventTypeStepFailed:
+		processErr = handlers.HandleStepFailureEvent(sagaCtx)
+	default:
+		// 忽略未知事件
+	}
+
+	if processErr != nil {
+		log.Printf("❌ Error processing event %s (ID: %s): %v",
+			event.CommonParams.EventType, event.CommonParams.EventID, processErr)
+		// 注意：根据之前的逻辑，这里返回 nil 表示“已处理（即使失败）”，SDK 会提交 Offset。
+		// 如果需要重试（At-Least-Once），应该返回 error。
+		return nil
+	}
+
+	return nil
 }
 
-// ConsumeEvents 消费事件的模板方法
-func (bh *BaseEventHandler) ConsumeEvents(ctx context.Context) error {
-	reader := bh.connection.Reader
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			// 设置读取超时
-			readCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
-			msg, err := reader.ReadMessage(readCtx)
-			cancel()
-
-			if err != nil {
-				if err == context.DeadlineExceeded {
-					continue // 超时继续循环
-				}
-				continue
-			}
-
-			// 解析外层结构
-			businessEvent, err := bh.parseOuterStructure(msg.Value)
-			if err != nil {
-				continue
-			}
-
-			// 事务协调分发逻辑 - 编排器接收启动事件和服务反馈消息
-			// 组装 SagaContext
-			sagaCtx := &handlers.SagaEventHandlerContext{
-				Ctx:           ctx,
-				EventData:     businessEvent.Data,
-				BusinessEvent: businessEvent,
-				KafkaProducer: bh.orchestrator.GetKafkaProducer(),
-				Sagas:         *bh.orchestrator.GetSagas(),
-				SagasMutex:    bh.orchestrator.GetSagasMutex(),
-			}
-
-			switch businessEvent.CommonParams.EventType {
-			case saga.EventTypeSagaStart:
-				if err := handlers.HandleSagaStartEvent(sagaCtx); err != nil {
-					log.Printf("❌ Failed to process saga start event: %v", err)
-					continue
-				}
-
-			case saga.EventTypeStepSuccess:
-				if err := handlers.HandleStepSuccessEvent(sagaCtx); err != nil {
-					log.Printf("❌ Failed to process step success event: %v", err)
-					continue
-				}
-
-			case saga.EventTypeStepFailed:
-				if err := handlers.HandleStepFailureEvent(sagaCtx); err != nil {
-					log.Printf("❌ Failed to process step failure event: %v", err)
-					continue
-				}
-
-			case saga.EventTypeStepRecoveryFail:
-				if err := handlers.HandleStepRecoveryFailureEvent(sagaCtx); err != nil {
-					log.Printf("❌ Failed to process step compensation failure event: %v", err)
-					continue
-				}
-
-			case saga.EventTypeStepRecoverySuccess:
-				if err := handlers.HandleStepRecoverySuccessEvent(sagaCtx); err != nil {
-					log.Printf("❌ Failed to process step compensation success event: %v", err)
-					continue
-				}
-
-			default:
-				log.Printf("⚠️ Received unhandled event type: %s", businessEvent.CommonParams.EventName)
-			}
-		}
-	}
+// Start 启动 Saga 事件消费者
+func Start(ctx context.Context, consumer *sdk_kafka.BaseConsumer, orchestrator SagaOrchestratorInterface) error {
+	log.Println("Starting Saga Orchestrator Consumer...")
+	handler := NewSagaEventHandler(orchestrator)
+	return consumer.Start(ctx, handler.HandleEvent)
 }

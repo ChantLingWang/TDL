@@ -64,3 +64,6 @@ docker-volumes/
 tmp/
 temp/
 *.tmp
+
+# Trae AI
+.trae/rules/project_rules.md

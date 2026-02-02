@@ -14,7 +14,10 @@ import (
 	"user_service/app/infrastructure/kafka"
 	"user_service/app/services"
 
+	sdk_kafka "infrastructure_sdk/kafka"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // initPostgreSQL 初始化PostgreSQL数据库连接
@@ -39,22 +42,20 @@ func initMongoDB() {
 	if err := mongoManager.Connect(); err != nil {
 		log.Fatalf("MongoDB连接失败: %v", err)
 	}
-	// 注意：这里不要 close，因为是长连接
-	// defer mongoManager.Close()
 }
 
 // initMessageService 初始化消息服务（包括 Kafka Producer）
-func initMessageService() *kafka.KafkaConnection {
+func initMessageService() *sdk_kafka.KafkaConnection {
 	kafkaConfig := core.KafkaConfigInstance
 
 	// 1. 创建 Kafka 连接（Producer 用）
-	// Producer 不需要 GroupID，所以这里 GroupID 传空字符串也行，或者共用
-	// 为了简单，我们创建一个专门用于 Producer 的连接，或者复用
-	// 这里我们创建一个专门的连接
-	conn := kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, "")
+	conn, err := sdk_kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, "producer-connection")
+	if err != nil {
+		log.Fatalf("创建 Kafka Producer 连接失败: %v", err)
+	}
 
 	// 2. 创建 Producer
-	producer := kafka.NewKafkaProducer(conn)
+	producer := kafka.NewKafkaProducer(conn, kafkaConfig.Topic)
 
 	// 3. 初始化 MessageService
 	services.InitMessageService(producer)
@@ -104,15 +105,24 @@ func startKafkaConsumer(sigchan chan os.Signal) {
 	kafkaConfig := core.KafkaConfigInstance
 
 	// 1. 创建 Kafka 连接 (Consumer 用)
-	connection := kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, "")
+	// 显式生成 GroupID (UUID)
+	groupID := uuid.New().String()
+	connection, err := sdk_kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, groupID)
+	if err != nil {
+		log.Printf("创建 Kafka Consumer 连接失败: %v", err)
+		return
+	}
 	defer connection.Close()
 
 	// 2. 创建事件处理器
-	handler := kafka.NewBaseEventHandler(connection)
+	handler := kafka.NewUserEventHandler()
 	// 注册聊天消息处理回调
 	handler.SetChatMessageHandler(services.HandleChatMessageEvent)
 	// 注册广播消息处理回调
 	handler.SetBroadcastMessageHandler(services.HandleBroadcastMessageEvent)
+
+	// 创建 SDK 消费者
+	consumer := sdk_kafka.NewBaseConsumer(connection)
 
 	// 3. 创建上下文用于控制消费者生命周期，带有信号处理
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,9 +130,8 @@ func startKafkaConsumer(sigchan chan os.Signal) {
 
 	// 4. 在单独协程中启动事件消费
 	go func() {
-		log.Println("Kafka 消费者已启动 (广播模式)")
-		if err := handler.ConsumeEvents(ctx); err != nil {
-			log.Printf("Kafka事件消费错误: %v", err)
+		if err := consumer.Start(ctx, handler.HandleEvent); err != nil {
+			log.Printf("Kafka consumer error: %v", err)
 		}
 	}()
 
@@ -159,7 +168,4 @@ func main() {
 	// 6. 等待关闭信号
 	<-sigchan
 	log.Println("接收到关闭信号，服务即将退出")
-
-	// 给一点时间让 cleanup 完成
-	// time.Sleep(time.Second)
 }

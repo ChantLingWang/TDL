@@ -5,13 +5,15 @@ go 1.25.0
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
-	github.com/segmentio/kafka-go v0.4.49
 	go.mongodb.org/mongo-driver v1.17.6
 	gorm.io/driver/postgres v1.5.7
 	gorm.io/gen v0.3.25
 	gorm.io/gorm v1.25.7
 	gorm.io/plugin/dbresolver v1.5.0
+	infrastructure_sdk v0.0.0
 )
+
+replace infrastructure_sdk => ../../infrastructure_sdk
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -27,6 +29,7 @@ require (
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/segmentio/kafka-go v0.4.50 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
