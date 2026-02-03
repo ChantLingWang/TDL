@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// HandlerFunc 业务处理函数定义
+type HandlerFunc func(ctx context.Context, event *BusinessEvent) error
+
 // BaseConsumer 通用消费者框架
 type BaseConsumer struct {
 	connection *KafkaConnection
@@ -37,6 +40,26 @@ func (mc *MessageContext) Commit() error {
 	}
 	return nil
 }
+
+
+// performBackoff 执行指数退避逻辑
+func performBackoff(ctx context.Context, attempt int, baseDelay time.Duration, eventID string) bool {
+	if attempt <= 0 {
+		return false
+	}
+
+	// 指数退避: 1s, 2s, 4s
+	backoff := baseDelay * time.Duration(1<<uint(attempt-1))
+	log.Printf("Retrying event %s (attempt %d) after %v...", eventID, attempt, backoff)
+
+	select {
+	case <-ctx.Done():
+		return true // 上下文取消
+	case <-time.After(backoff):
+		return false // 继续重试
+	}
+}
+
 
 // fetch 从 Kafka 拉取一条业务事件
 func (bc *BaseConsumer) fetch(ctx context.Context) (*BusinessEvent, *MessageContext, error) {
@@ -70,11 +93,8 @@ func (bc *BaseConsumer) fetch(ctx context.Context) (*BusinessEvent, *MessageCont
 	return event, msgCtx, nil
 }
 
-// HandlerFunc 业务处理函数定义
-type HandlerFunc func(ctx context.Context, event *BusinessEvent) error
 
 // Start 启动标准消费循环 (阻塞方法)
-// 封装了 Fetch -> Handle -> Commit 的标准流程，确保 At-Least-Once 语义
 func (bc *BaseConsumer) Start(ctx context.Context, handler HandlerFunc) error {
 	log.Printf("Kafka consumer started for topic: %s", bc.connection.Reader.Config().Topic)
 
@@ -96,21 +116,45 @@ func (bc *BaseConsumer) Start(ctx context.Context, handler HandlerFunc) error {
 				continue
 			}
 
-			// 2. 调用业务回调
-			if err := handler(ctx, event); err != nil {
-				// 业务处理失败
-				log.Printf("Event handling failed (ID: %s, Type: %s): %v",
-					event.CommonParams.EventID,
-					event.CommonParams.EventType,
-					err)
+			// 2. 调用业务回调 (带重试机制)
+			executeWithRetry(ctx, handler, event)
 
-				time.Sleep(100 * time.Millisecond) // 简单限流
-			} else {
-				// 3. 业务处理成功，提交 Offset
-				if err := msgCtx.Commit(); err != nil {
-					log.Printf("Failed to commit offset for event %s: %v", event.CommonParams.EventID, err)
-				}
+			// 3. 提交 Offset
+			// 只有当 handler 成功，或者重试次数耗尽我们决定跳过时，才提交
+			if err := msgCtx.Commit(); err != nil {
+				log.Printf("Kafka commit error: %v", err)
 			}
 		}
+	}
+}
+
+// executeWithRetry 执行业务回调并处理重试逻辑
+func executeWithRetry(ctx context.Context, handler HandlerFunc, event *BusinessEvent) {
+	const (
+		maxRetries = 3
+		baseDelay  = 1 * time.Second
+	)
+
+	var handleErr error
+	success := false
+
+	for i := 0; i <= maxRetries; i++ {
+		// 每次重试前，执行退避逻辑
+		if shouldStop := performBackoff(ctx, i, baseDelay, event.CommonParams.EventID); shouldStop {
+			return
+		}
+
+		handleErr = handler(ctx, event)
+		if handleErr == nil {
+			success = true
+			break
+		}
+		log.Printf("Handler error for event %s: %v", event.CommonParams.EventID, handleErr)
+	}
+
+	if !success {
+		log.Printf("❌ Failed to process event %s after %d attempts. Skipping to avoid blocking queue.", event.CommonParams.EventID, maxRetries)
+		// 注意：这里我们选择提交 Offset，即使处理失败。
+		// 这是一种 "Skip Bad Message" 策略。在更严格的系统中，这里应该投递到死信队列 (DLQ)。
 	}
 }

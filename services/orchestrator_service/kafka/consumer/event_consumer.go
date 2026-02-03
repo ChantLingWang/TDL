@@ -51,6 +51,10 @@ func (h *SagaEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.Bus
 		processErr = handlers.HandleStepSuccessEvent(sagaCtx)
 	case saga.EventTypeStepFailed:
 		processErr = handlers.HandleStepFailureEvent(sagaCtx)
+	case saga.EventTypeStepRecoverySuccess:
+		processErr = handlers.HandleStepRecoverySuccessEvent(sagaCtx)
+	case saga.EventTypeStepRecoveryFail:
+		processErr = handlers.HandleStepRecoveryFailureEvent(sagaCtx)
 	default:
 		// 忽略未知事件
 	}
@@ -58,17 +62,9 @@ func (h *SagaEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.Bus
 	if processErr != nil {
 		log.Printf("❌ Error processing event %s (ID: %s): %v",
 			event.CommonParams.EventType, event.CommonParams.EventID, processErr)
-		// 注意：根据之前的逻辑，这里返回 nil 表示“已处理（即使失败）”，SDK 会提交 Offset。
-		// 如果需要重试（At-Least-Once），应该返回 error。
-		return nil
+		// 直接返回错误，让 SDK 层进行重试
+		return processErr
 	}
 
 	return nil
-}
-
-// Start 启动 Saga 事件消费者
-func Start(ctx context.Context, consumer *sdk_kafka.BaseConsumer, orchestrator SagaOrchestratorInterface) error {
-	log.Println("Starting Saga Orchestrator Consumer...")
-	handler := NewSagaEventHandler(orchestrator)
-	return consumer.Start(ctx, handler.HandleEvent)
 }

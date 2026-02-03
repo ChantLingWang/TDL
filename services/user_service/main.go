@@ -17,7 +17,6 @@ import (
 	sdk_kafka "infrastructure_sdk/kafka"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // initPostgreSQL 初始化PostgreSQL数据库连接
@@ -99,52 +98,6 @@ func startServer() {
 	}
 }
 
-// startKafkaConsumer 启动Kafka消费者
-func startKafkaConsumer(sigchan chan os.Signal) {
-	// 从配置文件获取Kafka配置
-	kafkaConfig := core.KafkaConfigInstance
-
-	// 1. 创建 Kafka 连接 (Consumer 用)
-	// 显式生成 GroupID (UUID)
-	groupID := uuid.New().String()
-	connection, err := sdk_kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, groupID)
-	if err != nil {
-		log.Printf("创建 Kafka Consumer 连接失败: %v", err)
-		return
-	}
-	defer connection.Close()
-
-	// 2. 创建事件处理器
-	handler := kafka.NewUserEventHandler()
-	// 注册聊天消息处理回调
-	handler.SetChatMessageHandler(services.HandleChatMessageEvent)
-	// 注册广播消息处理回调
-	handler.SetBroadcastMessageHandler(services.HandleBroadcastMessageEvent)
-
-	// 创建 SDK 消费者
-	consumer := sdk_kafka.NewBaseConsumer(connection)
-
-	// 3. 创建上下文用于控制消费者生命周期，带有信号处理
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// 4. 在单独协程中启动事件消费
-	go func() {
-		if err := consumer.Start(ctx, handler.HandleEvent); err != nil {
-			log.Printf("Kafka consumer error: %v", err)
-		}
-	}()
-
-	// 等待信号或手动取消
-	select {
-	case <-sigchan:
-		log.Println("接收到关闭信号，正在关闭Kafka消费者...")
-		cancel()
-	case <-ctx.Done():
-		log.Println("Kafka消费者已停止")
-	}
-}
-
 func main() {
 	// 1. 初始化数据库连接
 	initPostgreSQL()
@@ -158,9 +111,22 @@ func main() {
 	sigchan := make(chan os.Signal, 1)
 	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
 
-	// 4. 启动 Kafka 消费者 (阻塞监听)
-	// 注意：这里应该用 go routine 启动，否则会阻塞 main
-	go startKafkaConsumer(sigchan)
+	// 创建上下文用于控制消费者生命周期
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 4. 启动 Kafka 消费者
+	consumerRunner := kafka.NewConsumerRunner(
+		services.HandleChatMessageEvent,
+		services.HandleBroadcastMessageEvent,
+	)
+
+	go func() {
+		if err := consumerRunner.Run(ctx); err != nil {
+			log.Printf("Kafka consumer error: %v", err)
+
+		}
+	}()
 
 	// 5. 启动 HTTP 服务器
 	go startServer()
@@ -168,4 +134,8 @@ func main() {
 	// 6. 等待关闭信号
 	<-sigchan
 	log.Println("接收到关闭信号，服务即将退出")
+
+	// 取消上下文，通知消费者停止
+	cancel()
+	// 可以添加一个短暂的等待让消费者清理资源，或者直接退出
 }

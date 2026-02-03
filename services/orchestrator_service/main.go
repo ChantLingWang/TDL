@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"orchestrator_service/kafka/consumer"
+	"orchestrator_service/kafka"
 	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator"
 	"orchestrator_service/templates"
@@ -29,58 +29,72 @@ func main() {
 	topic := GlobalConfig.Kafka.Topic
 	groupID := GlobalConfig.Kafka.GroupID
 
-	// 初始化Kafka连接和生产者
+	// 1. 初始化 Kafka 生产者连接
+	// 注意：这里需要一个单独的连接给 Producer 使用，因为 ConsumerRunner 会管理它自己的 Consumer 连接
+	// 这符合读写分离的原则，也避免了连接复用带来的复杂性
 	kafkaConn, err := sdk_kafka.NewKafkaConnection(brokers, topic, groupID)
 	if err != nil {
-		log.Fatalf("Failed to create Kafka connection: %v", err)
+		log.Fatalf("Failed to create Kafka connection for producer: %v", err)
 	}
+	defer kafkaConn.Close()
+
 	kafkaProducer := producer.NewKafkaProducer(kafkaConn)
 
-	// 初始化带Kafka的编排器
-	orchestrator := orchestrator.NewSagaOrchestratorWithKafka(kafkaProducer)
+	// 2. 初始化带Kafka的编排器
+	orchestratorInstance := orchestrator.NewSagaOrchestratorWithKafka(kafkaProducer)
 
-	// 初始化 SDK 消费者
-	eventConsumer := sdk_kafka.NewBaseConsumer(kafkaConn)
+	// 3. 设置信号处理和上下文
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// 启动Kafka消费者 (使用主动拉取循环)
+	// 4. 初始化并启动 Kafka 消费者 (ConsumerRunner)
+	consumerConfig := kafka.KafkaConfig{
+		Brokers: GlobalConfig.Kafka.Brokers,
+		Topic:   GlobalConfig.Kafka.Topic,
+		GroupID: GlobalConfig.Kafka.GroupID,
+	}
+
+	consumerRunner := kafka.NewConsumerRunner(consumerConfig, orchestratorInstance)
+
 	go func() {
-		if err := consumer.Start(context.Background(), eventConsumer, orchestrator); err != nil {
-			log.Printf("Saga consumer error: %v", err)
+		if err := consumerRunner.Run(ctx); err != nil {
+			log.Printf("Kafka consumer runner error: %v", err)
 		}
 	}()
 
-	// 启动Saga执行器（监听内部事件队列）
+	// 5. 启动 Saga 执行器（后台任务，如超时检查）
 	go func() {
-
-		startSagaExecutor(orchestrator)
+		startSagaExecutor(ctx, orchestratorInstance)
 	}()
 
-	// 等待中断信号进行优雅关闭
-	waitForShutdown(orchestrator)
+	// 6. 等待关闭信号
+	waitForShutdown(cancel, orchestratorInstance)
 }
 
 // startSagaExecutor 启动Saga执行器
 // 目前作为占位符，后续可用于执行超时检查、失败重试等后台任务
-func startSagaExecutor(orchestrator *orchestrator.SagaOrchestratorWithKafka) {
+func startSagaExecutor(ctx context.Context, orchestrator *orchestrator.SagaOrchestratorWithKafka) {
+	log.Println("Starting Saga Executor...")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-orchestrator.GetContext().Done():
-
+		case <-ctx.Done():
+			log.Println("Saga Executor stopped")
 			return
-		default:
+		case <-orchestrator.GetContext().Done(): // 同时也监听 orchestrator 自身的上下文
+			return
+		case <-ticker.C:
 			// 执行超时检查
 			timeoutThreshold := 10 * time.Second
 			orchestrator.CheckTimeouts(timeoutThreshold)
-
-			time.Sleep(1 * time.Second)
 		}
 	}
 }
 
 // waitForShutdown 等待关闭信号
-func waitForShutdown(orchestrator *orchestrator.SagaOrchestratorWithKafka) {
-
+func waitForShutdown(cancel context.CancelFunc, orchestrator *orchestrator.SagaOrchestratorWithKafka) {
 	// 创建信号通道
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -88,16 +102,13 @@ func waitForShutdown(orchestrator *orchestrator.SagaOrchestratorWithKafka) {
 	// 等待信号
 	<-quit
 
-	// 清理工作
+	// 1. 首先取消全局上下文，通知所有 Runner 停止
+	cancel()
 
+	// 2. 清理编排器资源
 	orchestrator.Shutdown()
 
-	// 等待所有goroutine结束
-	timeout := time.After(5 * time.Second)
-	select {
-	case <-orchestrator.GetContext().Done():
-
-	case <-timeout:
-		log.Println("Timeout waiting for graceful shutdown")
-	}
+	// 3. 给一点时间让 goroutine 退出
+	time.Sleep(2 * time.Second)
+	log.Println("Orchestrator service exited")
 }
