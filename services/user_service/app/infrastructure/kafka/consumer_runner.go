@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"user_service/app/core"
+	config "user_service/app/config"
 
 	sdk_kafka "infrastructure_sdk/kafka"
 
@@ -14,7 +14,7 @@ import (
 
 // ConsumerRunner 负责管理 Kafka 消费者的生命周期
 type ConsumerRunner struct {
-	config           core.KafkaConfig
+	config           config.KafkaConfig
 	chatHandler      func(context.Context, json.RawMessage) error
 	broadcastHandler func(context.Context, json.RawMessage) error
 }
@@ -25,7 +25,7 @@ func NewConsumerRunner(
 	broadcastHandler func(context.Context, json.RawMessage) error,
 ) *ConsumerRunner {
 	return &ConsumerRunner{
-		config:           core.KafkaConfigInstance,
+		config:           config.KafkaConfigInstance,
 		chatHandler:      chatHandler,
 		broadcastHandler: broadcastHandler,
 	}

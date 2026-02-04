@@ -1,0 +1,26 @@
+server:
+  port: 8080
+  name: "orchestrator-service"
+
+default_timeout: 30s
+default_retry_count: 3
+compensation_timeout: 15s
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  group_id: "orchestrator-group"
+  topic: "saga-events"
+  client_id: "orchestrator-service"
+
+templates:
+  path: "templates/example_yaml"
+
+saga:
+  execution_timeout: 5m
+  max_concurrent_sagas: 100
+  enable_step_retry: true
+
+monitoring:
+  enable_health_check: true
+  enable_metrics: true

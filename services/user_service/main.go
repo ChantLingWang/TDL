@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	v1 "user_service/app/api/v1"
-	"user_service/app/core"
+	config "user_service/app/config"
 	"user_service/app/database/mongodb"
 	"user_service/app/database/pgsql"
 	"user_service/app/infrastructure/kafka"
@@ -45,7 +45,7 @@ func initMongoDB() {
 
 // initMessageService 初始化消息服务（包括 Kafka Producer）
 func initMessageService() *sdk_kafka.KafkaConnection {
-	kafkaConfig := core.KafkaConfigInstance
+	kafkaConfig := config.KafkaConfigInstance
 
 	// 1. 创建 Kafka 连接（Producer 用）
 	conn, err := sdk_kafka.NewKafkaConnection(kafkaConfig.Brokers, kafkaConfig.Topic, "producer-connection")
@@ -93,12 +93,15 @@ func startServer() {
 	app := createApp()
 
 	// 启动HTTP服务器
-	if err := app.Run(":8080"); err != nil {
+	if err := app.Run(":" + config.ServerConfig.Port); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
 }
 
 func main() {
+	// 0. 初始化配置
+	config.InitConfig("config.yaml")
+
 	// 1. 初始化数据库连接
 	initPostgreSQL()
 	initMongoDB()

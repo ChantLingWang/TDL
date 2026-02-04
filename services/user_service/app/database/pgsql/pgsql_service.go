@@ -7,7 +7,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"user_service/app/core"
+	config "user_service/app/config"
 	"user_service/app/database/pgsql/model"
 	"user_service/app/database/pgsql/query"
 )
@@ -34,15 +34,15 @@ func GetDBManager() *DBManager {
 // Connect 连接到PostgreSQL数据库
 func (manager *DBManager) Connect() error {
 	// 从配置文件获取数据库连接信息
-	host := core.DataBaseConfig.Host
-	port := core.DataBaseConfig.Port
-	user := core.DataBaseConfig.User
-	password := core.DataBaseConfig.Password
-	dbname := core.DataBaseConfig.DBName
+	host := config.DataBaseConfig.Host
+	port := config.DataBaseConfig.Port
+	user := config.DataBaseConfig.User
+	password := config.DataBaseConfig.Password
+	dbname := config.DataBaseConfig.DBName
 
 	// 构建DSN (Data Source Name)
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
-		host, user, password, dbname, port, core.DataBaseConfig.SSLMode, core.DataBaseConfig.TimeZone)
+		host, user, password, dbname, port, config.DataBaseConfig.SSLMode, config.DataBaseConfig.TimeZone)
 
 	// Gorm框架提供的用于初始化数据库连接的主要函数
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
