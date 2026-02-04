@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"user_service/app/core"
+	config "user_service/app/config"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -34,23 +34,23 @@ func GetMongoDBManager() *MongoDBManager {
 // Connect 连接到MongoDB数据库
 func (manager *MongoDBManager) Connect() error {
 	// 直接从配置文件获取MongoDB连接URI
-	host := core.MongoDBConfig.Host
-	port := core.MongoDBConfig.Port
-	dbname := core.MongoDBConfig.DBName
+	host := config.MongoDBConfig.Host
+	port := config.MongoDBConfig.Port
+	dbname := config.MongoDBConfig.DBName
 
 	uri := fmt.Sprintf("mongodb://%s:%s/%s?sslmode=%s&timezone=%s",
-		host, port, dbname, core.MongoDBConfig.SSLMode, core.MongoDBConfig.TimeZone)
+		host, port, dbname, config.MongoDBConfig.SSLMode, config.MongoDBConfig.TimeZone)
 
 	// 创建客户端选项对象，配置连接池参数
 	clientOptions := options.Client().ApplyURI(uri)
 	
 	// 设置连接池配置参数
-	clientOptions.SetMaxPoolSize(uint64(core.MongoDBConfig.MaxPoolSize))
-	clientOptions.SetMinPoolSize(uint64(core.MongoDBConfig.MinPoolSize))
-	clientOptions.SetConnectTimeout(time.Duration(core.MongoDBConfig.ConnectTimeoutMS) * time.Millisecond)
-	clientOptions.SetSocketTimeout(time.Duration(core.MongoDBConfig.SocketTimeoutMS) * time.Millisecond)
-	clientOptions.SetServerSelectionTimeout(time.Duration(core.MongoDBConfig.ServerSelectionTimeoutMS) * time.Millisecond)
-	clientOptions.SetMaxConnIdleTime(time.Duration(core.MongoDBConfig.MaxIdleTimeMS) * time.Millisecond)
+	clientOptions.SetMaxPoolSize(uint64(config.MongoDBConfig.MaxPoolSize))
+	clientOptions.SetMinPoolSize(uint64(config.MongoDBConfig.MinPoolSize))
+	clientOptions.SetConnectTimeout(time.Duration(config.MongoDBConfig.ConnectTimeoutMS) * time.Millisecond)
+	clientOptions.SetSocketTimeout(time.Duration(config.MongoDBConfig.SocketTimeoutMS) * time.Millisecond)
+	clientOptions.SetServerSelectionTimeout(time.Duration(config.MongoDBConfig.ServerSelectionTimeoutMS) * time.Millisecond)
+	clientOptions.SetMaxConnIdleTime(time.Duration(config.MongoDBConfig.MaxIdleTimeMS) * time.Millisecond)
 
 	// 连接到MongoDB，传入配置的客户端选项
 	client, err := mongo.Connect(context.Background(), clientOptions)
@@ -75,7 +75,7 @@ func (manager *MongoDBManager) GetDatabase() *mongo.Database {
 	if manager.client == nil {
 		return nil
 	}
-	return manager.client.Database(core.MongoDBConfig.DBName)
+	return manager.client.Database(config.MongoDBConfig.DBName)
 }
 
 // Close 关闭MongoDB连接

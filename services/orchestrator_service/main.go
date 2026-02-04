@@ -13,21 +13,22 @@ import (
 	"orchestrator_service/orchestrator"
 	"orchestrator_service/templates"
 
+	config "orchestrator_service/config"
 	sdk_kafka "infrastructure_sdk/kafka"
 )
 
 func main() {
 
 	// 初始化全局配置
-	InitGlobalConfig()
+	config.InitGlobalConfig("config/config.yaml")
 
 	// 设置模板路径
-	templates.SetTemplatePath(GlobalConfig.Templates.Path)
+	templates.SetTemplatePath(config.GlobalConfig.Templates.Path)
 
 	// Kafka配置
-	brokers := GlobalConfig.Kafka.Brokers
-	topic := GlobalConfig.Kafka.Topic
-	groupID := GlobalConfig.Kafka.GroupID
+	brokers := config.GlobalConfig.Kafka.Brokers
+	topic := config.GlobalConfig.Kafka.Topic
+	groupID := config.GlobalConfig.Kafka.GroupID
 
 	// 1. 初始化 Kafka 生产者连接
 	// 注意：这里需要一个单独的连接给 Producer 使用，因为 ConsumerRunner 会管理它自己的 Consumer 连接
@@ -49,9 +50,9 @@ func main() {
 
 	// 4. 初始化并启动 Kafka 消费者 (ConsumerRunner)
 	consumerConfig := kafka.KafkaConfig{
-		Brokers: GlobalConfig.Kafka.Brokers,
-		Topic:   GlobalConfig.Kafka.Topic,
-		GroupID: GlobalConfig.Kafka.GroupID,
+		Brokers: config.GlobalConfig.Kafka.Brokers,
+		Topic:   config.GlobalConfig.Kafka.Topic,
+		GroupID: config.GlobalConfig.Kafka.GroupID,
 	}
 
 	consumerRunner := kafka.NewConsumerRunner(consumerConfig, orchestratorInstance)

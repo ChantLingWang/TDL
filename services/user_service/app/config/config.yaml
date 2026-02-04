@@ -1,0 +1,32 @@
+server:
+  port: "8080"
+
+postgres:
+  host: "127.0.0.1"
+  port: "5432"
+  user: "lianlinghao"
+  password: ""
+  db_name: "User"
+  ssl_mode: "disable"
+  timezone: "Asia/Shanghai"
+
+mongodb:
+  host: "127.0.0.1"
+  port: "27017"
+  db_name: "User_Database"
+  ssl_mode: "disable"
+  timezone: "Asia/Shanghai"
+  max_pool_size: 10
+  min_pool_size: 1
+  max_idle_time_ms: 30000
+  server_selection_timeout_ms: 5000
+  connect_timeout_ms: 10000
+  socket_timeout_ms: 10000
+  retry_writes: true
+  retry_reads: true
+
+kafka:
+  brokers:
+    - "localhost:9092"
+  topic: "user_registered_events"
+  group_id: "user_service_group"
