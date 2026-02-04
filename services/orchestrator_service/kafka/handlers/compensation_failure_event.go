@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"orchestrator_service/kafka/deadlinequeue"
+	"infrastructure_sdk/kafka"
 	"orchestrator_service/orchestrator/saga"
 )
 
@@ -59,15 +59,30 @@ func HandleStepRecoveryFailureEvent(sagaCtx *SagaEventHandlerContext) error {
 			if retryCount > maxRetries {
 				log.Printf("Max retries (%d) reached for saga %s step %d. Sending to DLQ.", maxRetries, sagaInstance.ID, result.StepIndex)
 
-				// 发送到死信队列
-				err := deadlinequeue.SendToDLQ(
-					context.Background(),
-					globalKafkaProducer,
+				// 构造 DLQ Payload
+				// 我们需要重构一个"补偿指令"事件，以便后续可以重试
+				// 使用 saga.EventTypeStepCompensate 作为事件类型，表明这是一个补偿操作
+				reconstructedEvent, _ := kafka.NewBusinessEvent(
+					saga.EventTypeStepCompensate,
+					"Step Compensation Retry",
 					sagaInstance.ID,
-					result.StepIndex,
-					step.ServiceName,
-					fmt.Sprintf("Compensation failed after %d retries. Last error: %s", maxRetries, result.Error),
 					step.Data,
+				)
+
+				dlqPayload := kafka.NewDLQPayload(
+					step.ServiceName, // 假设 ServiceName 对应 topic
+					reconstructedEvent,
+					fmt.Sprintf("Compensation failed after %d retries. Last error: %s", maxRetries, result.Error),
+				)
+				dlqPayload.Service = "orchestrator_service"
+
+				// 发送到死信队列 (Topic: saga-dlq)
+				err := globalKafkaProducer.SendEvent(
+					context.Background(),
+					saga.TopicSagaDLQ,
+					kafka.DLQEventType,
+					sagaInstance.ID,
+					dlqPayload,
 				)
 
 				if err != nil {
