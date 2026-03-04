@@ -17,6 +17,8 @@ type SagaOrchestratorInterface interface {
 	GetKafkaProducer() *producer.KafkaProducer
 	GetSagas() *map[string]*saga.Saga
 	GetSagasMutex() *sync.RWMutex
+	GetSagaRepo() saga.SagaRepository
+	GetInstanceID() string
 }
 
 // SagaEventHandler Saga事件处理器
@@ -41,6 +43,8 @@ func (h *SagaEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.Bus
 		KafkaProducer: h.orchestrator.GetKafkaProducer(),
 		Sagas:         *h.orchestrator.GetSagas(),
 		SagasMutex:    h.orchestrator.GetSagasMutex(),
+		SagaRepo:      h.orchestrator.GetSagaRepo(),
+		InstanceID:    h.orchestrator.GetInstanceID(),
 	}
 
 	var processErr error

@@ -5,12 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/bwmarrin/snowflake"
 	"gopkg.in/yaml.v3"
 )
-
-// 初始化雪花算法生成器
-var snowflakeNode, _ = snowflake.NewNode(1) // 节点ID为1
 
 // 模板路径全局变量
 var TemplatePath = "templates/example_yaml"
@@ -18,11 +14,6 @@ var TemplatePath = "templates/example_yaml"
 // SetTemplatePath 设置模板路径
 func SetTemplatePath(path string) {
 	TemplatePath = path
-}
-
-// GetEventID 获取事务ID - 使用雪花算法生成可查询且不重复的数字事务ID
-func GetEventID(_ string) string {
-	return fmt.Sprintf("%d", snowflakeNode.Generate().Int64())
 }
 
 // YAMLTemplate YAML模板结构
@@ -65,8 +56,11 @@ func LoadTemplateFromYAML(filename string) (EventTemplate, error) {
 		steps = append(steps, StepData(yamlStep))
 	}
 
+	// 确定模板ID：优先使用模板名称，如果为空则使用Topic
+	templateID := yamlTemplate.Name
+
 	template := EventTemplate{
-		ID:          GetEventID(yamlTemplate.Name),
+		ID:          templateID,
 		Name:        yamlTemplate.Name,
 		Topic:       yamlTemplate.Topic,
 		Description: yamlTemplate.Description,

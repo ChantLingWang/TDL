@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"orchestrator_service/config"
 	"orchestrator_service/kafka/consumer"
 	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
@@ -15,15 +16,8 @@ import (
 
 // ConsumerRunner 负责管理 Kafka 消费者的生命周期
 type ConsumerRunner struct {
-	config       KafkaConfig
+	config       config.KafkaConfig
 	orchestrator SagaOrchestratorInterface
-}
-
-// KafkaConfig 消费者运行器所需的配置
-type KafkaConfig struct {
-	Brokers []string
-	Topic   string
-	GroupID string
 }
 
 // SagaOrchestratorInterface 定义编排器接口 (避免循环依赖)
@@ -31,11 +25,13 @@ type SagaOrchestratorInterface interface {
 	GetKafkaProducer() *producer.KafkaProducer
 	GetSagas() *map[string]*saga.Saga
 	GetSagasMutex() *sync.RWMutex
+	GetSagaRepo() saga.SagaRepository
+	GetInstanceID() string
 }
 
 // NewConsumerRunner 创建新的消费者运行器
 func NewConsumerRunner(
-	config KafkaConfig,
+	config config.KafkaConfig,
 	orchestrator SagaOrchestratorInterface,
 ) *ConsumerRunner {
 	return &ConsumerRunner{

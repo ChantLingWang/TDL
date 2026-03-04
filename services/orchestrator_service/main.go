@@ -8,13 +8,13 @@ import (
 	"syscall"
 	"time"
 
+	"orchestrator_service/database/pgsql"
 	"orchestrator_service/kafka"
-	"orchestrator_service/kafka/producer"
+	"orchestrator_service/kafka/handlers"
 	"orchestrator_service/orchestrator"
 	"orchestrator_service/templates"
 
 	config "orchestrator_service/config"
-	sdk_kafka "infrastructure_sdk/kafka"
 )
 
 func main() {
@@ -22,39 +22,51 @@ func main() {
 	// 初始化全局配置
 	config.InitGlobalConfig("config/config.yaml")
 
+	// 初始化雪花算法生成器
+	if err := handlers.InitSnowflake(config.GlobalConfig.SnowflakeNodeID); err != nil {
+		log.Fatalf("Failed to initialize snowflake node: %v", err)
+	}
+
 	// 设置模板路径
 	templates.SetTemplatePath(config.GlobalConfig.Templates.Path)
 
-	// Kafka配置
-	brokers := config.GlobalConfig.Kafka.Brokers
-	topic := config.GlobalConfig.Kafka.Topic
-	groupID := config.GlobalConfig.Kafka.GroupID
+	// 初始化数据库连接
+	dbManager := pgsql.GetDBManager()
 
-	// 1. 初始化 Kafka 生产者连接
-	// 注意：这里需要一个单独的连接给 Producer 使用，因为 ConsumerRunner 会管理它自己的 Consumer 连接
-	// 这符合读写分离的原则，也避免了连接复用带来的复杂性
-	kafkaConn, err := sdk_kafka.NewKafkaConnection(brokers, topic, groupID)
-	if err != nil {
-		log.Fatalf("Failed to create Kafka connection for producer: %v", err)
+	// 设置 GEN 的默认数据库连接
+	if err := dbManager.Connect(); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer kafkaConn.Close()
+	// 设置数据库的自动关闭
+	defer dbManager.Close()
 
-	kafkaProducer := producer.NewKafkaProducer(kafkaConn)
+	// 自动创建数据库表结构
+	if err := dbManager.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
 
-	// 2. 初始化带Kafka的编排器
-	orchestratorInstance := orchestrator.NewSagaOrchestratorWithKafka(kafkaProducer)
+	// 创建 Saga 持久化仓库
+	sagaRepo := pgsql.NewPgsqlSagaRepository()
 
-	// 3. 设置信号处理和上下文
+	// 初始化Kafka连接管理器
+	kafkaManager := kafka.GetKafkaManager()
+	if err := kafkaManager.Connect(); err != nil {
+		log.Fatalf("Failed to connect to Kafka: %v", err)
+	}
+	defer kafkaManager.Close()
+
+	// 获取Kafka生产者
+	kafkaProducer := kafkaManager.GetProducer()
+
+	// 初始化带Kafka的编排器
+	orchestratorInstance := orchestrator.NewSagaOrchestratorWithKafka(kafkaProducer, sagaRepo)
+
+	// 设置信号处理和上下文
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 4. 初始化并启动 Kafka 消费者 (ConsumerRunner)
-	consumerConfig := kafka.KafkaConfig{
-		Brokers: config.GlobalConfig.Kafka.Brokers,
-		Topic:   config.GlobalConfig.Kafka.Topic,
-		GroupID: config.GlobalConfig.Kafka.GroupID,
-	}
-
+	// 初始化并启动Kafka消费者 (ConsumerRunner)
+	consumerConfig := kafkaManager.GetConfig()
 	consumerRunner := kafka.NewConsumerRunner(consumerConfig, orchestratorInstance)
 
 	go func() {
@@ -79,6 +91,13 @@ func startSagaExecutor(ctx context.Context, orchestrator *orchestrator.SagaOrche
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	// 使用配置中的超时值，如果未配置则使用默认值
+	timeoutThreshold := config.GlobalConfig.Saga.ExecutionTimeout
+	if timeoutThreshold == 0 {
+		timeoutThreshold = 5 * time.Minute // 默认5分钟
+	}
+	log.Printf("Saga execution timeout threshold: %v", timeoutThreshold)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -88,7 +107,6 @@ func startSagaExecutor(ctx context.Context, orchestrator *orchestrator.SagaOrche
 			return
 		case <-ticker.C:
 			// 执行超时检查
-			timeoutThreshold := 10 * time.Second
 			orchestrator.CheckTimeouts(timeoutThreshold)
 		}
 	}

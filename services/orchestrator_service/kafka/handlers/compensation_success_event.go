@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"orchestrator_service/orchestrator/saga"
 )
@@ -20,6 +21,20 @@ func HandleStepRecoverySuccessEvent(sagaCtx *SagaEventHandlerContext) error {
 	if err := json.Unmarshal(data, &result); err != nil {
 		log.Printf("❌ Failed to unmarshal step compensation success event: %v", err)
 		return err
+	}
+
+	// 检查分布式锁：只有持有锁的实例才能处理事件
+	if sagaCtx.SagaRepo != nil {
+		leaseDuration := 30 * time.Second
+		renewed, err := sagaCtx.SagaRepo.RenewLock(ctx, result.SagaID, sagaCtx.InstanceID, leaseDuration)
+		if err != nil {
+			log.Printf("❌ Failed to renew lock for saga %s: %v", result.SagaID, err)
+			return fmt.Errorf("failed to renew lock for saga: %w", err)
+		}
+		if !renewed {
+			log.Printf("⚠️ Lock not held by this instance for saga %s, ignoring event", result.SagaID)
+			return nil
+		}
 	}
 
 	// 获取Saga实例
@@ -50,9 +65,25 @@ func HandleStepRecoverySuccessEvent(sagaCtx *SagaEventHandlerContext) error {
 
 	sagaInstance.Mu.Unlock()
 
+	// 持久化步骤补偿状态（使用乐观锁重试）
+	compensatedStepIndex := result.StepIndex
+	if err := sagaCtx.SaveWithOptimisticLock(sagaInstance, 3, func(s *saga.Saga) bool {
+		if compensatedStepIndex < len(s.Steps) {
+			s.Steps[compensatedStepIndex].Executed = false
+		}
+		return true
+	}); err != nil {
+		log.Printf("❌ Failed to persist saga %s compensation progress: %v", sagaInstance.ID, err)
+	}
+
 	if !allCompensated {
 		log.Printf("Saga %s compensation in progress (step %d compensated)", sagaInstance.ID, result.StepIndex)
 		return nil
+	}
+
+	// 设置状态为已补偿
+	if !sagaInstance.SetStatus(saga.StatusCompensated) {
+		log.Printf("⚠️ Failed to set saga %s status to compensated", sagaInstance.ID)
 	}
 
 	// 发送 Saga 完全补偿的事件（用于监控/日志）
@@ -65,6 +96,25 @@ func HandleStepRecoverySuccessEvent(sagaCtx *SagaEventHandlerContext) error {
 	sagasMutex.Lock()
 	delete(sagas, sagaInstance.ID)
 	sagasMutex.Unlock()
+
+	// 释放分布式锁
+	if sagaCtx.SagaRepo != nil {
+		released, err := sagaCtx.SagaRepo.ReleaseLock(ctx, sagaInstance.ID, sagaCtx.InstanceID)
+		if err != nil {
+			log.Printf("⚠️ Failed to release lock for saga %s: %v", sagaInstance.ID, err)
+		} else if !released {
+			log.Printf("⚠️ Lock not held by this instance for saga %s during cleanup", sagaInstance.ID)
+		}
+	}
+
+	// 从持久化存储中删除
+	if sagaCtx.SagaRepo != nil {
+		if err := sagaCtx.SagaRepo.Delete(ctx, sagaInstance.ID); err != nil {
+			log.Printf("❌ Failed to delete saga %s from storage: %v", sagaInstance.ID, err)
+		}
+	}
+
+	log.Printf("Saga %s fully compensated and cleaned up", sagaInstance.ID)
 
 	return nil
 }

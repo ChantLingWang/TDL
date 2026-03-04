@@ -9,14 +9,15 @@ import (
 // NewSaga 创建新的Saga实例
 func NewSaga(id string, steps []SagaStep) *Saga {
 	return &Saga{
-		ID:          id,
-		Status:      StatusPending,
-		Steps:       steps,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Mu:          sync.Mutex{},
-		CurrentStep: -1,
-		Context:     make(map[string]any),
+		ID:            id,
+		Status:        StatusPending,
+		Steps:         steps,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		Mu:            sync.Mutex{},
+		CurrentStep:   -1,
+		Context:       make(map[string]any),
+		MaxRetryCount: 3, // 默认最大重试次数
 	}
 }
 
@@ -25,6 +26,11 @@ func (s *Saga) SetStatus(newStatus SagaStatus) bool {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
+	return s.setStatusLocked(newStatus)
+}
+
+// setStatusLocked 在已持有锁的情况下设置状态
+func (s *Saga) setStatusLocked(newStatus SagaStatus) bool {
 	// 验证状态转换是否合法
 	if !s.isValidStatusTransition(s.Status, newStatus) {
 		return false
@@ -95,7 +101,7 @@ func (s *Saga) AdvanceToNextStep() *SagaStep {
 
 	// 检查是否完成所有步骤
 	if s.CurrentStep >= len(s.Steps) {
-		s.Status = StatusCompleted
+		s.setStatusLocked(StatusCompleted)
 	}
 
 	if s.CurrentStep >= 0 && s.CurrentStep < len(s.Steps) {
@@ -110,14 +116,16 @@ func (s *Saga) MarkStepFailed(stepIndex int, errorMsg string) {
 	defer s.Mu.Unlock()
 
 	if stepIndex >= 0 && stepIndex < len(s.Steps) {
-		s.Steps[stepIndex].Executed = true
+		// 注意：失败的步骤不标记为 Executed，因为 Executed 用于判断是否需要补偿
+		// 只有成功执行的步骤才需要补偿
+		s.Steps[stepIndex].ExecutionLog = errorMsg
 		executedAt := time.Now()
 		s.Steps[stepIndex].ExecutedAt = &executedAt
 		s.FailedSteps++
 
 		// 如果失败次数超过阈值，设置整个Saga为失败
 		if s.FailedSteps >= s.MaxRetryCount {
-			s.Status = StatusFailed
+			s.setStatusLocked(StatusFailed)
 		}
 
 		s.UpdatedAt = time.Now()

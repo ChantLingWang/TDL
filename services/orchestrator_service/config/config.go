@@ -7,18 +7,32 @@ import (
 	"infrastructure_sdk/config"
 )
 
+// KafkaConfig Kafka连接配置
+type KafkaConfig struct {
+	Brokers  []string `yaml:"brokers"`
+	GroupID  string   `yaml:"group_id"`
+	Topic    string   `yaml:"topic"`
+	ClientID string   `yaml:"client_id"`
+}
+
 // Config 定义全局配置结构
 type Config struct {
 	DefaultTimeout      time.Duration `yaml:"default_timeout"`
 	DefaultRetryCount   int           `yaml:"default_retry_count"`
 	CompensationTimeout time.Duration `yaml:"compensation_timeout"`
+	SnowflakeNodeID     int64         `yaml:"snowflake_node_id"`
 
-	Kafka struct {
-		Brokers  []string `yaml:"brokers"`
-		GroupID  string   `yaml:"group_id"`
-		Topic    string   `yaml:"topic"`
-		ClientID string   `yaml:"client_id"`
-	} `yaml:"kafka"`
+	Kafka KafkaConfig `yaml:"kafka"`
+
+	Database struct {
+		Host     string `yaml:"host"`
+		Port     string `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		DBName   string `yaml:"dbname"`
+		SSLMode  string `yaml:"sslmode"`
+		TimeZone string `yaml:"timezone"`
+	} `yaml:"database"`
 
 	Templates struct {
 		Path string `yaml:"path"`

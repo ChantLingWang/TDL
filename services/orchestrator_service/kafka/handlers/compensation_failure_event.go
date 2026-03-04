@@ -5,10 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"infrastructure_sdk/kafka"
 	"orchestrator_service/orchestrator/saga"
+)
+
+// 用于跟踪正在进行补偿重试的步骤，防止重复启动重试 goroutine
+var (
+	compensationRetryTracker      = make(map[string]bool) // key: sagaID_stepIndex
+	compensationRetryTrackerMutex sync.Mutex
 )
 
 // HandleStepRecoveryFailureEvent 处理步骤补偿失败事件
@@ -24,6 +31,20 @@ func HandleStepRecoveryFailureEvent(sagaCtx *SagaEventHandlerContext) error {
 	if err := json.Unmarshal(data, &result); err != nil {
 		log.Printf("❌ Failed to unmarshal step compensation failure event: %v. Data: %s", err, string(data))
 		return err
+	}
+
+	// 检查分布式锁：只有持有锁的实例才能处理事件
+	if sagaCtx.SagaRepo != nil {
+		leaseDuration := 30 * time.Second
+		renewed, err := sagaCtx.SagaRepo.RenewLock(ctx, result.SagaID, sagaCtx.InstanceID, leaseDuration)
+		if err != nil {
+			log.Printf("❌ Failed to renew lock for saga %s: %v", result.SagaID, err)
+			return fmt.Errorf("failed to renew lock for saga: %w", err)
+		}
+		if !renewed {
+			log.Printf("⚠️ Lock not held by this instance for saga %s, ignoring event", result.SagaID)
+			return nil
+		}
 	}
 
 	// 获取Saga实例
@@ -45,8 +66,25 @@ func HandleStepRecoveryFailureEvent(sagaCtx *SagaEventHandlerContext) error {
 	step := sagaInstance.Steps[result.StepIndex]
 	sagaInstance.Mu.Unlock()
 
+	// 检查是否已经有重试 goroutine 在运行，防止重复启动
+	retryKey := fmt.Sprintf("%s_%d", sagaInstance.ID, result.StepIndex)
+	compensationRetryTrackerMutex.Lock()
+	if compensationRetryTracker[retryKey] {
+		compensationRetryTrackerMutex.Unlock()
+		log.Printf("⚠️ Compensation retry already in progress for saga %s step %d, skipping duplicate", sagaInstance.ID, result.StepIndex)
+		return nil
+	}
+	compensationRetryTracker[retryKey] = true
+	compensationRetryTrackerMutex.Unlock()
+
 	// 启动协程进行有限重试
 	go func() {
+		// 确保在 goroutine 退出时清理跟踪状态
+		defer func() {
+			compensationRetryTrackerMutex.Lock()
+			delete(compensationRetryTracker, retryKey)
+			compensationRetryTrackerMutex.Unlock()
+		}()
 		retryCount := 0
 		maxRetries := 10 // 最大重试次数
 		retryInterval := 2 * time.Second
