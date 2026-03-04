@@ -1,16 +1,38 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
-	"orchestrator_service/kafka/producer"
 	"orchestrator_service/orchestrator/saga"
 	"orchestrator_service/templates"
+
+	"github.com/bwmarrin/snowflake"
 )
+
+// 雪花算法生成器实例
+var snowflakeNode *snowflake.Node
+
+// InitSnowflake 初始化雪花算法生成器
+func InitSnowflake(nodeID int64) error {
+	var err error
+	snowflakeNode, err = snowflake.NewNode(nodeID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize snowflake node: %w", err)
+	}
+	return nil
+}
+
+// GetEventID 获取事务ID - 使用雪花算法生成可查询且不重复的数字事务ID
+func GetEventID() string {
+	if snowflakeNode == nil {
+		// 如果未初始化，尝试使用默认节点ID 1初始化（仅作为兜底）
+		_ = InitSnowflake(1)
+	}
+	return fmt.Sprintf("%d", snowflakeNode.Generate().Int64())
+}
 
 // mergeData 合并数据：按优先级递增顺序覆盖
 func mergeData(templateData map[string]any, inputData map[string]any) map[string]any {
@@ -53,7 +75,7 @@ func HandleSagaStartEvent(sagaCtx *SagaEventHandlerContext) error {
 	}
 
 	// 初始化SagaStartData
-	newSagaID := templates.GetEventID(businessEvent.CommonParams.EventName)
+	newSagaID := GetEventID()
 
 	startData := saga.SagaStartData{
 		SagaID: newSagaID,                // 使用新生成的唯一SagaID
@@ -122,14 +144,46 @@ func HandleSagaStartEvent(sagaCtx *SagaEventHandlerContext) error {
 	// 传递执行模式（用于控制串行/并行执行）
 	sagaInstance.Context["execution_mode"] = businessEvent.CommonParams.ExecutionMode
 
+	// 检查空步骤列表
+	if len(startData.Steps) == 0 {
+		log.Printf("⚠️ Saga %s has no steps, marking as completed", startData.SagaID)
+		sagaInstance.SetStatus(saga.StatusCompleted)
+		if err := kafkaProducer.SendEvent(ctx, "saga-events", saga.EventTypeSagaCompleted, sagaInstance.ID, nil); err != nil {
+			log.Printf("❌ Failed to send saga completed event: %v", err)
+		}
+		return nil
+	}
+
 	// 添加到Saga集合中
 	sagasMutex.Lock()
 	sagas[startData.SagaID] = sagaInstance
 	sagasMutex.Unlock()
 
-	sagaInstance.Mu.Lock()
-	sagaInstance.Status = saga.StatusRunning
-	sagaInstance.Mu.Unlock()
+	// 使用 SetStatus 方法设置状态，确保状态转换验证
+	if !sagaInstance.SetStatus(saga.StatusRunning) {
+		log.Printf("❌ Failed to set saga %s status to running", sagaInstance.ID)
+		return fmt.Errorf("failed to set saga status to running")
+	}
+
+	// 持久化新创建的Saga
+	if sagaCtx.SagaRepo != nil {
+		if err := sagaCtx.SagaRepo.Create(ctx, sagaInstance); err != nil {
+			log.Printf("❌ Failed to persist saga %s: %v", sagaInstance.ID, err)
+			return fmt.Errorf("failed to persist saga: %w", err)
+		}
+
+		// 获取分布式锁，确保当前实例负责处理此Saga
+		leaseDuration := 30 * time.Second
+		acquired, err := sagaCtx.SagaRepo.AcquireLock(ctx, sagaInstance.ID, sagaCtx.InstanceID, leaseDuration)
+		if err != nil {
+			log.Printf("❌ Failed to acquire lock for saga %s: %v", sagaInstance.ID, err)
+			return fmt.Errorf("failed to acquire lock for saga: %w", err)
+		}
+		if !acquired {
+			log.Printf("❌ Failed to acquire lock for saga %s (lock already held)", sagaInstance.ID)
+			return fmt.Errorf("failed to acquire lock for saga: lock already held")
+		}
+	}
 
 	// 发送Saga开始事件
 	if err := kafkaProducer.SendEvent(ctx, "saga-events", saga.EventTypeSagaInitiated, sagaInstance.ID, nil); err != nil {
@@ -138,11 +192,11 @@ func HandleSagaStartEvent(sagaCtx *SagaEventHandlerContext) error {
 	}
 
 	// 开始执行第一个步骤
-	return executeNextSteps(ctx, sagaInstance, kafkaProducer)
+	return executeNextSteps(sagaCtx, sagaInstance)
 }
 
 // executeNextSteps 根据执行模式执行下一个或多个步骤
-func executeNextSteps(ctx context.Context, sagaInstance *saga.Saga, kafkaProducer *producer.KafkaProducer) error {
+func executeNextSteps(sagaCtx *SagaEventHandlerContext, sagaInstance *saga.Saga) error {
 	// 从context中获取执行模式
 	executionMode, _ := sagaInstance.Context["execution_mode"].(string)
 
@@ -150,11 +204,11 @@ func executeNextSteps(ctx context.Context, sagaInstance *saga.Saga, kafkaProduce
 	switch executionMode {
 	case saga.ExecutionModeSerial:
 		// 串行模式：只执行第一步
-		return executeSequentialStep(ctx, sagaInstance, kafkaProducer, 0)
+		return executeSequentialStep(sagaCtx, sagaInstance, 0)
 
 	case saga.ExecutionModeParallel:
 		// 并行模式：同时执行所有步骤
-		return executeParallelSteps(ctx, sagaInstance, kafkaProducer)
+		return executeParallelSteps(sagaCtx, sagaInstance)
 	default:
 		// 未知模式直接报错
 		return fmt.Errorf("unknown execution mode: %s", executionMode)
@@ -162,7 +216,9 @@ func executeNextSteps(ctx context.Context, sagaInstance *saga.Saga, kafkaProduce
 }
 
 // executeSequentialStep 执行串行步骤
-func executeSequentialStep(ctx context.Context, sagaInstance *saga.Saga, kafkaProducer *producer.KafkaProducer, stepIndex int) error {
+func executeSequentialStep(sagaCtx *SagaEventHandlerContext, sagaInstance *saga.Saga, stepIndex int) error {
+	ctx := sagaCtx.Ctx
+	kafkaProducer := sagaCtx.KafkaProducer
 	if stepIndex >= len(sagaInstance.Steps) {
 		sagaInstance.SetStatus(saga.StatusCompleted)
 		// 完成事件发送到默认Topic（saga-events）
@@ -191,7 +247,16 @@ func executeSequentialStep(ctx context.Context, sagaInstance *saga.Saga, kafkaPr
 }
 
 // executeParallelSteps 执行并行步骤
-func executeParallelSteps(ctx context.Context, sagaInstance *saga.Saga, kafkaProducer *producer.KafkaProducer) error {
+func executeParallelSteps(sagaCtx *SagaEventHandlerContext, sagaInstance *saga.Saga) error {
+	ctx := sagaCtx.Ctx
+	kafkaProducer := sagaCtx.KafkaProducer
+	// 使用 channel 收集发送失败的步骤
+	type sendResult struct {
+		stepIndex int
+		err       error
+	}
+	resultCh := make(chan sendResult, len(sagaInstance.Steps))
+
 	// 直接遍历所有步骤并行执行
 	for i := range sagaInstance.Steps {
 		// 捕获变量
@@ -211,16 +276,41 @@ func executeParallelSteps(ctx context.Context, sagaInstance *saga.Saga, kafkaPro
 			// 发送事件到Kafka（步骤名即为Topic名）
 			// 简单的重试逻辑：失败后重试3次
 			maxSendRetries := 3
+			var lastErr error
 			for retry := range maxSendRetries {
 				if err := kafkaProducer.SendEvent(ctx, s.Name, saga.EventTypeStepExecute, sagaInstance.ID, stepData); err != nil {
+					lastErr = err
 					// 简单的退避策略
 					time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
 				} else {
-					// 发送成功，跳出循环
-					break
+					// 发送成功
+					resultCh <- sendResult{stepIndex: idx, err: nil}
+					return
 				}
 			}
+			// 所有重试都失败
+			log.Printf("❌ Failed to send step %d after %d retries: %v", idx, maxSendRetries, lastErr)
+			resultCh <- sendResult{stepIndex: idx, err: lastErr}
 		}(stepIndex, step)
+	}
+
+	// 收集所有结果
+	var failedSteps []int
+	for range sagaInstance.Steps {
+		result := <-resultCh
+		if result.err != nil {
+			failedSteps = append(failedSteps, result.stepIndex)
+		}
+	}
+
+	// 如果有步骤发送失败，触发补偿
+	if len(failedSteps) > 0 {
+		log.Printf("❌ Saga %s: %d steps failed to send, triggering compensation", sagaInstance.ID, len(failedSteps))
+		sagaInstance.SetStatus(saga.StatusCompensating)
+		// 对已成功发送的步骤触发补偿（由于是并行发送，可能有些已经开始执行）
+		// 注意：这里使用 -1 表示没有特定的失败步骤
+		TriggerSagaCompensation(sagaCtx, sagaInstance, -1)
+		return fmt.Errorf("failed to send %d steps", len(failedSteps))
 	}
 
 	return nil

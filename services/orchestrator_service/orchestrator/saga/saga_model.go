@@ -138,12 +138,15 @@ type SagaStep struct {
 	CompensateAction string `json:"compensate_action"` // 补偿操作名称，用于步骤失败时回滚
 
 	// 执行结果
-	Executed      bool           `json:"executed"`                 // 步骤是否已经执行完成
+	Executed      bool           `json:"executed"`                 // 步骤是否已经执行完成（成功）
 	ExecutedAt    *time.Time     `json:"executed_at,omitempty"`    // 步骤执行完成的具体时间
 	ExecutionLog  string         `json:"execution_log,omitempty"`  // 步骤执行过程的日志信息
 	ExecutionData map[string]any `json:"execution_data,omitempty"` // 步骤实际执行时的数据
 	RetryCount    int            `json:"retry_count"`              // 该步骤已经重试的次数
 	MaxRetries    int            `json:"max_retries"`              // 该步骤允许的最大重试次数
+
+	// 补偿状态
+	Compensating bool `json:"compensating,omitempty"` // 是否正在进行补偿操作（防止重复补偿）
 }
 
 // Saga 表示一个Saga事务
@@ -167,7 +170,11 @@ type Saga struct {
 	RetryCount     int `json:"retry_count,omitempty"`     // 整个Saga的重试次数
 	MaxRetryCount  int `json:"max_retry_count,omitempty"` // Saga允许的最大重试次数
 
-	// 互斥锁保护并发安全（导出字段供外部包使用）
+	// 分布式锁字段
+	LockedBy   *string    `json:"locked_by,omitempty"`   // 持有锁的实例ID
+	LockExpiry *time.Time `json:"lock_expiry,omitempty"` // 锁过期时间
+
+	// 互斥锁保护并发安全
 	Mu sync.Mutex // 并发控制锁，确保多线程访问Saga数据的安全性
 }
 

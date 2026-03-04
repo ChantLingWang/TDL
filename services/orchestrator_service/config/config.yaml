@@ -5,6 +5,7 @@ server:
 default_timeout: 30s
 default_retry_count: 3
 compensation_timeout: 15s
+snowflake_node_id: 1
 
 kafka:
   brokers:
@@ -12,6 +13,15 @@ kafka:
   group_id: "orchestrator-group"
   topic: "saga-events"
   client_id: "orchestrator-service"
+
+database:
+  host: "localhost"
+  port: "5432"
+  user: "postgres"
+  password: "postgres"
+  dbname: "orchestrator"
+  sslmode: "disable"
+  timezone: "Asia/Shanghai"
 
 templates:
   path: "templates/example_yaml"
