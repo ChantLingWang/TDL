@@ -9,13 +9,13 @@ snowflake_node_id: 1
 
 kafka:
   brokers:
-    - "localhost:9092"
+    - "kafka:29092"
   group_id: "orchestrator-group"
   topic: "saga-events"
   client_id: "orchestrator-service"
 
 database:
-  host: "localhost"
+  host: "postgres"
   port: "5432"
   user: "postgres"
   password: "postgres"

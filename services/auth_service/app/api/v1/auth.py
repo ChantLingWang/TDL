@@ -144,7 +144,7 @@ async def register(request:Request,data: VerifyCodeRequest):
         # 发送 Kafka 消息 (Start Saga)
         event_publisher.publish_user_registered_event(event)
 
-        # 发送完毕后，直接保存到数据库中即可，后续kafka传来事务后，可以直接按event_id关联的user_id查，若有直接返回成功，若无直接返回失败，拒绝后续操作，然后标记其字段为实效
+        # 发送完毕后，直接保存到数据库中即可，后续kafka传来事务后，可以直接按event_id关联的user_id查，若有直接返回成功，若无直接返回失败，拒绝后续操作，然后标记其字段为失效
         user_service.create_user(user_data)
         
         return {

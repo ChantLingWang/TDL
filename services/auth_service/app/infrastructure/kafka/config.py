@@ -9,7 +9,7 @@ class KafkaSettings(BaseSettings):
     """Kafka配置类"""
     
     # 基本连接配置
-    bootstrap_servers: List[str] = ["localhost:9092"]
+    bootstrap_servers: List[str] = ["kafka:29092"]
     client_id: str = "auth-service"
     
     # 主题配置

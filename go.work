@@ -1,0 +1,6 @@
+go 1.26.1
+
+use (
+	./services/orchestrator_service
+	./services/chat_service
+)

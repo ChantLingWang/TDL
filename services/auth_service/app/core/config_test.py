@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     port: int = 9030
     
     # mongo数据库配置
-    mongodb_url: str = "mongodb://localhost:27017"
-    database_name: str = "TDL_local_test_database"
+    mongodb_url: str = "mongodb://mongodb:27017"
+    database_name: str = "auth"
     
     # JWT配置
     secret_key: str = get_secret_key()
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     smtp_password: str = "flvvqalxrcmlbdhj"
     
     # Redis配置
-    redis_host: str = "localhost"
+    redis_host: str = "redis"
     redis_port: int = 6379
     redis_db: int = 0
     

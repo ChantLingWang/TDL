@@ -75,10 +75,21 @@ class JWTUtils:
     
     @classmethod
     def verify_token(cls, token: str) -> Optional[Dict[str, Any]]:
+        """
+        验证JWT token并返回包含userid、username、email的payload
+        """
         try:
             # 解码token，验证签名和有效期
             payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]) #使用jwt库的decode方法解码token，SECRET_KEY：密钥，ALGORITHM：算法
-            return {"status": "success", "payload": payload}  # 返回有效的payload
+            
+            # 提取Go微服务需要的用户信息字段
+            user_info = {
+                "user_id": payload.get("user_id"),
+                "username": payload.get("username"),
+                "email": payload.get("email")
+            }
+            
+            return {"status": "success", "payload": payload, "user_info": user_info}
         except jwt.ExpiredSignatureError:
             # 处理过期的token
             return {"status": "error", "message": "Token已过期"}

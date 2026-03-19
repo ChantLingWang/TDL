@@ -1,9 +1,9 @@
 # ---------------------------------------------------------
 # 第一阶段：构建阶段 (Builder Stage)
 # ---------------------------------------------------------
-# 使用 golang:1.23-alpine 作为基础镜像进行编译
+# 使用 golang:1.26-alpine 作为基础镜像进行编译
 # "AS builder" 给这个阶段起个别名，方便后面引用
-FROM docker.m.daocloud.io/library/golang:1.23-alpine AS builder
+FROM docker.m.daocloud.io/library/golang:1.26-alpine AS builder
 
 # 设置环境变量
 # CGO_ENABLED=0: 禁用 CGO，确保生成静态链接的二进制文件，不依赖系统库
