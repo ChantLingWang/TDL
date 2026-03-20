@@ -1,0 +1,31 @@
+// last_offline_time.proto
+syntax = "proto3";
+
+package grpc;
+
+option go_package = "infrastructure_sdk/last_offline_time_grpc/proto";
+
+service LastOfflineTimeService {
+  // 更新用户最后离线时间
+  rpc UpdateLastOfflineTime(UpdateLastOfflineTimeRequest) returns (UpdateLastOfflineTimeResponse);
+  // 获取用户最后离线时间
+  rpc GetLastOfflineTime(GetLastOfflineTimeRequest) returns (GetLastOfflineTimeResponse);
+}
+
+// 更新用户最后离线时间
+message UpdateLastOfflineTimeRequest {
+  string user_id = 1;
+}
+
+message UpdateLastOfflineTimeResponse {
+  bool success = 1;
+}
+
+// 获取用户最后离线时间
+message GetLastOfflineTimeRequest {
+  string user_id = 1;
+}
+
+message GetLastOfflineTimeResponse {
+  int64 last_offline_time = 1;  // 时间戳（秒）
+}

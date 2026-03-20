@@ -6,6 +6,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -155,11 +156,20 @@ func (u *user) fillFieldMap() {
 
 func (u user) clone(db *gorm.DB) user {
 	u.userDo.ReplaceConnPool(db.Statement.ConnPool)
+	u.Tempchat.db = db.Session(&gorm.Session{Initialized: true})
+	u.Tempchat.db.Statement.ConnPool = db.Statement.ConnPool
+	u.PrivateChat.db = db.Session(&gorm.Session{Initialized: true})
+	u.PrivateChat.db.Statement.ConnPool = db.Statement.ConnPool
+	u.Groups.db = db.Session(&gorm.Session{Initialized: true})
+	u.Groups.db.Statement.ConnPool = db.Statement.ConnPool
 	return u
 }
 
 func (u user) replaceDB(db *gorm.DB) user {
 	u.userDo.ReplaceDB(db)
+	u.Tempchat.db = db.Session(&gorm.Session{})
+	u.PrivateChat.db = db.Session(&gorm.Session{})
+	u.Groups.db = db.Session(&gorm.Session{})
 	return u
 }
 
@@ -194,6 +204,11 @@ func (a userHasManyTempchat) Session(session *gorm.Session) *userHasManyTempchat
 
 func (a userHasManyTempchat) Model(m *model.User) *userHasManyTempchatTx {
 	return &userHasManyTempchatTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyTempchat) Unscoped() *userHasManyTempchat {
+	a.db = a.db.Unscoped()
+	return &a
 }
 
 type userHasManyTempchatTx struct{ tx *gorm.Association }
@@ -234,6 +249,11 @@ func (a userHasManyTempchatTx) Count() int64 {
 	return a.tx.Count()
 }
 
+func (a userHasManyTempchatTx) Unscoped() *userHasManyTempchatTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
 type userHasManyPrivateChat struct {
 	db *gorm.DB
 
@@ -265,6 +285,11 @@ func (a userHasManyPrivateChat) Session(session *gorm.Session) *userHasManyPriva
 
 func (a userHasManyPrivateChat) Model(m *model.User) *userHasManyPrivateChatTx {
 	return &userHasManyPrivateChatTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyPrivateChat) Unscoped() *userHasManyPrivateChat {
+	a.db = a.db.Unscoped()
+	return &a
 }
 
 type userHasManyPrivateChatTx struct{ tx *gorm.Association }
@@ -303,6 +328,11 @@ func (a userHasManyPrivateChatTx) Clear() error {
 
 func (a userHasManyPrivateChatTx) Count() int64 {
 	return a.tx.Count()
+}
+
+func (a userHasManyPrivateChatTx) Unscoped() *userHasManyPrivateChatTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type userManyToManyGroups struct {
@@ -354,6 +384,11 @@ func (a userManyToManyGroups) Model(m *model.User) *userManyToManyGroupsTx {
 	return &userManyToManyGroupsTx{a.db.Model(m).Association(a.Name())}
 }
 
+func (a userManyToManyGroups) Unscoped() *userManyToManyGroups {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
 type userManyToManyGroupsTx struct{ tx *gorm.Association }
 
 func (a userManyToManyGroupsTx) Find() (result []*model.Group, err error) {
@@ -390,6 +425,11 @@ func (a userManyToManyGroupsTx) Clear() error {
 
 func (a userManyToManyGroupsTx) Count() int64 {
 	return a.tx.Count()
+}
+
+func (a userManyToManyGroupsTx) Unscoped() *userManyToManyGroupsTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type userDo struct{ gen.DO }
@@ -449,6 +489,8 @@ type IUserDo interface {
 	FirstOrCreate() (*model.User, error)
 	FindByPage(offset int, limit int) (result []*model.User, count int64, err error)
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
 	Returning(value interface{}, columns ...string) IUserDo
 	UnderlyingDB() *gorm.DB

@@ -77,7 +77,21 @@ func (TempChat) TableName() string {
 	return "temp_chats"
 }
 
+// Conversation 会话模型（用于跟踪用户对会话的已读状态）
+type Conversation struct {
+	UserID           string    `gorm:"primaryKey"`        // 用户ID
+	ConversationID   string    `gorm:"primaryKey"`        // 会话ID (群ID 或 userA_userB)
+	ConversationType string    `gorm:"not null"`          // 会话类型: "private" 或 "group"
+	LastReadTime     time.Time // 最后已读时间（用户最后一次在线的时间）
+	UpdateTime       time.Time // 更新时间
+}
+
+// TableName 指定Conversation表名
+func (Conversation) TableName() string {
+	return "conversations"
+}
+
 // AutoMigrate 自动迁移数据库表结构
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&User{}, &Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{})
+	return db.AutoMigrate(&User{}, &Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{}, &Conversation{})
 }

@@ -4,7 +4,7 @@
 // versions:
 // 	protoc-gen-go v1.36.8
 // 	protoc        v6.33.1
-// source: services/chat_service/app/infrastructure/grpc/proto/auth.proto
+// source: auth.proto
 
 package proto
 
@@ -32,7 +32,7 @@ type VerifyTokenRequest struct {
 
 func (x *VerifyTokenRequest) Reset() {
 	*x = VerifyTokenRequest{}
-	mi := &file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes[0]
+	mi := &file_auth_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *VerifyTokenRequest) String() string {
 func (*VerifyTokenRequest) ProtoMessage() {}
 
 func (x *VerifyTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes[0]
+	mi := &file_auth_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *VerifyTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyTokenRequest.ProtoReflect.Descriptor instead.
 func (*VerifyTokenRequest) Descriptor() ([]byte, []int) {
-	return file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescGZIP(), []int{0}
+	return file_auth_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *VerifyTokenRequest) GetToken() string {
@@ -80,7 +80,7 @@ type VerifyTokenResponse struct {
 
 func (x *VerifyTokenResponse) Reset() {
 	*x = VerifyTokenResponse{}
-	mi := &file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes[1]
+	mi := &file_auth_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -92,7 +92,7 @@ func (x *VerifyTokenResponse) String() string {
 func (*VerifyTokenResponse) ProtoMessage() {}
 
 func (x *VerifyTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes[1]
+	mi := &file_auth_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -105,7 +105,7 @@ func (x *VerifyTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyTokenResponse.ProtoReflect.Descriptor instead.
 func (*VerifyTokenResponse) Descriptor() ([]byte, []int) {
-	return file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescGZIP(), []int{1}
+	return file_auth_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *VerifyTokenResponse) GetValid() bool {
@@ -143,11 +143,12 @@ func (x *VerifyTokenResponse) GetMessage() string {
 	return ""
 }
 
-var File_services_chat_service_app_infrastructure_grpc_proto_auth_proto protoreflect.FileDescriptor
+var File_auth_proto protoreflect.FileDescriptor
 
-const file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDesc = "" +
+const file_auth_proto_rawDesc = "" +
 	"\n" +
-	">services/chat_service/app/infrastructure/grpc/proto/auth.proto\x12\x04grpc\"*\n" +
+	"\n" +
+	"auth.proto\x12\x04grpc\"*\n" +
 	"\x12VerifyTokenRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\x90\x01\n" +
 	"\x13VerifyTokenResponse\x12\x14\n" +
@@ -157,26 +158,26 @@ const file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDes
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage2Q\n" +
 	"\vAuthService\x12B\n" +
-	"\vVerifyToken\x12\x18.grpc.VerifyTokenRequest\x1a\x19.grpc.VerifyTokenResponseB,Z*chat_service/app/infrastructure/grpc/protob\x06proto3"
+	"\vVerifyToken\x12\x18.grpc.VerifyTokenRequest\x1a\x19.grpc.VerifyTokenResponseB*Z(infrastructure_sdk/token_auth_grpc/protob\x06proto3"
 
 var (
-	file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescOnce sync.Once
-	file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescData []byte
+	file_auth_proto_rawDescOnce sync.Once
+	file_auth_proto_rawDescData []byte
 )
 
-func file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescGZIP() []byte {
-	file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescOnce.Do(func() {
-		file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDesc), len(file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDesc)))
+func file_auth_proto_rawDescGZIP() []byte {
+	file_auth_proto_rawDescOnce.Do(func() {
+		file_auth_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)))
 	})
-	return file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDescData
+	return file_auth_proto_rawDescData
 }
 
-var file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_goTypes = []any{
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_auth_proto_goTypes = []any{
 	(*VerifyTokenRequest)(nil),  // 0: grpc.VerifyTokenRequest
 	(*VerifyTokenResponse)(nil), // 1: grpc.VerifyTokenResponse
 }
-var file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_depIdxs = []int32{
+var file_auth_proto_depIdxs = []int32{
 	0, // 0: grpc.AuthService.VerifyToken:input_type -> grpc.VerifyTokenRequest
 	1, // 1: grpc.AuthService.VerifyToken:output_type -> grpc.VerifyTokenResponse
 	1, // [1:2] is the sub-list for method output_type
@@ -186,26 +187,26 @@ var file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_depIdxs 
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_init() }
-func file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_init() {
-	if File_services_chat_service_app_infrastructure_grpc_proto_auth_proto != nil {
+func init() { file_auth_proto_init() }
+func file_auth_proto_init() {
+	if File_auth_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDesc), len(file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_goTypes,
-		DependencyIndexes: file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_depIdxs,
-		MessageInfos:      file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_msgTypes,
+		GoTypes:           file_auth_proto_goTypes,
+		DependencyIndexes: file_auth_proto_depIdxs,
+		MessageInfos:      file_auth_proto_msgTypes,
 	}.Build()
-	File_services_chat_service_app_infrastructure_grpc_proto_auth_proto = out.File
-	file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_goTypes = nil
-	file_services_chat_service_app_infrastructure_grpc_proto_auth_proto_depIdxs = nil
+	File_auth_proto = out.File
+	file_auth_proto_goTypes = nil
+	file_auth_proto_depIdxs = nil
 }

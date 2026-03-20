@@ -19,8 +19,7 @@ const (
 type Message struct {
 	Timestamp   time.Time `bson:"timestamp"`    // 时间戳
 	Content     string    `bson:"content"`      // 消息内容
-	UserID      string    `bson:"user_id"`      // 用户ID
-	TouserID    string    `bson:"touser_id"` 	// 目标用户ID
+	TouserID    string    `bson:"touser_id"`    // 目标用户ID
 	MessageID   string    `bson:"message_id"`   // 消息ID
 	MessageType string    `bson:"message_type"` // 消息类型
 	IsActive    bool      `bson:"is_active"`    // 是否可见

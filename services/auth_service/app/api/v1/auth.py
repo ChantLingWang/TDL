@@ -122,31 +122,31 @@ async def register(request:Request,data: VerifyCodeRequest):
         # 生成token（如果失败会抛出异常，整个注册流程就会失败）
         access_token = JWTUtils.create_access_token(user)
         refresh_token = await MongoDBUserTokenService.create_user_token(user)
-        
+
+        # TODO: 未来将增加saga事件的支持，但目前不添加，直接把用户字段存入数据库
         # 构建用户注册事件的数据
         # 将数据按步骤Topic组织，以便Orchestrator能精确匹配
         # 这里 "sync_user_fields" 对应 user_register_sync.yaml 中的步骤 topic
-        steps_data = {
-            "sync_user_fields": {
-                "user_id": str(user_id),
-                "username": data.username,
-                "email": data.email,
-                "created_at": current_time,
-            }
-        }
+        # steps_data = {
+        #     "sync_user_fields": {
+        #         "user_id": str(user_id),
+        #         "username": data.username,
+        #         "email": data.email,
+        #         "created_at": current_time,
+        #     }
+        # }
         
-        event = UserRegisteredEvent(
-            event_id = event_id,
-            execution_mode = Status.PARALLEL,
-            user_data = steps_data
-        )
+        # event = UserRegisteredEvent(
+        #     event_id = event_id,
+        #     execution_mode = Status.PARALLEL,
+        #     user_data = steps_data
+        # )
     
-        # 发送 Kafka 消息 (Start Saga)
-        event_publisher.publish_user_registered_event(event)
+        # # # 发送 Kafka 消息 (Start Saga)
+        # # event_publisher.publish_user_registered_event(event)
 
-        # 发送完毕后，直接保存到数据库中即可，后续kafka传来事务后，可以直接按event_id关联的user_id查，若有直接返回成功，若无直接返回失败，拒绝后续操作，然后标记其字段为失效
         user_service.create_user(user_data)
-        
+
         return {
             "message": Status.SUCCESS,
             "data": {

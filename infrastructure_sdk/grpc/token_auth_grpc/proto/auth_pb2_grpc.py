@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from app.infrastructure.grpc.proto import auth_pb2 as app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2
+import auth_pb2 as auth__pb2
 
 GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in app/infrastructure/grpc/proto/auth_pb2_grpc.py depends on'
+        + f' but the generated code in auth_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,8 +36,8 @@ class AuthServiceStub(object):
         """
         self.VerifyToken = channel.unary_unary(
                 '/grpc.AuthService/VerifyToken',
-                request_serializer=app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenRequest.SerializeToString,
-                response_deserializer=app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenResponse.FromString,
+                request_serializer=auth__pb2.VerifyTokenRequest.SerializeToString,
+                response_deserializer=auth__pb2.VerifyTokenResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,8 +55,8 @@ def add_AuthServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'VerifyToken': grpc.unary_unary_rpc_method_handler(
                     servicer.VerifyToken,
-                    request_deserializer=app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenRequest.FromString,
-                    response_serializer=app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenResponse.SerializeToString,
+                    request_deserializer=auth__pb2.VerifyTokenRequest.FromString,
+                    response_serializer=auth__pb2.VerifyTokenResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -84,8 +84,8 @@ class AuthService(object):
             request,
             target,
             '/grpc.AuthService/VerifyToken',
-            app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenRequest.SerializeToString,
-            app_dot_infrastructure_dot_grpc_dot_proto_dot_auth__pb2.VerifyTokenResponse.FromString,
+            auth__pb2.VerifyTokenRequest.SerializeToString,
+            auth__pb2.VerifyTokenResponse.FromString,
             options,
             channel_credentials,
             insecure,

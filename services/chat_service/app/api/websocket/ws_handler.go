@@ -1,13 +1,9 @@
 package websocket
 
 import (
-	"context"
 	"encoding/json"
 	"log"
-	"net/http"
-	"strings"
 
-	"chat_service/app/infrastructure/grpc"
 	"chat_service/app/infrastructure/kafka"
 	"chat_service/app/services"
 
@@ -16,43 +12,16 @@ import (
 
 // IncomingMessage 定义客户端发送的消息格式
 type IncomingMessage struct {
-	Type    string          `json:"type"`    // 消息类型: "private_chat", "group_chat", "ping" 等
+	Type    string          `json:"type"`
 	Content json.RawMessage `json:"content"` // 消息内容，根据类型不同而结构不同
 }
 
 // HandleWebSocket 处理 WebSocket 连接请求
 func HandleWebSocket(c *gin.Context) {
-	// 1. 从 Header 获取 Token
-	authHeader := c.GetHeader("Authorization")
-	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
-		return
-	}
+	// 从 Context 获取用户信息
+	userInfo := c.MustGet("userInfo").(*services.UserInfo)
 
-	// 解析 Token (Bearer xxx)
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-	if token == authHeader {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization format"})
-		return
-	}
-
-	// 2. 通过 gRPC 调用 auth_service 验证 Token
-	authClient := grpc.GetAuthClient()
-	resp, err := authClient.VerifyToken(context.Background(), token)
-	if err != nil || !resp.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": resp.Message})
-		return
-	}
-
-	// 3. 从响应中获取完整的用户信息
-	userInfo := &services.UserInfo{
-		UserID:   resp.UserId,
-		Username: resp.Username,
-		Email:    resp.Email,
-	}
-	log.Printf("WebSocket connection validated for user: %s (%s)", userInfo.Username, userInfo.UserID)
-
-	// 4. 升级 HTTP 连接为 WebSocket
+	// 1. 升级 HTTP 连接为 WebSocket
 	conn, err := services.WSUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade websocket: %v", err)
@@ -100,4 +69,9 @@ func HandleWebSocket(c *gin.Context) {
 	// 9. 连接断开后的清理工作
 	// ReadLoop 返回意味着连接已关闭
 	hub.Unregister(client)
+
+	// 10. 用户离线，更新所有会话的最后阅读时间
+	// TODO: 需要查询用户所在的所有群和私聊，然后更新每个会话的 LastReadTime
+	// 当前简化处理：下次用户上线时，会自动获取该时间之后的消息
+	_ = userInfo.UserID // 用户ID，用于后续查询
 }

@@ -5,7 +5,7 @@ import (
 	"log"
 	"sync"
 
-	"chat_service/app/infrastructure/grpc/proto"
+	"infrastructure_sdk/grpc/token_auth_grpc/proto"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

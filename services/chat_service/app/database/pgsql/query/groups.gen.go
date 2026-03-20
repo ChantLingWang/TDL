@@ -6,6 +6,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -144,11 +145,17 @@ func (g *group) fillFieldMap() {
 
 func (g group) clone(db *gorm.DB) group {
 	g.groupDo.ReplaceConnPool(db.Statement.ConnPool)
+	g.Users.db = db.Session(&gorm.Session{Initialized: true})
+	g.Users.db.Statement.ConnPool = db.Statement.ConnPool
+	g.Managers.db = db.Session(&gorm.Session{Initialized: true})
+	g.Managers.db.Statement.ConnPool = db.Statement.ConnPool
 	return g
 }
 
 func (g group) replaceDB(db *gorm.DB) group {
 	g.groupDo.ReplaceDB(db)
+	g.Users.db = db.Session(&gorm.Session{})
+	g.Managers.db = db.Session(&gorm.Session{})
 	return g
 }
 
@@ -201,6 +208,11 @@ func (a groupManyToManyUsers) Model(m *model.Group) *groupManyToManyUsersTx {
 	return &groupManyToManyUsersTx{a.db.Model(m).Association(a.Name())}
 }
 
+func (a groupManyToManyUsers) Unscoped() *groupManyToManyUsers {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
 type groupManyToManyUsersTx struct{ tx *gorm.Association }
 
 func (a groupManyToManyUsersTx) Find() (result []*model.User, err error) {
@@ -239,6 +251,11 @@ func (a groupManyToManyUsersTx) Count() int64 {
 	return a.tx.Count()
 }
 
+func (a groupManyToManyUsersTx) Unscoped() *groupManyToManyUsersTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
 type groupManyToManyManagers struct {
 	db *gorm.DB
 
@@ -270,6 +287,11 @@ func (a groupManyToManyManagers) Session(session *gorm.Session) *groupManyToMany
 
 func (a groupManyToManyManagers) Model(m *model.Group) *groupManyToManyManagersTx {
 	return &groupManyToManyManagersTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a groupManyToManyManagers) Unscoped() *groupManyToManyManagers {
+	a.db = a.db.Unscoped()
+	return &a
 }
 
 type groupManyToManyManagersTx struct{ tx *gorm.Association }
@@ -308,6 +330,11 @@ func (a groupManyToManyManagersTx) Clear() error {
 
 func (a groupManyToManyManagersTx) Count() int64 {
 	return a.tx.Count()
+}
+
+func (a groupManyToManyManagersTx) Unscoped() *groupManyToManyManagersTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type groupDo struct{ gen.DO }
@@ -367,6 +394,8 @@ type IGroupDo interface {
 	FirstOrCreate() (*model.Group, error)
 	FindByPage(offset int, limit int) (result []*model.Group, count int64, err error)
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
 	Returning(value interface{}, columns ...string) IGroupDo
 	UnderlyingDB() *gorm.DB
