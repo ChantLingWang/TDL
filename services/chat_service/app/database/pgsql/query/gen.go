@@ -16,16 +16,18 @@ import (
 )
 
 var (
-	Q           = new(Query)
-	Group       *group
-	PrivateChat *privateChat
-	TempChat    *tempChat
-	User        *user
-	UserGroup   *userGroup
+	Q            = new(Query)
+	Conversation *conversation
+	Group        *group
+	PrivateChat  *privateChat
+	TempChat     *tempChat
+	User         *user
+	UserGroup    *userGroup
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
+	Conversation = &Q.Conversation
 	Group = &Q.Group
 	PrivateChat = &Q.PrivateChat
 	TempChat = &Q.TempChat
@@ -35,35 +37,38 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:          db,
-		Group:       newGroup(db, opts...),
-		PrivateChat: newPrivateChat(db, opts...),
-		TempChat:    newTempChat(db, opts...),
-		User:        newUser(db, opts...),
-		UserGroup:   newUserGroup(db, opts...),
+		db:           db,
+		Conversation: newConversation(db, opts...),
+		Group:        newGroup(db, opts...),
+		PrivateChat:  newPrivateChat(db, opts...),
+		TempChat:     newTempChat(db, opts...),
+		User:         newUser(db, opts...),
+		UserGroup:    newUserGroup(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	Group       group
-	PrivateChat privateChat
-	TempChat    tempChat
-	User        user
-	UserGroup   userGroup
+	Conversation conversation
+	Group        group
+	PrivateChat  privateChat
+	TempChat     tempChat
+	User         user
+	UserGroup    userGroup
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:          db,
-		Group:       q.Group.clone(db),
-		PrivateChat: q.PrivateChat.clone(db),
-		TempChat:    q.TempChat.clone(db),
-		User:        q.User.clone(db),
-		UserGroup:   q.UserGroup.clone(db),
+		db:           db,
+		Conversation: q.Conversation.clone(db),
+		Group:        q.Group.clone(db),
+		PrivateChat:  q.PrivateChat.clone(db),
+		TempChat:     q.TempChat.clone(db),
+		User:         q.User.clone(db),
+		UserGroup:    q.UserGroup.clone(db),
 	}
 }
 
@@ -77,30 +82,33 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:          db,
-		Group:       q.Group.replaceDB(db),
-		PrivateChat: q.PrivateChat.replaceDB(db),
-		TempChat:    q.TempChat.replaceDB(db),
-		User:        q.User.replaceDB(db),
-		UserGroup:   q.UserGroup.replaceDB(db),
+		db:           db,
+		Conversation: q.Conversation.replaceDB(db),
+		Group:        q.Group.replaceDB(db),
+		PrivateChat:  q.PrivateChat.replaceDB(db),
+		TempChat:     q.TempChat.replaceDB(db),
+		User:         q.User.replaceDB(db),
+		UserGroup:    q.UserGroup.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	Group       IGroupDo
-	PrivateChat IPrivateChatDo
-	TempChat    ITempChatDo
-	User        IUserDo
-	UserGroup   IUserGroupDo
+	Conversation IConversationDo
+	Group        IGroupDo
+	PrivateChat  IPrivateChatDo
+	TempChat     ITempChatDo
+	User         IUserDo
+	UserGroup    IUserGroupDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		Group:       q.Group.WithContext(ctx),
-		PrivateChat: q.PrivateChat.WithContext(ctx),
-		TempChat:    q.TempChat.WithContext(ctx),
-		User:        q.User.WithContext(ctx),
-		UserGroup:   q.UserGroup.WithContext(ctx),
+		Conversation: q.Conversation.WithContext(ctx),
+		Group:        q.Group.WithContext(ctx),
+		PrivateChat:  q.PrivateChat.WithContext(ctx),
+		TempChat:     q.TempChat.WithContext(ctx),
+		User:         q.User.WithContext(ctx),
+		UserGroup:    q.UserGroup.WithContext(ctx),
 	}
 }
 

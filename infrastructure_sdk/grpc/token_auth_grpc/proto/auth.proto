@@ -3,7 +3,7 @@ syntax = "proto3";
 
 package grpc;
 
-option go_package = "chat_service/app/infrastructure/grpc/proto";
+option go_package = "infrastructure_sdk/token_auth_grpc/proto";
 
 service AuthService {
   rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);

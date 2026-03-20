@@ -20,6 +20,7 @@ func main() {
 		model.UserGroup{},
 		model.PrivateChat{},
 		model.TempChat{},
+		model.Conversation{},
 	)
 
 	// 执行生成

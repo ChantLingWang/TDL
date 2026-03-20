@@ -3,10 +3,10 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"time"
 
+	chatconst "chat_service/app/const"
 	"chat_service/app/database/mongodb"
 	"chat_service/app/database/pgsql"
 	"chat_service/app/infrastructure/kafka"
@@ -25,11 +25,12 @@ func RegisterSendMessageFunc(fn SendMessageFunc) {
 
 // ChatMessageRequest 聊天消息请求结构
 type ChatMessageRequest struct {
-	ConversationType string `json:"conversation_type"`   // 会话类型: "private", "group"
-	UserID			 string `json:"user_id,omitempty"`	 // 发送者
-	TargetID         string `json:"target_id,omitempty"` // 私聊接收者
-	GroupID          string `json:"group_id,omitempty"`  // 群聊接收者
-	Text             string `json:"text"`                // 文本内容
+	ConversationType string `json:"conversation_type"`    // 会话类型: "private", "group"
+	TargetID         string `json:"target_id,omitempty"`  // 私聊接收者
+	GroupID          string `json:"group_id,omitempty"`   // 群聊接收者
+	Text             string `json:"text"`                  // 文本内容
+	MessageID		 string `json:"message_id,omitempty"`  // 消息ID,方便溯源,去重
+	MessageType      string `json:"message_type,omitempty"` // 消息类型: "text", "image" 等
 }
 
 // HandleChat 处理统一聊天逻辑
@@ -45,29 +46,27 @@ func HandleChat(senderID string, content json.RawMessage) {
 	}
 
 	// 1. 构建消息对象
+	msgID := chatContent.MessageID
+	contentType := chatContent.MessageType
+
 	msg := &mongodb.Message{
 		Timestamp:   time.Now(),
 		Content:     chatContent.Text,
-		UserID:      senderID,
-		
-		MessageID:   fmt.Sprintf("%s_%d", senderID, time.Now().UnixNano()),
-		MessageType: "text",
+		TouserID:    senderID,
+		MessageID:   msgID,
+		MessageType: contentType,
 		IsActive:    true,
 	}
 
 	var targetUserIDs []string
-	var msgType string
+	var wsMsgType string
 	var conversationID string
 
 	// 2. 判断是私聊还是群聊
 	switch chatContent.ConversationType {
-	case kafka.ConversationTypeGroup:
-		if chatContent.GroupID == "" {
-			log.Println("Invalid group chat: GroupID is empty")
-			return
-		}
+	case chatconst.ConversationTypeGroup:
 		// 群聊逻辑
-		msgType = kafka.WSMsgTypeGroupChat
+		wsMsgType = kafka.WSMsgTypeGroupChat
 		conversationID = chatContent.GroupID
 
 		// 获取群成员
@@ -79,13 +78,13 @@ func HandleChat(senderID string, content json.RawMessage) {
 		}
 		targetUserIDs = members
 
-	case kafka.ConversationTypePrivate:
+	case chatconst.ConversationTypePrivate:
 		if chatContent.TargetID == "" {
 			log.Println("Invalid private chat: TargetID is empty")
 			return
 		}
 		// 私聊逻辑
-		msgType = kafka.WSMsgTypePrivateChat
+		wsMsgType = kafka.WSMsgTypePrivateChat
 		conversationID = chatContent.TargetID
 
 		// 目标用户就是接收者
@@ -105,14 +104,14 @@ func HandleChat(senderID string, content json.RawMessage) {
 	// 3. 构造发送给前端的消息
 	// 保持结构清晰，统一返回格式
 	responseMsg := map[string]interface{}{
-		"type":            msgType,
+		"type":            wsMsgType,
 		"conversation_id": conversationID,
 		"sender":          senderID,
 		"content":         chatContent.Text,
 		"time":            msg.Timestamp,
 	}
 
-	if msgType == kafka.WSMsgTypeGroupChat {
+	if wsMsgType == kafka.WSMsgTypeGroupChat {
 		responseMsg["group_id"] = chatContent.GroupID
 	}
 

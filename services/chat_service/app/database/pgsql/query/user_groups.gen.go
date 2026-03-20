@@ -6,6 +6,7 @@ package query
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -104,117 +105,63 @@ type userGroupDo struct{ gen.DO }
 
 type IUserGroupDo interface {
 	gen.SubQuery
-	// Debug 开启调试模式，在控制台打印生成的 SQL 语句
 	Debug() IUserGroupDo
-	// WithContext 设置请求上下文，用于超时控制和链路追踪
 	WithContext(ctx context.Context) IUserGroupDo
-	// WithResult 获取底层执行结果信息（如 RowsAffected）
 	WithResult(fc func(tx gen.Dao)) gen.ResultInfo
-	// ReplaceDB 替换底层的 GORM DB 实例（通常用于事务中切换连接）
 	ReplaceDB(db *gorm.DB)
-	// ReadDB 切换到读库（如果配置了读写分离）
 	ReadDB() IUserGroupDo
-	// WriteDB 切换到写库（如果配置了读写分离）
 	WriteDB() IUserGroupDo
-	// As 为当前表设置别名（如 SELECT * FROM user_groups AS u）
 	As(alias string) gen.Dao
-	// Session 创建一个新的 GORM Session 配置
 	Session(config *gorm.Session) IUserGroupDo
-	// Columns 指定要查询或操作的列（动态列名）
 	Columns(cols ...field.Expr) gen.Columns
-	// Clauses 添加原生的 GORM Clause（如 FOR UPDATE 锁）
 	Clauses(conds ...clause.Expression) IUserGroupDo
-	// Not 添加 NOT 条件（WHERE NOT ...）
 	Not(conds ...gen.Condition) IUserGroupDo
-	// Or 添加 OR 条件（WHERE ... OR ...）
 	Or(conds ...gen.Condition) IUserGroupDo
-	// Select 指定要查询的字段（SELECT name, age FROM ...）
 	Select(conds ...field.Expr) IUserGroupDo
-	// Where 添加 AND 条件（WHERE ... AND ...）
 	Where(conds ...gen.Condition) IUserGroupDo
-	// Order 指定排序规则（ORDER BY ...）
 	Order(conds ...field.Expr) IUserGroupDo
-	// Distinct 去重查询（SELECT DISTINCT ...）
 	Distinct(cols ...field.Expr) IUserGroupDo
-	// Omit 忽略指定字段（通常用于 Create/Update 时跳过某些列）
 	Omit(cols ...field.Expr) IUserGroupDo
-	// Join 内连接（INNER JOIN）
 	Join(table schema.Tabler, on ...field.Expr) IUserGroupDo
-	// LeftJoin 左连接（LEFT JOIN）
 	LeftJoin(table schema.Tabler, on ...field.Expr) IUserGroupDo
-	// RightJoin 右连接（RIGHT JOIN）
 	RightJoin(table schema.Tabler, on ...field.Expr) IUserGroupDo
-	// Group 分组查询（GROUP BY ...）
 	Group(cols ...field.Expr) IUserGroupDo
-	// Having 分组后筛选（HAVING ...）
 	Having(conds ...gen.Condition) IUserGroupDo
-	// Limit 限制返回条数（LIMIT n）
 	Limit(limit int) IUserGroupDo
-	// Offset 跳过前 n 条（OFFSET n）
 	Offset(offset int) IUserGroupDo
-	// Count 统计符合条件的记录数（SELECT COUNT(*)）
 	Count() (count int64, err error)
-	// Scopes 应用预定义的查询作用域（Scopes）
 	Scopes(funcs ...func(gen.Dao) gen.Dao) IUserGroupDo
-	// Unscoped 忽略软删除（查询被软删除的记录）
 	Unscoped() IUserGroupDo
-	// Create 插入一条或多条记录
 	Create(values ...*model.UserGroup) error
-	// CreateInBatches 分批插入大量数据（避免 SQL 过长）
 	CreateInBatches(values []*model.UserGroup, batchSize int) error
-	// Save 保存记录（如果主键为空则插入，不为空则更新所有字段）
 	Save(values ...*model.UserGroup) error
-	// First 查询第一条匹配的记录（按主键升序），找不到报错 ErrRecordNotFound
 	First() (*model.UserGroup, error)
-	// Take 随机获取一条匹配的记录（不保证顺序），找不到报错 ErrRecordNotFound
 	Take() (*model.UserGroup, error)
-	// Last 查询最后一条匹配的记录（按主键降序），找不到报错 ErrRecordNotFound
 	Last() (*model.UserGroup, error)
-	// Find 查询所有匹配的记录
 	Find() ([]*model.UserGroup, error)
-	// FindInBatch 分批次查询并处理数据（适合处理大量数据，避免内存溢出）
 	FindInBatch(batchSize int, fc func(tx gen.Dao, batch int) error) (results []*model.UserGroup, err error)
-	// FindInBatches 同 FindInBatch，但结果直接填充到 result 切片中
 	FindInBatches(result *[]*model.UserGroup, batchSize int, fc func(tx gen.Dao, batch int) error) error
-	// Pluck 查询单列数据并填充到切片中（如只查所有 user_id）
 	Pluck(column field.Expr, dest interface{}) error
-	// Delete 删除匹配的记录
 	Delete(...*model.UserGroup) (info gen.ResultInfo, err error)
-	// Update 更新指定列（Update("name", "jack")）
 	Update(column field.Expr, value interface{}) (info gen.ResultInfo, err error)
-	// UpdateSimple 更新多个列（Updates(u.Name.Value("jack"), u.Age.Value(18))）
 	UpdateSimple(columns ...field.AssignExpr) (info gen.ResultInfo, err error)
-	// Updates 更新非零值字段（传入结构体或 Map）
 	Updates(value interface{}) (info gen.ResultInfo, err error)
-	// UpdateColumn 更新单列，不触发 Hooks（BeforeUpdate 等）也不更新时间戳
 	UpdateColumn(column field.Expr, value interface{}) (info gen.ResultInfo, err error)
-	// UpdateColumnSimple 更新多列，不触发 Hooks
 	UpdateColumnSimple(columns ...field.AssignExpr) (info gen.ResultInfo, err error)
-	// UpdateColumns 更新所有列（包括零值），不触发 Hooks
 	UpdateColumns(value interface{}) (info gen.ResultInfo, err error)
-	// UpdateFrom 使用子查询更新（UPDATE ... FROM ...）
 	UpdateFrom(q gen.SubQuery) gen.Dao
-	// Attrs 如果记录未找到，初始化时设置这些默认值（用于 FirstOrInit/FirstOrCreate）
 	Attrs(attrs ...field.AssignExpr) IUserGroupDo
-	// Assign 不管记录是否找到，都强制设置这些值（用于 FirstOrInit/FirstOrCreate）
 	Assign(attrs ...field.AssignExpr) IUserGroupDo
-	// Joins 预加载关联数据（JOIN 方式，通常更高效）
 	Joins(fields ...field.RelationField) IUserGroupDo
-	// Preload 预加载关联数据（分两条 SQL 查询）
 	Preload(fields ...field.RelationField) IUserGroupDo
-	// FirstOrInit 查询记录，如果找不到就用 Attrs/Assign 的值初始化一个新对象（不入库）
 	FirstOrInit() (*model.UserGroup, error)
-	// FirstOrCreate 查询记录，如果找不到就创建一个新记录入库
 	FirstOrCreate() (*model.UserGroup, error)
-	// FindByPage 分页查询，返回当前页数据、总条数和错误
 	FindByPage(offset int, limit int) (result []*model.UserGroup, count int64, err error)
-	// ScanByPage 分页查询并扫描到自定义结构体中
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
-	// Scan 将结果扫描到自定义结构体中（不局限于 Model）
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
-	// Returning 支持 PostgreSQL 的 RETURNING 子句，插入/更新后返回指定列
 	Returning(value interface{}, columns ...string) IUserGroupDo
-	// UnderlyingDB 获取底层的原生 *gorm.DB 对象（用于逃生舱，执行 GEN 不支持的操作）
 	UnderlyingDB() *gorm.DB
 	schema.Tabler
 }

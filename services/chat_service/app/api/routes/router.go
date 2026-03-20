@@ -3,6 +3,7 @@ package routes
 import (
 	"chat_service/app/api/handlers"
 	"chat_service/app/api/websocket"
+	"chat_service/app/middleware/auth_token"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,8 +20,9 @@ func NewRouter() *Router {
 
 // SetupRoutes 设置路由
 func (r *Router) SetupRoutes() *gin.RouterGroup {
-	// 创建API v1路由组
+	// 创建API v1路由组，并应用全局认证中间件
 	v1 := r.Engine.Group("/api/v1")
+	v1.Use(auth_token.Auth())
 
 	// 用户相关路由
 	users := v1.Group("/users")
@@ -43,8 +45,16 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 	}
 
 	// WebSocket 路由
-	// 注意：WebSocket 是 GET 请求
 	v1.GET("/ws", websocket.HandleWebSocket)
+
+	// 消息相关路由
+	messages := v1.Group("/messages")
+	{
+		// 获取消息列表（包含未读消息）
+		messages.GET("", handlers.GetMessages)
+		// 标记消息已读
+		messages.POST("/read", handlers.MarkMessagesAsRead)
+	}
 
 	return v1
 }
