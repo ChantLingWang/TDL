@@ -114,3 +114,23 @@ func (s *ConversationService) UpdateLastReadTimeWhenOffline(ctx context.Context,
 		Where("user_id = ?", userID).
 		Update("last_read_time", now).Error
 }
+
+// GetUserConversationIDs 获取用户所有会话 ID 列表
+func (s *ConversationService) GetUserConversationIDs(ctx context.Context, userID string) ([]string, error) {
+	conv := query.Conversation
+
+	records, err := conv.WithContext(ctx).Where(
+		conv.UserID.Eq(userID),
+	).Find()
+
+	if err != nil {
+		return nil, err
+	}
+
+	conversationIDs := make([]string, len(records))
+	for i, record := range records {
+		conversationIDs[i] = record.ConversationID
+	}
+
+	return conversationIDs, nil
+}

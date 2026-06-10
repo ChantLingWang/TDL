@@ -44,7 +44,7 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 		groups.POST("/join", handlers.JoinGroup)
 	}
 
-	// WebSocket 路由
+	// WebSocket 路由,负责发送和接收消息
 	v1.GET("/ws", websocket.HandleWebSocket)
 
 	// 消息相关路由
@@ -54,6 +54,8 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 		messages.GET("", handlers.GetMessages)
 		// 标记消息已读
 		messages.POST("/read", handlers.MarkMessagesAsRead)
+		// 获取历史消息（支持时间范围和关键字搜索）
+		messages.GET("/history", handlers.GetMessageHistory)
 	}
 
 	return v1

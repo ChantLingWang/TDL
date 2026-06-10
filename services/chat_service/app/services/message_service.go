@@ -7,6 +7,8 @@ import (
 
 	"chat_service/app/infrastructure/kafka"
 	"chat_service/app/models"
+
+	"github.com/google/uuid"
 )
 
 // MessageService 负责处理消息路由及业务逻辑
@@ -53,7 +55,8 @@ func (s *MessageService) SendMessageToUser(ctx context.Context, userID string, m
 
 	// 发送 "user.chat.message" 事件
 	// 使用 TargetUserID 作为 Key，保证消息顺序
-	err := s.producer.SendEvent(ctx, "user.chat.message", userID, chatEvent)
+	// 使用 uuid 作为 messageID
+	err := s.producer.SendEvent(ctx, "user.chat.message", uuid.New().String(), userID, chatEvent)
 	if err != nil {
 		return fmt.Errorf("消息转发 Kafka 失败: %v", err)
 	}

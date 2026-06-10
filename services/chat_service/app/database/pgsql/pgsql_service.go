@@ -94,5 +94,28 @@ func (manager *DBManager) Initialize() error {
 		return fmt.Errorf("database not connected")
 	}
 
-	return model.AutoMigrate(manager.db)
+	// 1. 自动迁移表结构
+	if err := model.AutoMigrate(manager.db); err != nil {
+		return fmt.Errorf("failed to auto migrate: %w", err)
+	}
+
+	// 2. 初始化 Sequence（如果不存在则创建）
+	sequences := []string{
+		"group_id_seq",
+	}
+
+	for _, seq := range sequences {
+		sql := fmt.Sprintf(`
+			CREATE SEQUENCE IF NOT EXISTS %s
+			START WITH 1
+			INCREMENT BY 1
+			NO MAXVALUE
+			NO CYCLE;
+		`, seq)
+		if err := manager.db.Exec(sql).Error; err != nil {
+			return fmt.Errorf("failed to create sequence %s: %w", seq, err)
+		}
+	}
+
+	return nil
 }
