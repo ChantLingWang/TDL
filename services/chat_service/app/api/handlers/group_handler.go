@@ -8,7 +8,6 @@ import (
 	"chat_service/app/database/pgsql/model"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // CreateGroupRequest 创建群组请求
@@ -33,8 +32,14 @@ func CreateGroup(c *gin.Context) {
 
 	service := pgsql.NewUserGroupService(pgsql.GetDBManager())
 
-	// 1. 创建群组
-	groupID := uuid.New().String()
+	// 1. 使用 PostgreSQL Sequence 生成递增的 group_id
+	groupID, err := service.GenerateGroupID()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate group ID"})
+		return
+	}
+
+	// 创建群组
 	group, err := service.CreateGroup(groupID, req.GroupName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group"})

@@ -27,6 +27,9 @@ services:
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       # 允许自动创建 Topic (开发环境方便)
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      # 分区和副本配置
+      KAFKA_NUM_PARTITIONS: '2'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: '1'
     depends_on:
       - zookeeper
     networks:

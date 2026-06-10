@@ -62,6 +62,14 @@ func (h *UserEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.Bus
 		log.Printf("未设置广播消息处理器，忽略事件")
 		return nil
 
+	// 处理群聊消息事件
+	case EventGroupChatMessage:
+		return services.HandleGroupChatMessageEvent(ctx, event.Data)
+
+	// 处理私聊消息事件
+	case EventPrivateChatMessage:
+		return services.HandlePrivateChatMessageEvent(ctx, event.Data)
+
 	default:
 		log.Printf("忽略未知事件类型: %s", event.CommonParams.EventType)
 		return nil

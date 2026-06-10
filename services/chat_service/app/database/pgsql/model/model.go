@@ -52,6 +52,15 @@ type TempChat struct {
 }
 
 
+// Conversation 会话模型（用于跟踪用户对会话的已读状态）
+type Conversation struct {
+	UserID           string    `gorm:"primaryKey"`        // 用户ID
+	ConversationID   string    `gorm:"primaryKey"`        // 会话ID (群ID 或 userA_userB)
+	ConversationType string    `gorm:"not null"`          // 会话类型: "private" 或 "group"
+	LastReadTime     time.Time // 最后已读时间
+	UpdateTime       time.Time // 更新时间
+}
+
 // TableName 指定User表名
 func (User) TableName() string {
 	return "users"
@@ -75,15 +84,6 @@ func (PrivateChat) TableName() string {
 // TableName 指定TempChat表名
 func (TempChat) TableName() string {
 	return "temp_chats"
-}
-
-// Conversation 会话模型（用于跟踪用户对会话的已读状态）
-type Conversation struct {
-	UserID           string    `gorm:"primaryKey"`        // 用户ID
-	ConversationID   string    `gorm:"primaryKey"`        // 会话ID (群ID 或 userA_userB)
-	ConversationType string    `gorm:"not null"`          // 会话类型: "private" 或 "group"
-	LastReadTime     time.Time // 最后已读时间（用户最后一次在线的时间）
-	UpdateTime       time.Time // 更新时间
 }
 
 // TableName 指定Conversation表名

@@ -177,3 +177,16 @@ func (ugs *UserGroupService) GetGroupMembers(groupID string) ([]string, error) {
 	}
 	return memberIDs, nil
 }
+
+// GenerateGroupID 使用 PostgreSQL Sequence 生成递增的 group_id
+func (ugs *UserGroupService) GenerateGroupID() (string, error) {
+	// 直接获取下一个 Sequence 值（Sequence 已在 Initialize 时创建）
+	var nextVal int64
+	if err := ugs.dbManager.GetDB().Raw("SELECT nextval('group_id_seq')").Scan(&nextVal).Error; err != nil {
+		return "", fmt.Errorf("failed to get next sequence value: %w", err)
+	}
+
+	// 转换为字符串格式 "G" + 序号（如 G1, G2, G3...）
+	groupID := fmt.Sprintf("G%d", nextVal)
+	return groupID, nil
+}

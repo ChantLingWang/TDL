@@ -1,20 +1,18 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"log"
+	"time"
 
+	"chat_service/app/api/models"
+	"chat_service/app/infrastructure/grpc"
 	"chat_service/app/infrastructure/kafka"
 	"chat_service/app/services"
 
 	"github.com/gin-gonic/gin"
 )
-
-// IncomingMessage 定义客户端发送的消息格式
-type IncomingMessage struct {
-	Type    string          `json:"type"`
-	Content json.RawMessage `json:"content"` // 消息内容，根据类型不同而结构不同
-}
 
 // HandleWebSocket 处理 WebSocket 连接请求
 func HandleWebSocket(c *gin.Context) {
@@ -46,7 +44,7 @@ func HandleWebSocket(c *gin.Context) {
 	// 8. 启动读泵 (ReadLoop) - 负责上行消息
 	// 这里的匿名函数就是 "Callback"（回调函数），ReadLoop 每收到一条消息，就会调用它一次
 	wsConn.ReadLoop(func(messageType int, data []byte) error {
-		var msg IncomingMessage
+		var msg models.IncomingMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			log.Printf("Invalid message format: %v", err)
 			return nil // 格式错误忽略，不断开连接
@@ -55,7 +53,7 @@ func HandleWebSocket(c *gin.Context) {
 		// 根据消息类型分发给不同的处理函数
 		switch msg.Type {
 		case kafka.WSMsgTypeChat:
-			services.HandleChat(userInfo.UserID, msg.Content)
+			services.HandleChat(msg.Content)
 		case kafka.WSMsgTypePing:
 			// 心跳包处理
 			log.Printf("Received ping from %s", userInfo.UserID)
@@ -70,8 +68,20 @@ func HandleWebSocket(c *gin.Context) {
 	// ReadLoop 返回意味着连接已关闭
 	hub.Unregister(client)
 
-	// 10. 用户离线，更新所有会话的最后阅读时间
-	// TODO: 需要查询用户所在的所有群和私聊，然后更新每个会话的 LastReadTime
-	// 当前简化处理：下次用户上线时，会自动获取该时间之后的消息
-	_ = userInfo.UserID // 用户ID，用于后续查询
+	// 10. 用户离线，通过 gRPC 更新用户最后离线时间
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		client := grpc.GetLastOfflineTimeClient()
+		resp, err := client.UpdateLastOfflineTime(ctx, userInfo.UserID)
+		if err != nil {
+			log.Printf("Failed to update last offline time for user %s: %v", userInfo.UserID, err)
+			return
+		}
+		if !resp.Success {
+			log.Printf("Failed to update last offline time for user %s: success=false", userInfo.UserID)
+			return
+		}
+	}()
 }

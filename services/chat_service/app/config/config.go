@@ -39,12 +39,20 @@ type KafkaConfig struct {
 	GroupID string   `yaml:"group_id"`
 }
 
+// Redis配置
+type RedisConfig struct {
+	Host string `yaml:"host"`
+	Port string `yaml:"port"`
+	DB   int    `yaml:"db"`
+}
+
 // Config 定义全局配置结构
 type Config struct {
 	Server   ServerCfg   `yaml:"server"`
 	Postgres DBConfig    `yaml:"postgres"`
 	MongoDB  DBConfig    `yaml:"mongodb"`
 	Kafka    KafkaConfig `yaml:"kafka"`
+	Redis    RedisConfig `yaml:"redis"`
 }
 
 // 全局变量，保持原有变量名以减少代码修改
@@ -53,6 +61,7 @@ var (
 	MongoDBConfig       DBConfig
 	ServerConfig        ServerCfg
 	KafkaConfigInstance KafkaConfig
+	RedisConfigInstance RedisConfig
 )
 
 // InitConfig 初始化全局配置
@@ -69,4 +78,5 @@ func InitConfig(path string) {
 	MongoDBConfig = globalConfig.MongoDB
 	ServerConfig = globalConfig.Server
 	KafkaConfigInstance = globalConfig.Kafka
+	RedisConfigInstance = globalConfig.Redis
 }

@@ -9,14 +9,14 @@ import (
 func GetUser(c *gin.Context) {
 	// 从URL参数中获取用户ID
 	userID := c.Param("user_id")
-	
+
 	// 调用服务层获取用户信息
 	user, err := pgsql.NewUserService(pgsql.GetDBManager()).GetUserByID(c, userID)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "User not found"})
 		return
 	}
-	
+
 	// 返回用户信息
 	c.JSON(200, user)
 }

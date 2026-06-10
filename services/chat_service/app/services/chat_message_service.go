@@ -4,132 +4,136 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
+	"chat_service/app/api/models"
 	chatconst "chat_service/app/const"
 	"chat_service/app/database/mongodb"
-	"chat_service/app/database/pgsql"
 	"chat_service/app/infrastructure/kafka"
 )
 
-// SendMessageFunc 发送消息函数的类型
-type SendMessageFunc func(ctx context.Context, userIDs []string, message []byte)
-
-// 全局发送消息函数
-var sendMessageFn SendMessageFunc
-
-// RegisterSendMessageFunc 注册发送消息函数（由 main.go 调用）
-func RegisterSendMessageFunc(fn SendMessageFunc) {
-	sendMessageFn = fn
+// getGroupPartitionKey 根据 GroupID 数字部分实现奇偶分区
+// G1 -> "0", G2 -> "1", G3 -> "0", G4 -> "1"...
+func getGroupPartitionKey(groupID string) string {
+	// 提取 GroupID 中的数字部分（G1 -> 1, G2 -> 2）
+	numStr := strings.TrimPrefix(groupID, "G")
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		return "0" // 默认分区 0
+	}
+	// 奇数 -> 0 区，偶数 -> 1 区
+	return strconv.Itoa(num % 2)
 }
 
-// ChatMessageRequest 聊天消息请求结构
-type ChatMessageRequest struct {
-	ConversationType string `json:"conversation_type"`    // 会话类型: "private", "group"
-	TargetID         string `json:"target_id,omitempty"`  // 私聊接收者
-	GroupID          string `json:"group_id,omitempty"`   // 群聊接收者
-	Text             string `json:"text"`                  // 文本内容
-	MessageID		 string `json:"message_id,omitempty"`  // 消息ID,方便溯源,去重
-	MessageType      string `json:"message_type,omitempty"` // 消息类型: "text", "image" 等
+// GroupChatMessage 群聊消息结构
+type GroupChatMessage struct {
+	GroupID     string `json:"group_id"`
+	SenderID    string `json:"sender_id"`
+	Content     string `json:"content"`
+	Timestamp   int64  `json:"timestamp"`
+	MessageID   string `json:"message_id"`
+	MessageType string `json:"message_type,omitempty"`
+}
+
+// PrivateChatMessage 私聊消息结构
+type PrivateChatMessage struct {
+	SenderID     string `json:"sender_id"`
+	TargetUserID string `json:"target_user_id"`
+	Content      string `json:"content"`
+	Timestamp    int64  `json:"timestamp"`
+	MessageID    string `json:"message_id"`
+	MessageType  string `json:"message_type,omitempty"`
+}
+
+// ToJSON 转换为 JSON 字节数组
+func (g *GroupChatMessage) ToJSON() []byte {
+	data, _ := json.Marshal(g)
+	return data
+}
+
+// ToJSON 转换为 JSON 字节数组
+func (p *PrivateChatMessage) ToJSON() []byte {
+	data, _ := json.Marshal(p)
+	return data
 }
 
 // HandleChat 处理统一聊天逻辑
-func HandleChat(senderID string, content json.RawMessage) {
-	var chatContent ChatMessageRequest
-	if err := json.Unmarshal(content, &chatContent); err != nil {
-		log.Printf("Invalid chat content: %v", err)
+func HandleChat(content models.ChatMessageRequest) {
+	if content.Text == "" {
 		return
 	}
 
-	if chatContent.Text == "" {
-		return
-	}
+	msgID := content.MessageID
+	contentType := content.MessageType
 
-	// 1. 构建消息对象
-	msgID := chatContent.MessageID
-	contentType := chatContent.MessageType
-
-	msg := &mongodb.Message{
-		Timestamp:   time.Now(),
-		Content:     chatContent.Text,
-		TouserID:    senderID,
-		MessageID:   msgID,
-		MessageType: contentType,
-		IsActive:    true,
-	}
-
-	var targetUserIDs []string
-	var wsMsgType string
-	var conversationID string
-
-	// 2. 判断是私聊还是群聊
-	switch chatContent.ConversationType {
+	switch content.ConversationType {
 	case chatconst.ConversationTypeGroup:
 		// 群聊逻辑
-		wsMsgType = kafka.WSMsgTypeGroupChat
-		conversationID = chatContent.GroupID
-
-		// 获取群成员
-		userGroupService := pgsql.NewUserGroupService(pgsql.GetDBManager())
-		members, err := userGroupService.GetGroupMembers(chatContent.GroupID)
-		if err != nil {
-			log.Printf("Failed to get group members: %v", err)
-			return
+		// 先保存群消息到数据库
+		msg := &mongodb.Message{
+			SenderID:    content.SenderID,
+			Timestamp:   time.Now(),
+			Content:     content.Text,
+			GroupID:     content.GroupID,
+			MessageID:   msgID,
+			MessageType: contentType,
+			IsActive:    true,
 		}
-		targetUserIDs = members
+		_ = mongodb.SaveMessage(content.ConversationType, content.SenderID, content.GroupID, msg)
+
+		// 再发送群消息到 Kafka
+		groupMsg := &GroupChatMessage{
+			GroupID:     content.GroupID,
+			SenderID:    content.SenderID,
+			Content:     content.Text,
+			Timestamp:   time.Now().UnixMilli(),
+			MessageID:   msgID,
+			MessageType: contentType,
+		}
+		// 使用 GroupID 数字部分 % 分区数 实现奇偶分区
+		partitionKey := getGroupPartitionKey(content.GroupID)
+		kafka.GetProducer().SendEvent(context.Background(), kafka.EventGroupChatMessage, msgID, partitionKey, groupMsg.ToJSON())
+		return
 
 	case chatconst.ConversationTypePrivate:
-		if chatContent.TargetID == "" {
+		if content.TargetID == "" {
 			log.Println("Invalid private chat: TargetID is empty")
 			return
 		}
-		// 私聊逻辑
-		wsMsgType = kafka.WSMsgTypePrivateChat
-		conversationID = chatContent.TargetID
 
-		// 目标用户就是接收者
-		targetUserIDs = []string{chatContent.TargetID}
+		// 保存私聊消息到数据库
+		msg := &mongodb.Message{
+			SenderID:    content.SenderID,
+			Timestamp:   time.Now(),
+			Content:     content.Text,
+			PrivateID:   content.TargetID,
+			MessageID:   msgID,
+			MessageType: contentType,
+			IsActive:    true,
+		}
+		if err := mongodb.SaveMessage(content.ConversationType, content.SenderID, content.TargetID, msg); err != nil {
+			log.Printf("Failed to save private message: %v", err)
+		}
+
+		// 构造私聊消息（给消费者推送给目标用户）
+		privateMsg := &PrivateChatMessage{
+			SenderID:    content.SenderID,
+			TargetUserID: content.TargetID,
+			Content:     content.Text,
+			Timestamp:   time.Now().UnixMilli(),
+			MessageID:   msgID,
+			MessageType: contentType,
+		}
+
+		// 发送私聊消息到 Kafka（各实例消费后推送给各自本地的在线目标用户）
+		// 使用 TargetUserID 作为 Key，保证同一用户的私聊消息有序
+		kafka.GetProducer().SendEvent(context.Background(), kafka.EventPrivateChatMessage, msgID, content.TargetID, privateMsg.ToJSON())
+		return
 
 	default:
-		log.Printf("Unknown conversation type: %s", chatContent.ConversationType)
+		log.Printf("Unknown conversation type: %s", content.ConversationType)
 		return
-	}
-
-	// 统一持久化消息
-	if err := mongodb.SaveMessage(chatContent.ConversationType, senderID, conversationID, msg); err != nil {
-		log.Printf("Failed to save message: %v", err)
-		// 持久化失败是否阻断发送？通常建议继续发送，或者返回错误给前端
-	}
-
-	// 3. 构造发送给前端的消息
-	// 保持结构清晰，统一返回格式
-	responseMsg := map[string]interface{}{
-		"type":            wsMsgType,
-		"conversation_id": conversationID,
-		"sender":          senderID,
-		"content":         chatContent.Text,
-		"time":            msg.Timestamp,
-	}
-
-	if wsMsgType == kafka.WSMsgTypeGroupChat {
-		responseMsg["group_id"] = chatContent.GroupID
-	}
-
-	msgBytes, _ := json.Marshal(responseMsg)
-
-	// 4. 批量广播给目标用户
-	hub := GetWSHub()
-	var remoteUserIDs []string
-
-	// 尝试本地发送
-	for _, userID := range targetUserIDs {
-		if !hub.BroadcastToUser(userID, msgBytes) {
-			remoteUserIDs = append(remoteUserIDs, userID)
-		}
-	}
-
-	// 如果有远程用户，通过注册的发送函数发送到 Kafka
-	if len(remoteUserIDs) > 0 && sendMessageFn != nil {
-		sendMessageFn(context.Background(), remoteUserIDs, msgBytes)
 	}
 }

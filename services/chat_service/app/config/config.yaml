@@ -27,6 +27,11 @@ mongodb:
 
 kafka:
   brokers:
-    - "localhost:9092"
-  topic: "user_registered_events"
-  group_id: "user_service_group"
+    - "localhost:9094"
+  topic: "chat_group_message"
+  group_id: "chat_service_instance_1"
+
+redis:
+  host: "127.0.0.1"
+  port: "6379"
+  db: 0

@@ -4,8 +4,6 @@ import (
 	"context"
 
 	sdk_kafka "infrastructure_sdk/kafka"
-
-	"github.com/google/uuid"
 )
 
 // KafkaProducer 包装 SDK 生产者，适配本地接口
@@ -14,20 +12,30 @@ type KafkaProducer struct {
 	defaultTopic string
 }
 
+// 全局生产者单例
+var globalProducer *KafkaProducer
+
 // NewKafkaProducer 创建新的Kafka生产者
 func NewKafkaProducer(connection *sdk_kafka.KafkaConnection, defaultTopic string) *KafkaProducer {
-	return &KafkaProducer{
+	p := &KafkaProducer{
 		sdkProducer:  sdk_kafka.NewKafkaProducer(connection),
 		defaultTopic: defaultTopic,
 	}
+	// 保存为全局单例
+	globalProducer = p
+	return p
+}
+
+// GetProducer 获取全局生产者实例
+func GetProducer() *KafkaProducer {
+	return globalProducer
 }
 
 // SendEvent 通用发送方法
-// key: 可选的分区键（如 UserID），传空字符串则轮询分区
-func (kp *KafkaProducer) SendEvent(ctx context.Context, eventType string, key string, data interface{}) error {
-	// 构造业务事件
-	eventID := uuid.New().String()
-	event, err := sdk_kafka.NewBusinessEvent(eventType, eventType, eventID, data)
+// messageID 用于标识消息，用于 Kafka 事件的 eventID
+func (kp *KafkaProducer) SendEvent(ctx context.Context, eventType string, messageID string, key string, data interface{}) error {
+	// 使用传入的 messageID 作为 eventID
+	event, err := sdk_kafka.NewBusinessEvent(eventType, eventType, messageID, data)
 	if err != nil {
 		return err
 	}

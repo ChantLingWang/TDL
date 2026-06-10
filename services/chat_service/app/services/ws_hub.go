@@ -158,6 +158,18 @@ func (h *WSHub) GetOnlineCount() int {
 	return len(h.clients)
 }
 
+// GetAllUserIDs 获取所有在线用户ID（用于群消息广播）
+func (h *WSHub) GetAllUserIDs() []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	userIDs := make([]string, 0, len(h.clients))
+	for userID := range h.clients {
+		userIDs = append(userIDs, userID)
+	}
+	return userIDs
+}
+
 // IsUserOnline 检查用户是否在线
 func (h *WSHub) IsUserOnline(userID string) bool {
 	h.mu.RLock()

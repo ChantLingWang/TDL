@@ -8,8 +8,6 @@ import (
 	config "chat_service/app/config"
 
 	sdk_kafka "infrastructure_sdk/kafka"
-
-	"github.com/google/uuid"
 )
 
 // ConsumerRunner 负责管理 Kafka 消费者的生命周期
@@ -33,9 +31,8 @@ func NewConsumerRunner(
 
 // Run 启动消费者，阻塞直到上下文取消
 func (r *ConsumerRunner) Run(ctx context.Context) error {
-	// 1. 创建 Kafka 连接
-	// 显式生成 GroupID (UUID) 以支持多实例
-	groupID := uuid.New().String()
+	// 使用配置文件中的 GroupID（每个实例配置不同的 ID，实现多实例消息分发）
+	groupID := r.config.GroupID
 	log.Printf("Initializing Kafka consumer with GroupID: %s", groupID)
 
 	connection, err := sdk_kafka.NewKafkaConnection(r.config.Brokers, r.config.Topic, groupID)

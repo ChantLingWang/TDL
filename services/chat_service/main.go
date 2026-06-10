@@ -13,7 +13,6 @@ import (
 	"chat_service/app/database/pgsql"
 	"chat_service/app/infrastructure/kafka"
 	kafkaServices "chat_service/app/infrastructure/kafka/services"
-	"chat_service/app/models"
 	"chat_service/app/services"
 
 	sdk_kafka "infrastructure_sdk/kafka"
@@ -55,18 +54,9 @@ func initMessageService() *sdk_kafka.KafkaConnection {
 		log.Fatalf("创建 Kafka Producer 连接失败: %v", err)
 	}
 
-	// 2. 创建 Producer
-	producer := kafka.NewKafkaProducer(conn, kafkaConfig.Topic)
-
-	// 3. 注册发送消息函数到 services 包
-	services.RegisterSendMessageFunc(func(ctx context.Context, userIDs []string, message []byte) {
-		broadcastEvent := models.BroadcastChatMessage{
-			TargetUserIDs: userIDs,
-			Message:       message,
-		}
-		producer.SendEvent(ctx, "user.chat.broadcast", "broadcast", broadcastEvent)
-	})
-	log.Println("SendMessageFunc 已注册")
+	// 2. 创建 Producer（会在内部设置为全局单例）
+	kafka.NewKafkaProducer(conn, kafkaConfig.Topic)
+	log.Println("Kafka Producer 已初始化")
 
 	return conn
 }
@@ -127,6 +117,31 @@ func main() {
 	defer cancel()
 
 	// 4. 启动 Kafka 消费者
+	// 先注册群消息本地广播函数
+	kafkaServices.RegisterGroupMessageLocalBroadcast(func(groupID string, message []byte) {
+		// 从数据库获取群成员
+		userGroupService := pgsql.NewUserGroupService(pgsql.GetDBManager())
+		members, err := userGroupService.GetGroupMembers(groupID)
+		if err != nil {
+			log.Printf("获取群成员失败: group_id=%s, err=%v", groupID, err)
+			return
+		}
+
+		// 推送给本地在线用户
+		hub := services.GetWSHub()
+		for _, userID := range members {
+			hub.BroadcastToUser(userID, message)
+		}
+		log.Printf("群消息已推送给本地在线用户: group_id=%s, members=%d", groupID, len(members))
+	})
+
+	// 注册私聊消息本地广播函数
+	kafkaServices.RegisterPrivateMessageLocalBroadcast(func(targetUserID string, message []byte) {
+		hub := services.GetWSHub()
+		hub.BroadcastToUser(targetUserID, message)
+		log.Printf("私聊消息已推送给本地在线用户: to=%s", targetUserID)
+	})
+
 	consumerRunner := kafka.NewConsumerRunner(
 		kafkaServices.HandleChatMessageEvent,
 		kafkaServices.HandleBroadcastMessageEvent,

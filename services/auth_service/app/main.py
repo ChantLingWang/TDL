@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config_test import settings
 from app.api.v1.auth import router as auth_router
-from app.api.v1.health import router as health_router
 from app.database.mongodb_service import db_manager
 from app.infrastructure.kafka.kafka_manager import kafka_producer
 from app.infrastructure.kafka.event_consumer import event_consumer
@@ -65,7 +64,6 @@ def create_app() -> FastAPI:
     
     # 注册路由
     app.include_router(auth_router, prefix="/api/v1", tags=["认证"])
-    app.include_router(health_router, prefix="/api/v1",tags=["健康检查"])
     
     # 根路径
     @app.get("/", tags=["根路径"])

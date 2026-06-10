@@ -214,3 +214,42 @@ class MongoDBUserService:
             return user.get("status") if user else None
         except Exception as e:
             raise Exception(f"获取用户状态失败: {e}")
+
+    async def update_last_offline_time(self, user_id: str, timestamp: int) -> bool:
+        """
+        更新用户最后离线时间
+        
+        Args:
+            user_id: 用户ID
+            timestamp: 时间戳（秒）
+            
+        Returns:
+            bool: 是否更新成功
+        """
+        try:
+            result = await self.collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"last_offline_time": timestamp}}
+            )
+            return result.modified_count > 0 or result.matched_count > 0
+        except Exception as e:
+            raise Exception(f"更新用户最后离线时间失败: {e}")
+
+    async def get_last_offline_time(self, user_id: str) -> Optional[int]:
+        """
+        获取用户最后离线时间
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            int: 时间戳（秒），如果不存在则返回 None
+        """
+        try:
+            user = await self.collection.find_one(
+                {"user_id": user_id},
+                {"last_offline_time": 1, "_id": 0}
+            )
+            return user.get("last_offline_time") if user else None
+        except Exception as e:
+            raise Exception(f"获取用户最后离线时间失败: {e}")

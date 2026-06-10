@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
+	"sort"
 	"sync"
 	"time"
 
@@ -15,25 +17,6 @@ import (
 const (
 	MaxMessagesPerBucket = 500 // 每个分桶最大消息数
 )
-
-type Message struct {
-	Timestamp   time.Time `bson:"timestamp"`    // 时间戳
-	Content     string    `bson:"content"`      // 消息内容
-	TouserID    string    `bson:"touser_id"`    // 目标用户ID
-	MessageID   string    `bson:"message_id"`   // 消息ID
-	MessageType string    `bson:"message_type"` // 消息类型
-	IsActive    bool      `bson:"is_active"`    // 是否可见
-}
-
-// GroupMessageHistory 表示组群聊天记录的结构
-type GroupMessageHistory struct {
-	GroupID        string    `bson:"group_id"`        // 群组ID
-	DateIdentifier string    `bson:"date_identifier"` // 日期标识符
-	Messages       []Message `bson:"messages"`        // 消息数组
-	Count          int       `bson:"count"`           // 当前文档消息数量，用于分桶控制
-	StartTime      time.Time `bson:"start_time"`      // 桶内第一条消息时间
-	EndTime        time.Time `bson:"end_time"`        // 桶内最后一条消息时间
-}
 
 // GroupMessageHistoryService 组群聊天记录服务
 type GroupMessageHistoryService struct {
@@ -157,6 +140,330 @@ func (service *GroupMessageHistoryService) GetGroupMessagesByDate(groupID string
 
 	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("cursor error: %w", err)
+	}
+
+	return allMessages, nil
+}
+
+// GetUnreadMessages 获取未读消息（根据会话ID列表和时间）
+// conversationIDs: 会话ID列表
+// afterTime: 时间戳（秒），只获取该时间之后的消息
+// limit: 返回数量限制
+func (service *GroupMessageHistoryService) GetUnreadMessages(conversationIDs []string, afterTime int64, limit int) ([]Message, int, error) {
+	if len(conversationIDs) == 0 {
+		return nil, 0, nil
+	}
+
+	db := GetMongoDBManager().GetDatabase()
+	if db == nil {
+		return nil, 0, fmt.Errorf("failed to get database instance")
+	}
+
+	afterTimestamp := time.Unix(afterTime, 0)
+	var allMessages []Message
+	var totalCount int
+
+	// 获取过去几天的 collection
+	now := time.Now()
+	for i := 0; i < 3; i++ { // 最多查最近3天
+		collectionTime := now.AddDate(0, 0, -i)
+		collectionName := "group_message_history_" + collectionTime.Format("200601")
+		collection := db.Collection(collectionName)
+
+		// 查询条件：group_id 在会话列表中，且消息时间大于 afterTime
+		filter := bson.M{
+			"group_id": bson.M{"$in": conversationIDs},
+			"messages": bson.M{
+				"$elemMatch": bson.M{
+					"timestamp": bson.M{"$gt": afterTimestamp},
+				},
+			},
+		}
+
+		// 查询消息
+		opts := options.Find().
+			SetSort(bson.M{"end_time": -1}). // 按结束时间倒序，最新的在前
+			SetLimit(int64(limit))
+
+		cursor, err := collection.Find(context.Background(), filter, opts)
+		if err != nil {
+			continue
+		}
+
+		for cursor.Next(context.Background()) {
+			var doc GroupMessageHistory
+			if err := cursor.Decode(&doc); err != nil {
+				continue
+			}
+			// 过滤并统计时间大于 afterTime 的消息
+			for _, msg := range doc.Messages {
+				if msg.Timestamp.After(afterTimestamp) {
+					allMessages = append(allMessages, msg)
+					totalCount++ // 累加实际未读消息数量
+				}
+			}
+		}
+		cursor.Close(context.Background())
+
+		// 如果已经收集够消息了，就停止
+		if len(allMessages) >= limit {
+			break
+		}
+	}
+
+	// 按时间倒序排列（最新的在前）
+	sort.Slice(allMessages, func(i, j int) bool {
+		return allMessages[i].Timestamp.After(allMessages[j].Timestamp)
+	})
+
+	// 取前 N 条
+	if len(allMessages) > limit {
+		allMessages = allMessages[:limit]
+	}
+
+	return allMessages, totalCount, nil
+}
+
+// GetHistoryMessages 获取历史消息（支持时间范围和关键字搜索）
+// conversationID: 会话ID（群ID）
+// GetHistoryMessages 获取历史消息（分发函数）
+func (service *GroupMessageHistoryService) GetHistoryMessages(conversationID string, cursor, startTime, endTime int64, keyword string, limit int) ([]Message, error) {
+	hasCursor := cursor > 0
+
+	if hasCursor {
+		return service.GetHistoryMessagesByCursor(conversationID, cursor, keyword, limit)
+	}
+	return service.GetHistoryMessagesByTimeRange(conversationID, startTime, endTime, keyword, limit)
+}
+
+// GetHistoryMessagesByCursor 按游标获取历史消息
+func (service *GroupMessageHistoryService) GetHistoryMessagesByCursor(conversationID string, cursor int64, keyword string, limit int) ([]Message, error) {
+	if cursor <= 0 {
+		return nil, fmt.Errorf("invalid cursor: must be greater than 0")
+	}
+
+	db := GetMongoDBManager().GetDatabase()
+	if db == nil {
+		return nil, fmt.Errorf("failed to get database instance")
+	}
+
+	// cursor 是 Unix 时间戳（秒），转换为 time.Time 用于时间比较
+	searchCursor := time.Unix(cursor, 0)
+	var allMessages []Message
+
+	now := time.Now()
+	for i := 0; i < 30; i++ {
+		collectionTime := now.AddDate(0, 0, -i)
+		collectionName := "group_message_history_" + collectionTime.Format("200601")
+		collection := db.Collection(collectionName)
+
+		filter := bson.M{
+			"group_id": conversationID,
+		}
+
+		timeCondition := bson.M{"$lt": searchCursor}
+
+		if keyword != "" {
+			filter["messages"] = bson.M{
+				"$elemMatch": bson.M{
+					"timestamp": timeCondition,
+					"content":   bson.M{"$regex": keyword, "$options": "i"},
+				},
+			}
+		} else {
+			filter["messages"] = bson.M{
+				"$elemMatch": bson.M{
+					"timestamp": timeCondition,
+				},
+			}
+		}
+
+		opts := options.Find().
+			SetSort(bson.M{"end_time": -1}).
+			SetLimit(int64(limit))
+
+		cursor, err := collection.Find(context.Background(), filter, opts)
+		if err != nil {
+			continue
+		}
+
+		for cursor.Next(context.Background()) {
+			var doc GroupMessageHistory
+			if err := cursor.Decode(&doc); err != nil {
+				continue
+			}
+			for _, msg := range doc.Messages {
+				if !msg.Timestamp.Before(searchCursor) {
+					continue
+				}
+				if keyword != "" {
+					matched, err := regexp.MatchString(`(?i)`+keyword, msg.Content)
+					if err != nil || !matched {
+						continue
+					}
+				}
+				allMessages = append(allMessages, msg)
+			}
+		}
+		cursor.Close(context.Background())
+
+		if len(allMessages) >= limit {
+			break
+		}
+	}
+
+	sort.Slice(allMessages, func(i, j int) bool {
+		return allMessages[i].Timestamp.After(allMessages[j].Timestamp)
+	})
+
+	if len(allMessages) > limit {
+		allMessages = allMessages[:limit]
+	}
+
+	return allMessages, nil
+}
+
+// GetHistoryMessagesByTimeRange 按时间范围获取历史消息
+func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(conversationID string, startTime, endTime int64, keyword string, limit int) ([]Message, error) {
+	db := GetMongoDBManager().GetDatabase()
+	if db == nil {
+		return nil, fmt.Errorf("failed to get database instance")
+	}
+
+	var searchStartTime, searchEndTime time.Time
+	if startTime > 0 {
+		searchStartTime = time.Unix(startTime, 0)
+	}
+	if endTime > 0 {
+		searchEndTime = time.Unix(endTime, 0)
+	}
+
+	var allMessages []Message
+	now := time.Now()
+
+	// 时间范围查询的三种情况：
+	// 1. 只有 startTime：按 startTime 往后（更晚时间）查30条
+	// 2. 只有 endTime：按 endTime 往前（更早时间）查30条
+	// 3. 两个都有：从 startTime 开始往后查，直到 endTime
+	hasStartTime := startTime > 0
+	hasEndTime := endTime > 0
+
+	for i := 0; i < 30; i++ {
+		collectionTime := now.AddDate(0, 0, -i)
+		collectionName := "group_message_history_" + collectionTime.Format("200601")
+		collection := db.Collection(collectionName)
+
+		// 构建基础过滤条件
+		filter := bson.M{
+			"group_id": conversationID,
+		}
+
+		// 构建时间条件
+		var timeCondition bson.M
+		if hasStartTime && hasEndTime {
+			// 两个时间都有：查询 startTime <= 消息 <= endTime
+			timeCondition = bson.M{
+				"$gte": searchStartTime,
+				"$lte": searchEndTime,
+			}
+		} else if hasStartTime {
+			// 只有 startTime：按 startTime 往后（更晚时间）查
+			timeCondition = bson.M{
+				"$gte": searchStartTime,
+			}
+		} else if hasEndTime {
+			// 只有 endTime：按 endTime 往前（更早时间）查
+			timeCondition = bson.M{
+				"$lte": searchEndTime,
+			}
+		}
+
+		// 构建消息过滤条件
+		if len(timeCondition) > 0 {
+			if keyword != "" {
+				filter["messages"] = bson.M{
+					"$elemMatch": bson.M{
+						"timestamp": timeCondition,
+						"content":   bson.M{"$regex": keyword, "$options": "i"},
+					},
+				}
+			} else {
+				filter["messages"] = bson.M{
+					"$elemMatch": bson.M{
+						"timestamp": timeCondition,
+					},
+				}
+			}
+		} else if keyword != "" {
+			filter["messages"] = bson.M{
+				"$elemMatch": bson.M{
+					"content": bson.M{"$regex": keyword, "$options": "i"},
+				},
+			}
+		}
+
+		// 设置排序和limit
+		// 只有 startTime 时，需要按时间正序（asc），从早到晚
+		// 只有 endTime 时，需要按时间倒序（desc），从晚到早
+		// 两个都有时，按时间倒序
+		var opts *options.FindOptions
+		if hasStartTime && !hasEndTime {
+			// 只有 startTime，按时间正序，从早到晚
+			opts = options.Find().
+				SetSort(bson.M{"end_time": 1}).
+				SetLimit(int64(limit))
+		} else {
+			// 其他情况按时间倒序，最新的在前
+			opts = options.Find().
+				SetSort(bson.M{"end_time": -1}).
+				SetLimit(int64(limit))
+		}
+
+		cursor, err := collection.Find(context.Background(), filter, opts)
+		if err != nil {
+			continue
+		}
+
+		for cursor.Next(context.Background()) {
+			var doc GroupMessageHistory
+			if err := cursor.Decode(&doc); err != nil {
+				continue
+			}
+			// 过滤消息
+			for _, msg := range doc.Messages {
+				// 时间范围过滤
+				if hasStartTime && msg.Timestamp.Before(searchStartTime) {
+					continue
+				}
+				if hasEndTime && msg.Timestamp.After(searchEndTime) {
+					continue
+				}
+				// 关键字过滤
+				if keyword != "" {
+					matched, err := regexp.MatchString(`(?i)`+keyword, msg.Content)
+					if err != nil || !matched {
+						continue
+					}
+				}
+				allMessages = append(allMessages, msg)
+			}
+		}
+		cursor.Close(context.Background())
+
+		// 如果已经收集够消息了，就停止
+		if len(allMessages) >= limit {
+			break
+		}
+	}
+
+	// 按时间倒序排列（最新的在前）
+	sort.Slice(allMessages, func(i, j int) bool {
+		return allMessages[i].Timestamp.After(allMessages[j].Timestamp)
+	})
+
+	// 取前 N 条
+	if len(allMessages) > limit {
+		allMessages = allMessages[:limit]
 	}
 
 	return allMessages, nil
