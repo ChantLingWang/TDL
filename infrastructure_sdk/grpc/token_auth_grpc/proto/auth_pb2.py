@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nauth.proto\x12\x04grpc\"#\n\x12VerifyTokenRequest\x12\r\n\x05token\x18\x01 \x01(\t\"g\n\x13VerifyTokenResponse\x12\r\n\x05valid\x18\x01 \x01(\x08\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x10\n\x08username\x18\x03 \x01(\t\x12\r\n\x05\x65mail\x18\x04 \x01(\t\x12\x0f\n\x07message\x18\x05 \x01(\t2Q\n\x0b\x41uthService\x12\x42\n\x0bVerifyToken\x12\x18.grpc.VerifyTokenRequest\x1a\x19.grpc.VerifyTokenResponseB*Z(infrastructure_sdk/token_auth_grpc/protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nauth.proto\x12\x04grpc\"#\n\x12VerifyTokenRequest\x12\r\n\x05token\x18\x01 \x01(\t\"g\n\x13VerifyTokenResponse\x12\r\n\x05valid\x18\x01 \x01(\x08\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x10\n\x08username\x18\x03 \x01(\t\x12\r\n\x05\x65mail\x18\x04 \x01(\t\x12\x0f\n\x07message\x18\x05 \x01(\t\"%\n\x12GetUserByIDRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\"w\n\x13GetUserByIDResponse\x12\r\n\x05\x66ound\x18\x01 \x01(\x08\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12\x10\n\x08username\x18\x03 \x01(\t\x12\r\n\x05\x65mail\x18\x04 \x01(\t\x12\x0e\n\x06status\x18\x05 \x01(\t\x12\x0f\n\x07message\x18\x06 \x01(\t2\x95\x01\n\x0b\x41uthService\x12\x42\n\x0bVerifyToken\x12\x18.grpc.VerifyTokenRequest\x1a\x19.grpc.VerifyTokenResponse\x12\x42\n\x0bGetUserByID\x12\x18.grpc.GetUserByIDRequest\x1a\x19.grpc.GetUserByIDResponseB*Z(infrastructure_sdk/token_auth_grpc/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -36,6 +36,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_VERIFYTOKENREQUEST']._serialized_end=55
   _globals['_VERIFYTOKENRESPONSE']._serialized_start=57
   _globals['_VERIFYTOKENRESPONSE']._serialized_end=160
-  _globals['_AUTHSERVICE']._serialized_start=162
-  _globals['_AUTHSERVICE']._serialized_end=243
+  _globals['_GETUSERBYIDREQUEST']._serialized_start=162
+  _globals['_GETUSERBYIDREQUEST']._serialized_end=199
+  _globals['_GETUSERBYIDRESPONSE']._serialized_start=201
+  _globals['_GETUSERBYIDRESPONSE']._serialized_end=320
+  _globals['_AUTHSERVICE']._serialized_start=323
+  _globals['_AUTHSERVICE']._serialized_end=472
 # @@protoc_insertion_point(module_scope)

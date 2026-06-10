@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 
 	"infrastructure_sdk/grpc/last_offline_time_grpc/proto"
@@ -12,8 +13,7 @@ import (
 )
 
 const (
-	// LastOfflineTimeServiceAddr auth_service 的 gRPC 地址
-	LastOfflineTimeServiceAddr = "localhost:50052"
+	defaultLastOfflineTimeServiceAddr = "localhost:50052"
 )
 
 // LastOfflineTimeClient gRPC 客户端
@@ -31,7 +31,11 @@ var (
 // GetLastOfflineTimeClient 获取 LastOfflineTimeClient 单例
 func GetLastOfflineTimeClient() *LastOfflineTimeClient {
 	lastOfflineTimeClientOnce.Do(func() {
-		lastOfflineTimeClientInstance = NewLastOfflineTimeClient(LastOfflineTimeServiceAddr)
+		addr := os.Getenv("LAST_OFFLINE_GRPC_ADDR")
+		if addr == "" {
+			addr = defaultLastOfflineTimeServiceAddr
+		}
+		lastOfflineTimeClientInstance = NewLastOfflineTimeClient(addr)
 	})
 	return lastOfflineTimeClientInstance
 }

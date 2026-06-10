@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 
 	"infrastructure_sdk/grpc/token_auth_grpc/proto"
@@ -12,8 +13,7 @@ import (
 )
 
 const (
-	// AuthServiceAddr auth_service 的 gRPC 地址
-	AuthServiceAddr = "localhost:50051"
+	defaultAuthServiceAddr = "localhost:50051"
 )
 
 // AuthClient gRPC 认证客户端
@@ -31,7 +31,11 @@ var (
 // GetAuthClient 获取 AuthClient 单例
 func GetAuthClient() *AuthClient {
 	authClientOnce.Do(func() {
-		authClientInstance = NewAuthClient(AuthServiceAddr)
+		addr := os.Getenv("AUTH_GRPC_ADDR")
+		if addr == "" {
+			addr = defaultAuthServiceAddr
+		}
+		authClientInstance = NewAuthClient(addr)
 	})
 	return authClientInstance
 }
@@ -73,6 +77,31 @@ func (c *AuthClient) VerifyToken(ctx context.Context, token string) (*proto.Veri
 		log.Printf("VerifyToken error: %v", err)
 		return &proto.VerifyTokenResponse{
 			Valid:   false,
+			Message: err.Error(),
+		}, err
+	}
+
+	return resp, nil
+}
+
+// GetUserByID 根据 user_id 查询用户信息
+func (c *AuthClient) GetUserByID(ctx context.Context, userID string) (*proto.GetUserByIDResponse, error) {
+	if c.client == nil {
+		return &proto.GetUserByIDResponse{
+			Found:   false,
+			Message: "auth client not initialized",
+		}, nil
+	}
+
+	req := &proto.GetUserByIDRequest{
+		UserId: userID,
+	}
+
+	resp, err := c.client.GetUserByID(ctx, req)
+	if err != nil {
+		log.Printf("GetUserByID error: %v", err)
+		return &proto.GetUserByIDResponse{
+			Found:   false,
 			Message: err.Error(),
 		}, err
 	}

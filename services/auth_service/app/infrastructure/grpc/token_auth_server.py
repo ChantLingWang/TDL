@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2_grpc
 from app.services.jwt_service import JWTUtils
+from app.database.mongodb_user_service import MongoDBUserService
+from app.database.mongodb_service import db_manager
 
 
 class AuthService(auth_pb2_grpc.AuthServiceServicer):
@@ -36,6 +38,33 @@ class AuthService(auth_pb2_grpc.AuthServiceServicer):
                 valid=False,
                 message=result.get("message", "invalid token")
             )
+
+    def GetUserByID(self, request, context):
+        """根据 user_id 字符串查询用户信息"""
+        user_id = request.user_id
+        user_service = MongoDBUserService(db_manager)
+
+        try:
+            user = user_service.get_user_by_user_id(user_id)
+        except Exception as e:
+            return auth_pb2.GetUserByIDResponse(
+                found=False,
+                message=str(e),
+            )
+
+        if user is None:
+            return auth_pb2.GetUserByIDResponse(
+                found=False,
+                message="user not found",
+            )
+
+        return auth_pb2.GetUserByIDResponse(
+            found=True,
+            user_id=user.get("user_id", ""),
+            username=user.get("username", ""),
+            email=user.get("email", ""),
+            status=user.get("status", ""),
+        )
 
 
 def serve(port=50051):

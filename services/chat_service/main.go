@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"chat_service/app/api/routes"
 	config "chat_service/app/config"
@@ -148,9 +149,20 @@ func main() {
 	)
 
 	go func() {
-		if err := consumerRunner.Run(ctx); err != nil {
-			log.Printf("Kafka consumer error: %v", err)
-
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			if err := consumerRunner.Run(ctx); err != nil {
+				log.Printf("Kafka consumer error: %v, restarting in 3s...", err)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second):
+				}
+			}
 		}
 	}()
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"os"
 
 	"infrastructure_sdk/config"
 )
@@ -77,6 +78,18 @@ func InitConfig(path string) {
 	DataBaseConfig = globalConfig.Postgres
 	MongoDBConfig = globalConfig.MongoDB
 	ServerConfig = globalConfig.Server
-	KafkaConfigInstance = globalConfig.Kafka
 	RedisConfigInstance = globalConfig.Redis
+
+	// Kafka 消费者 GroupID：每台机器需要独立 group_id，各自消费全量消息并做本地广播。
+	// 优先用环境变量 CHAT_GROUP_ID，未设置则以 hostname 为后缀。
+	groupID := os.Getenv("CHAT_GROUP_ID")
+	if groupID == "" {
+		hostname, _ := os.Hostname()
+		groupID = globalConfig.Kafka.GroupID + "_" + hostname
+	}
+	KafkaConfigInstance = KafkaConfig{
+		Brokers: globalConfig.Kafka.Brokers,
+		Topic:   globalConfig.Kafka.Topic,
+		GroupID: groupID,
+	}
 }

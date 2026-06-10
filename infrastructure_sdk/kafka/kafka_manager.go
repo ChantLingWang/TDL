@@ -28,7 +28,7 @@ func NewKafkaConnection(brokers []string, topic string, groupID string) (*KafkaC
 		MinBytes:       10e3,        // 10KB
 		MaxBytes:       10e6,        // 10MB
 		CommitInterval: time.Second, // 提交偏移量间隔
-		StartOffset:    kafkago.FirstOffset,
+		StartOffset:    kafkago.LastOffset,
 		ReadBackoffMin: 100 * time.Millisecond,
 		ReadBackoffMax: 500 * time.Millisecond,
 	}

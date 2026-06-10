@@ -66,6 +66,16 @@ func (service *PrivateMessageHistoryService) AddPrivateMessage(senderID, receive
 
 	sessionID := GenerateSessionID(senderID, receiverID)
 
+	// 幂等去重：message_id 已存在则跳过（Kafka 重试/重启回放保护）
+	dupFilter := bson.M{
+		"session_id":            sessionID,
+		"date_identifier":       getPrivateMessageHistoryDocTime(),
+		"messages.message_id":   message.MessageID,
+	}
+	if count, err := collection.CountDocuments(context.Background(), dupFilter); err == nil && count > 0 {
+		return nil
+	}
+
 	filter := bson.M{
 		"session_id":      sessionID,
 		"date_identifier": getPrivateMessageHistoryDocTime(),
