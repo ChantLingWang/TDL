@@ -39,12 +39,23 @@ class AuthServiceStub(object):
                 request_serializer=auth__pb2.VerifyTokenRequest.SerializeToString,
                 response_deserializer=auth__pb2.VerifyTokenResponse.FromString,
                 _registered_method=True)
+        self.GetUserByID = channel.unary_unary(
+                '/grpc.AuthService/GetUserByID',
+                request_serializer=auth__pb2.GetUserByIDRequest.SerializeToString,
+                response_deserializer=auth__pb2.GetUserByIDResponse.FromString,
+                _registered_method=True)
 
 
 class AuthServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def VerifyToken(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetUserByID(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -57,6 +68,11 @@ def add_AuthServiceServicer_to_server(servicer, server):
                     servicer.VerifyToken,
                     request_deserializer=auth__pb2.VerifyTokenRequest.FromString,
                     response_serializer=auth__pb2.VerifyTokenResponse.SerializeToString,
+            ),
+            'GetUserByID': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUserByID,
+                    request_deserializer=auth__pb2.GetUserByIDRequest.FromString,
+                    response_serializer=auth__pb2.GetUserByIDResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -86,6 +102,33 @@ class AuthService(object):
             '/grpc.AuthService/VerifyToken',
             auth__pb2.VerifyTokenRequest.SerializeToString,
             auth__pb2.VerifyTokenResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetUserByID(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/grpc.AuthService/GetUserByID',
+            auth__pb2.GetUserByIDRequest.SerializeToString,
+            auth__pb2.GetUserByIDResponse.FromString,
             options,
             channel_credentials,
             insecure,

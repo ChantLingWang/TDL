@@ -92,6 +92,20 @@ class MongoDBUserService:
             return result
         except Exception as e:
             raise Exception("删除用户信息失败")
+
+    async def get_user_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        根据 user_id 字段（字符串）查询用户信息，排除 _id 和 password。
+        供 gRPC GetUserByID 使用。
+        """
+        try:
+            user = await self.collection.find_one(
+                {"user_id": user_id},
+                {"_id": 0, "password": 0},
+            )
+            return user
+        except Exception as e:
+            raise Exception(f"根据 user_id 获取用户信息失败: {e}")
         
         
     #扩展方法

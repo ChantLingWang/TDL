@@ -64,6 +64,16 @@ func (service *GroupMessageHistoryService) AddGroupMessageByUser(groupID string,
 	// 获取集合
 	collection := db.Collection("group_message_history_" + getGroupMessageHistoryCollectionTime())
 
+	// 幂等去重：message_id 已存在则跳过（Kafka 重试/重启回放保护）
+	dupFilter := bson.M{
+		"group_id":              groupID,
+		"date_identifier":       getGroupMessageHistoryDocTime(),
+		"messages.message_id":   message.MessageID,
+	}
+	if count, err := collection.CountDocuments(context.Background(), dupFilter); err == nil && count > 0 {
+		return nil
+	}
+
 	// 构造查找条件：增加消息数量限制，实现自动分桶
 	filter := bson.M{
 		"group_id":        groupID,

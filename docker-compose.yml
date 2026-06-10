@@ -218,6 +218,35 @@ services:
         condition: service_started
     networks:
       - chant-shared-network
+  restart: on-failure
+
+  chat-service:
+    build:
+      context: ./services/chat_service
+      dockerfile: Dockerfile
+    container_name: chat-service
+    ports:
+      - "8083:8080"
+    environment:
+      # Kafka 每实例独立 group_id，多实例部署时设为不同值（如 chat-1 / chat-2）
+      CHAT_GROUP_ID: chat-1
+      # gRPC 地址指向 auth_service 容器
+      AUTH_GRPC_ADDR: auth-service:50051
+      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - chant-shared-network
     restart: on-failure
 
 volumes:
