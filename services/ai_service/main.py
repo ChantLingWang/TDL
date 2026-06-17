@@ -16,6 +16,10 @@ import signal
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
+# 显式导入 provider，触发 @register 注册（必须在 get_llm 调用之前）
+import shared.llm.providers.openai_compatible  # noqa: F401
+import shared.llm.providers.deepseek  # noqa: F401
+
 from chat.service import handle_private_message
 from shared.cost import store as cost_store
 from config.settings import settings
@@ -77,8 +81,11 @@ async def main() -> None:
         consumer = await create_consumer()
         producer = await create_producer()
 
-        # 初始化成本审计数据库连接池
-        await cost_store.init_pool()
+        # 初始化成本审计数据库连接池（失败不阻塞启动）
+        try:
+            await cost_store.init_pool()
+        except Exception:
+            logger.warning("成本审计数据库连接失败，成本记录功能停用")
 
         async def handler(event: BusinessEvent) -> None:
             await dispatch(producer, event)
@@ -98,7 +105,10 @@ async def main() -> None:
             await consumer.stop()
         if producer:
             await producer.stop()
-        await cost_store.close_pool()
+        try:
+            await cost_store.close_pool()
+        except Exception:
+            pass
         logger.info("ai_service 已停止")
 
 
