@@ -36,17 +36,7 @@ func (h *UserEventHandler) SetBroadcastMessageHandler(handler func(ctx context.C
 func (h *UserEventHandler) HandleEvent(ctx context.Context, event *sdk_kafka.BusinessEvent) error {
 	// 注意：编排器的事件类型存储在 CommonParams.EventType 中
 	switch event.CommonParams.EventType {
-	// 处理用户注册事件
-	case EventUserRegistered:
-		return services.HandleUserRegisteredEvent(ctx, event.Data)
-
-	// 处理踢人事件
-	case EventUserKick:
-		// TODO: 需要在 services 包中实现 HandleUserKickEvent
-		log.Printf("收到踢人事件，但暂未实现处理逻辑")
-		return nil
-
-	// 处理聊天消息事件
+// 处理聊天消息事件
 	case EventUserChatMessage:
 		if h.chatMessageHandler != nil {
 			return h.chatMessageHandler(ctx, event.Data)

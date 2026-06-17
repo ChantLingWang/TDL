@@ -15,7 +15,6 @@ func main() {
 
 	// 指定需要生成的模型
 	g.ApplyBasic(
-		model.User{},
 		model.Group{},
 		model.UserGroup{},
 		model.PrivateChat{},

@@ -8,9 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config_test import settings
 from app.api.v1.auth import router as auth_router
 from app.database.mongodb_service import db_manager
-from app.infrastructure.kafka.kafka_manager import kafka_producer
-from app.infrastructure.kafka.event_consumer import event_consumer
-from app.infrastructure.kafka.config import kafka_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,14 +16,6 @@ async def lifespan(app: FastAPI):
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
     
-    # 启动Kafka消费者
-    topics = [
-        kafka_settings.topic_saga_events,
-        kafka_settings.topic_sync_user_fields
-    ]
-    event_consumer.start(topics)
-    print(f"🚀 Kafka消费者已启动，订阅: {topics}")
-    
     print(f"🚀 {settings.app_name} 启动完成")
     
     yield
@@ -34,14 +23,6 @@ async def lifespan(app: FastAPI):
     # 关闭时执行
     print(f"关闭 {settings.app_name}")
     await db_manager.close()
-    
-    # 关闭Kafka生产者
-    kafka_producer.close()
-    
-    # 停止消费者 (需要添加stop方法，这里暂时简单处理)
-    event_consumer.running = False
-    
-    print("✅ Kafka生产者已关闭")
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""

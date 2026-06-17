@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"infrastructure_sdk/config"
 )
@@ -80,7 +81,22 @@ func InitConfig(path string) {
 	ServerConfig = globalConfig.Server
 	RedisConfigInstance = globalConfig.Redis
 
-	// Kafka 消费者 GroupID：每台机器需要独立 group_id，各自消费全量消息并做本地广播。
+	// 环境变量覆盖基础设施地址（config.yaml 提供 localhost 默认值，docker-compose 提供容器名）
+	subEnv(&DataBaseConfig.Host, "POSTGRES_HOST")
+	subEnv(&DataBaseConfig.Port, "POSTGRES_PORT")
+	subEnv(&DataBaseConfig.User, "POSTGRES_USER")
+	subEnv(&DataBaseConfig.Password, "POSTGRES_PASSWORD")
+	subEnv(&DataBaseConfig.DBName, "POSTGRES_DB_NAME")
+	subEnv(&MongoDBConfig.Host, "MONGODB_HOST")
+	subEnv(&MongoDBConfig.Port, "MONGODB_PORT")
+	subEnv(&MongoDBConfig.DBName, "MONGODB_DB_NAME")
+	subEnv(&RedisConfigInstance.Host, "REDIS_HOST")
+	subEnv(&RedisConfigInstance.Port, "REDIS_PORT")
+	subEnv(&ServerConfig.Port, "SERVER_PORT")
+	// Kafka brokers 从逗号分隔的环境变量读取
+	if brokers := os.Getenv("KAFKA_BROKERS"); brokers != "" {
+		globalConfig.Kafka.Brokers = strings.Split(brokers, ",")
+	}	// Kafka 消费者 GroupID：每台机器需要独立 group_id，各自消费全量消息并做本地广播。
 	// 优先用环境变量 CHAT_GROUP_ID，未设置则以 hostname 为后缀。
 	groupID := os.Getenv("CHAT_GROUP_ID")
 	if groupID == "" {
@@ -91,5 +107,12 @@ func InitConfig(path string) {
 		Brokers: globalConfig.Kafka.Brokers,
 		Topic:   globalConfig.Kafka.Topic,
 		GroupID: groupID,
+	}
+}
+
+// subEnv 如果环境变量存在则覆盖指针指向的值
+func subEnv(ptr *string, envKey string) {
+	if v := os.Getenv(envKey); v != "" {
+		*ptr = v
 	}
 }

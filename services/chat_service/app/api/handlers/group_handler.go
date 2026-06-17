@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"chat_service/app/database/pgsql"
-	"chat_service/app/database/pgsql/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,7 +38,7 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	// 创建群组
-	group, err := service.CreateGroup(groupID, req.GroupName)
+	group, err := service.CreateGroup(groupID, req.GroupName, req.CreatorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group"})
 		return
@@ -102,28 +100,3 @@ func GetUserGroups(c *gin.Context) {
 	})
 }
 
-// InitTestUser 初始化测试用户（方便测试用）
-func InitTestUser(c *gin.Context) {
-	userID := c.Param("user_id")
-	username := c.Query("username")
-	if username == "" {
-		username = "Test User " + userID
-	}
-
-	db := pgsql.GetDBManager().GetDB()
-
-	user := model.User{
-		UserID:       userID,
-		Username:     username,
-		Email:        userID + "@example.com",
-		RegisterTime: time.Now(),
-	}
-
-	// FirstOrCreate
-	if err := db.Where(model.User{UserID: userID}).FirstOrCreate(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "User initialized", "user": user})
-}

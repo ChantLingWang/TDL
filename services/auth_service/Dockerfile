@@ -21,7 +21,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # 复制依赖文件
-COPY requirements.txt .
+COPY services/auth_service/requirements.txt .
 
 # 安装依赖，使用清华源加速
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
@@ -36,7 +36,7 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
+    PYTHONPATH=/app:/app/infrastructure_sdk/grpc/token_auth_grpc/proto:/app/infrastructure_sdk/grpc/last_offline_time_grpc/proto \
     PATH="/opt/venv/bin:$PATH"
 
 # 更换 apt 源
@@ -46,7 +46,18 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
 COPY --from=builder /opt/venv /opt/venv
 
 # 复制应用代码
-COPY app/ ./app/
+COPY services/auth_service/app/ ./app/
+
+# Proto 文件（gRPC server 需要）
+COPY infrastructure_sdk/grpc/token_auth_grpc/proto/auth_pb2.py /app/infrastructure_sdk/grpc/token_auth_grpc/proto/
+COPY infrastructure_sdk/grpc/token_auth_grpc/proto/auth_pb2_grpc.py /app/infrastructure_sdk/grpc/token_auth_grpc/proto/
+COPY infrastructure_sdk/grpc/token_auth_grpc/proto/__init__.py /app/infrastructure_sdk/grpc/token_auth_grpc/proto/
+COPY infrastructure_sdk/grpc/last_offline_time_grpc/proto/last_offline_time_pb2.py /app/infrastructure_sdk/grpc/last_offline_time_grpc/proto/
+COPY infrastructure_sdk/grpc/last_offline_time_grpc/proto/last_offline_time_pb2_grpc.py /app/infrastructure_sdk/grpc/last_offline_time_grpc/proto/
+RUN mkdir -p /app/infrastructure_sdk/grpc/token_auth_grpc/proto && mkdir -p /app/infrastructure_sdk/grpc/last_offline_time_grpc/proto && touch /app/infrastructure_sdk/__init__.py /app/infrastructure_sdk/grpc/__init__.py /app/infrastructure_sdk/grpc/token_auth_grpc/__init__.py /app/infrastructure_sdk/grpc/last_offline_time_grpc/__init__.py /app/infrastructure_sdk/grpc/last_offline_time_grpc/proto/__init__.py
+
+# 清除旧的 .pyc 缓存
+RUN find /app -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null; find /app -name '*.pyc' -delete 2>/dev/null; true
 
 # 启动命令
-CMD ["python", "-m", "app.main"]
+CMD PYTHONPATH=/app:/app/infrastructure_sdk/grpc/token_auth_grpc/proto:/app/infrastructure_sdk/grpc/last_offline_time_grpc/proto sh -c "python3 -m app.infrastructure.grpc.token_auth_server & python3 -m app.infrastructure.grpc.last_offline_time_server & uvicorn app.main:app --host 0.0.0.0 --port 9030"

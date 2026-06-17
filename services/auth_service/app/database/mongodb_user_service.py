@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional,Dict,Any
+from pymongo import ReturnDocument
 from bson import ObjectId                                   # MongoDB 的对象ID，用于文档的唯一标识                                          # 密码哈希库，用于安全存储密码
 from pymongo.results import UpdateResult
 from app.database.mongodb_service import db_manager
@@ -17,6 +18,17 @@ class MongoDBUserService:
         self.connection_name = "Users"
         self.db_manager = db_manager
         self.collection = self.db_manager.get_collection(self.connection_name)
+
+    @staticmethod
+    def _normalize_user_id(user_id):
+        """将 user_id 归一化以匹配 MongoDB 的存储类型（int 或 string）"""
+        if isinstance(user_id, str) and user_id.isdigit():
+            try:
+                return int(user_id)
+            except ValueError:
+                return user_id
+        return user_id
+
         
         
     #基础方法：创建用户，根据用户id获取用户信息，根据用户id更新用户信息，根据用户id删除用户
@@ -43,9 +55,10 @@ class MongoDBUserService:
                    不传则使用默认配置（排除_id和password）
         """
         try:
+            query_id = self._normalize_user_id(user_id)
             projection = fields or {"_id": 0, "password": 0}
             user = await self.collection.find_one(
-                {"_id":ObjectId(user_id)},
+                {"user_id": query_id},
                 projection
             )
             return user
@@ -73,7 +86,7 @@ class MongoDBUserService:
         """
         try:
             user_id_status = await self.collection.find_one(
-                {"user_id":str(user_id)},
+                {"user_id": self._normalize_user_id(user_id)},
                 {"user_id": 1},
             )
             return user_id_status is not None
@@ -99,8 +112,9 @@ class MongoDBUserService:
         供 gRPC GetUserByID 使用。
         """
         try:
+            query_id = self._normalize_user_id(user_id)
             user = await self.collection.find_one(
-                {"user_id": user_id},
+                {"user_id": query_id},
                 {"_id": 0, "password": 0},
             )
             return user
@@ -164,7 +178,7 @@ class MongoDBUserService:
                 {"_id": sequence_name},
                 {"$inc": {"sequence_value": 1}},
                 {"_id": 0, "sequence_value": 1},
-                upsert=True
+                upsert=True, return_document=ReturnDocument.AFTER
             )
             return result["sequence_value"]
         except Exception as e:
@@ -202,8 +216,9 @@ class MongoDBUserService:
             bool: 是否更新成功
         """
         try:
+            query_id = self._normalize_user_id(user_id)
             result = await self.collection.update_one(
-                {"user_id": user_id},
+                {"user_id": query_id},
                 {"$set": {"status": status, "updated_at": datetime.now(timezone.utc)}}
             )
             return result.modified_count > 0
@@ -241,8 +256,9 @@ class MongoDBUserService:
             bool: 是否更新成功
         """
         try:
+            query_id = self._normalize_user_id(user_id)
             result = await self.collection.update_one(
-                {"user_id": user_id},
+                {"user_id": query_id},
                 {"$set": {"last_offline_time": timestamp}}
             )
             return result.modified_count > 0 or result.matched_count > 0
@@ -260,8 +276,9 @@ class MongoDBUserService:
             int: 时间戳（秒），如果不存在则返回 None
         """
         try:
+            query_id = self._normalize_user_id(user_id)
             user = await self.collection.find_one(
-                {"user_id": user_id},
+                {"user_id": query_id},
                 {"last_offline_time": 1, "_id": 0}
             )
             return user.get("last_offline_time") if user else None

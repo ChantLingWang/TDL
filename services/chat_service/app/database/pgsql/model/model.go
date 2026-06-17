@@ -7,26 +7,12 @@ import (
 )
 
 
-// User 用户模型
-type User struct {
-	RegisterTime time.Time `gorm:"not null"`
-	UserID       string `gorm:"primaryKey"`
-	Username string `gorm:"not null"`
-	Email    string `gorm:"uniqueIndex;not null"`
-	Groups   []Group `gorm:"many2many:user_groups;"`
-	Tempchat []TempChat `gorm:"foreignKey:UserID;references:UserID"`
-	PrivateChat []PrivateChat `gorm:"foreignKey:UserID;references:UserID"`
-}
-
-
 // Group 组群模型
 type Group struct {
 	CreateTime    time.Time `gorm:"not null"`
 	GroupID       string    `gorm:"primaryKey"`
 	GroupName     string    `gorm:"not null"`
-	Users         []User    `gorm:"many2many:user_groups;"`
 	CreateByUserID string   `gorm:"not null"` // 创建者ID (单人)
-	Managers      []User    `gorm:"many2many:group_managers;"` // 管理员列表 (多人)
 }
 
 
@@ -61,11 +47,6 @@ type Conversation struct {
 	UpdateTime       time.Time // 更新时间
 }
 
-// TableName 指定User表名
-func (User) TableName() string {
-	return "users"
-}
-
 // TableName 指定Group表名
 func (Group) TableName() string {
 	return "groups"
@@ -93,5 +74,5 @@ func (Conversation) TableName() string {
 
 // AutoMigrate 自动迁移数据库表结构
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&User{}, &Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{}, &Conversation{})
+	return db.AutoMigrate(&Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{}, &Conversation{})
 }

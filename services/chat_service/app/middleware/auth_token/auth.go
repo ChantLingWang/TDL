@@ -19,6 +19,13 @@ func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. 从 Header 获取 Token
 		authHeader := c.GetHeader("Authorization")
+		// 浏览器 WebSocket 不支持自定义 Header，回退到 query parameter
+		if authHeader == "" {
+			authHeader = c.Query("token")
+			if authHeader != "" {
+				authHeader = "Bearer " + authHeader
+			}
+		}
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
 			c.Abort()

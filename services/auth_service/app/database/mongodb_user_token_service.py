@@ -37,7 +37,7 @@ class MongoDBUserTokenService:
             #只存储必要的字段，区分数据库保证安全
             token_data = {
                 '_id': ObjectId(),  # MongoDB自动生成
-                'user_id': ObjectId(user_id),  # 确保ObjectId类型
+                'user_id': user_id,
                 'email': user_email,
                 'refresh_token': refresh_token,
                 'is_valid': True,
@@ -60,7 +60,17 @@ class MongoDBUserTokenService:
         try:
             result = await self.collection.update_one(
                 {"user_id":user_id},   #查询条件
-                {"$set":{"refresh_token":refresh_token}},   #更新操作
+                {"$set":{
+                    "refresh_token":refresh_token,
+                    "is_valid":True,
+                    "updated_at":datetime.now(timezone.utc),
+                },
+                "$setOnInsert":{
+                    "user_id":user_id,
+                    "created_at":datetime.now(timezone.utc),
+                    "expire_at":datetime.now(timezone.utc) + timedelta(days=365),
+                }},
+                upsert=True
             )
             return result
         except Exception as e:
