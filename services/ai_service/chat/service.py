@@ -32,9 +32,7 @@ from shared.models import ChatHistoryMessage
 logger = logging.getLogger(__name__)
 
 # AI 助理的系统提示词：定义 AI 的基本人设和行为风格
-SYSTEM_PROMPT = (
-    "你是一个乐于助人的 AI 助手，名叫 Chant AI。请简洁自然地回答问题。"
-)
+from chat.prompts import SYSTEM_PROMPT
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +67,13 @@ async def _fetch_history(
     """
     session_id = _session_id(user_id)
     url = f"{settings.chat_service_url}/api/v1/messages/history"
-    params = {"conversation_id": session_id, "limit": limit}
+    # chat_service history 接口要求传 start_time 或 cursor
+    # epoch 0 表示拉全部历史
+    params = {
+        "conversation_id": session_id,
+        "limit": limit,
+        "start_time": 0,
+    }
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
         resp = await client.get(url, params=params)
         resp.raise_for_status()

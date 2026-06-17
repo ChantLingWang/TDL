@@ -1,1 +1,1 @@
-# Image / audio / video model integration (future)
+"""多模态（图片/视频/音频）— 未来扩展。"""

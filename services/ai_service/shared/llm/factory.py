@@ -15,9 +15,18 @@ from shared.llm.base import AbstractLLM
 _registry: dict[str, type[AbstractLLM]] = {}
 
 
-def register(provider_name: str, cls: type[AbstractLLM]) -> None:
-    """装饰器：将 LLM provider 类注册到工厂。"""
-    _registry[provider_name] = cls
+def register(provider_name: str):
+    """装饰器工厂：返回一个装饰器，将类注册到工厂。
+
+    用法：
+        @register("deepseek")
+        class DeepSeekLLM(OpenAICompatibleLLM):
+            ...
+    """
+    def decorator(cls: type[AbstractLLM]) -> type[AbstractLLM]:
+        _registry[provider_name] = cls
+        return cls
+    return decorator
 
 
 def get_llm(provider: str | None = None) -> AbstractLLM:
@@ -36,6 +45,4 @@ def get_llm(provider: str | None = None) -> AbstractLLM:
     return cls()
 
 
-# ---- 启动时自动导入所有 provider，触发 @register 注册 ----
-import shared.llm.providers.openai_compatible  # noqa: E402, F401
-import shared.llm.providers.deepseek  # noqa: E402, F401
+# provider 注册由 main.py 启动时显式 import 触发，避免循环引用
