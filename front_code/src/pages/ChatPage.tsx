@@ -109,24 +109,47 @@ const ChatPage: React.FC = () => {
 
   const handleSend = () => {
     if (!input.trim() || !activeGroup) return;
-    const msg = {
-      type: 'chat',
-      content: {
-        conversation_type: 'group',
-        sender_id: userId,
-        group_id: activeGroup,
-        text: input.trim(),
-        message_id: `${userId}-${Date.now()}`,
-        message_type: 'text',
-      },
-    };
+    const isAI = activeGroup === 'ai-assistant';
+    const msg = isAI
+      ? {
+          type: 'chat',
+          content: {
+            conversation_type: 'private',
+            sender_id: userId,
+            target_user_id: 'ai-assistant',
+            text: input.trim(),
+            message_id: `${userId}-${Date.now()}`,
+            message_type: 'text',
+          },
+        }
+      : {
+          type: 'chat',
+          content: {
+            conversation_type: 'group',
+            sender_id: userId,
+            group_id: activeGroup,
+            text: input.trim(),
+            message_id: `${userId}-${Date.now()}`,
+            message_type: 'text',
+          },
+        };
     wsRef.current?.send(JSON.stringify(msg));
     setInput('');
   };
 
-  const filteredMessages = messages.filter(
-    (m) => m.group_id === activeGroup || m.conversation_id === activeGroup,
-  );
+  const filteredMessages = (() => {
+    if (activeGroup === 'ai-assistant') {
+      return messages.filter(
+        (m) =>
+          m.sender === 'ai-assistant' ||
+          m.conversation_id === 'ai-assistant' ||
+          (m.type === 'private_chat' && m.sender === 'ai-assistant'),
+      );
+    }
+    return messages.filter(
+      (m) => m.group_id === activeGroup || m.conversation_id === activeGroup,
+    );
+  })();
 
   // --- logout ---
   const handleLogout = () => {
@@ -145,6 +168,16 @@ const ChatPage: React.FC = () => {
           <button className={styles.logoutBtn} onClick={handleLogout}>X</button>
         </div>
         <div className={styles.statusLine}>{statusMsg}</div>
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>CHAT</div>
+          <div
+            className={`${styles.groupItem} ${activeGroup === 'ai-assistant' ? styles.active : ''}`}
+            onClick={() => setActiveGroup('ai-assistant')}
+          >
+            🤖 AI Assistant
+          </div>
+        </div>
 
         <div className={styles.section}>
           <div className={styles.sectionTitle}>GROUPS</div>
