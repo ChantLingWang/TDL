@@ -1,0 +1,266 @@
+version: '3.8'
+
+networks:
+  chant-shared-network:
+    driver: bridge
+
+services:
+  # 基础设施服务
+  zookeeper:
+    image: docker.m.daocloud.io/wurstmeister/zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - chant-shared-network
+
+  kafka:
+    image: docker.m.daocloud.io/wurstmeister/kafka
+    container_name: kafka
+    ports:
+      - "9094:9092"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    depends_on:
+      - zookeeper
+    networks:
+      - chant-shared-network
+
+  kafka-ui:
+    image: docker.m.daocloud.io/provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - chant-shared-network
+
+  postgres:
+    image: docker.m.daocloud.io/library/postgres:15-alpine
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orchestrator
+      POSTGRES_MULTIPLE_DATABASES: "orchestrator,user_service"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+    networks:
+      - chant-shared-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: docker.m.daocloud.io/library/mongo:6
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - chant-shared-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: docker.m.daocloud.io/library/redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - redis_data:/data
+    networks:
+      - chant-shared-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 应用服务
+  auth-service:
+    build:
+      context: ./services/auth_service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "9030:9030"
+    environment:
+      # 数据库配置
+      MONGODB_URL: mongodb://mongodb:27017
+      DATABASE_NAME: auth
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Kafka配置
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CLIENT_ID: auth-service
+      KAFKA_TOPIC_SAGA_EVENTS: saga-events
+      KAFKA_TOPIC_USER_REGISTERED: user-registrations
+      KAFKA_TOPIC_USER_UPDATED: user-updates
+      KAFKA_TOPIC_SYNC_USER_FIELDS: sync_user_fields
+      # 应用配置
+      HOST: 0.0.0.0
+      PORT: 9030
+      DEBUG: "true"
+      TZ: Asia/Shanghai
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - chant-shared-network
+    restart: on-failure
+
+  orchestrator-service:
+    build:
+      context: ./services/orchestrator_service
+      dockerfile: Dockerfile
+    container_name: orchestrator-service
+    ports:
+      - "8081:8080"
+    environment:
+      # Kafka配置
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_GROUP_ID: orchestrator-group
+      KAFKA_TOPIC: saga-events
+      KAFKA_CLIENT_ID: orchestrator-service
+      # 数据库配置
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: orchestrator
+      DATABASE_SSLMODE: disable
+      DATABASE_TIMEZONE: Asia/Shanghai
+      # 应用配置
+      SERVER_PORT: 8080
+      SERVER_NAME: orchestrator-service
+      DEFAULT_TIMEOUT: 30s
+      DEFAULT_RETRY_COUNT: 3
+      COMPENSATION_TIMEOUT: 15s
+      SNOWFLAKE_NODE_ID: 1
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - chant-shared-network
+    restart: on-failure
+
+  user-service:
+    build:
+      context: ./services/user_service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8082:8080"
+    environment:
+      # 服务器配置
+      SERVER_PORT: 8080
+      # PostgreSQL配置
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB_NAME: user_service
+      POSTGRES_SSL_MODE: disable
+      POSTGRES_TIMEZONE: Asia/Shanghai
+      # MongoDB配置
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_DB_NAME: User_Database
+      MONGODB_SSL_MODE: disable
+      MONGODB_TIMEZONE: Asia/Shanghai
+      # Kafka配置
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: user_registered_events
+      KAFKA_GROUP_ID: user_service_group
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - chant-shared-network
+
+  chat-service:
+    build:
+      context: ./services/chat_service
+      dockerfile: Dockerfile
+    container_name: chat-service
+    ports:
+      - "8083:8080"
+    environment:
+      # Kafka 每实例独立 group_id，多实例部署时设为不同值（如 chat-1 / chat-2）
+      CHAT_GROUP_ID: chat-1
+      # 基础设施地址（覆盖 config.yaml 的 localhost 默认值）
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB_NAME: orchestrator
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MONGODB_DB_NAME: chat
+      KAFKA_BROKERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # gRPC 地址指向 auth_service 容器
+      AUTH_GRPC_ADDR: auth-service:50051
+      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - chant-shared-network
+    restart: on-failure
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

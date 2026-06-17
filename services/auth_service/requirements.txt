@@ -17,5 +17,5 @@ confluent-kafka
 avro-python3==1.10.2
 
 # gRPC依赖
-grpcio==1.72.2
-grpcio-tools==1.72.2
+grpcio>=1.74.0
+grpcio-tools>=1.74.0

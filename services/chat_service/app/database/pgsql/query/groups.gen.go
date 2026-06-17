@@ -19,7 +19,6 @@ import (
 
 	"chat_service/app/database/pgsql/model"
 )
-
 func newGroup(db *gorm.DB, opts ...gen.DOOption) group {
 	_group := group{}
 
@@ -32,48 +31,6 @@ func newGroup(db *gorm.DB, opts ...gen.DOOption) group {
 	_group.GroupID = field.NewString(tableName, "group_id")
 	_group.GroupName = field.NewString(tableName, "group_name")
 	_group.CreateByUserID = field.NewString(tableName, "create_by_user_id")
-	_group.Users = groupManyToManyUsers{
-		db: db.Session(&gorm.Session{}),
-
-		RelationField: field.NewRelation("Users", "model.User"),
-		Tempchat: struct {
-			field.RelationField
-		}{
-			RelationField: field.NewRelation("Users.Tempchat", "model.TempChat"),
-		},
-		PrivateChat: struct {
-			field.RelationField
-		}{
-			RelationField: field.NewRelation("Users.PrivateChat", "model.PrivateChat"),
-		},
-		Groups: struct {
-			field.RelationField
-			Users struct {
-				field.RelationField
-			}
-			Managers struct {
-				field.RelationField
-			}
-		}{
-			RelationField: field.NewRelation("Users.Groups", "model.Group"),
-			Users: struct {
-				field.RelationField
-			}{
-				RelationField: field.NewRelation("Users.Groups.Users", "model.User"),
-			},
-			Managers: struct {
-				field.RelationField
-			}{
-				RelationField: field.NewRelation("Users.Groups.Managers", "model.User"),
-			},
-		},
-	}
-
-	_group.Managers = groupManyToManyManagers{
-		db: db.Session(&gorm.Session{}),
-
-		RelationField: field.NewRelation("Managers", "model.User"),
-	}
 
 	_group.fillFieldMap()
 
@@ -88,9 +45,6 @@ type group struct {
 	GroupID        field.String
 	GroupName      field.String
 	CreateByUserID field.String
-	Users          groupManyToManyUsers
-
-	Managers groupManyToManyManagers
 
 	fieldMap map[string]field.Expr
 }
@@ -135,206 +89,21 @@ func (g *group) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (g *group) fillFieldMap() {
-	g.fieldMap = make(map[string]field.Expr, 6)
+	g.fieldMap = make(map[string]field.Expr, 4)
 	g.fieldMap["create_time"] = g.CreateTime
 	g.fieldMap["group_id"] = g.GroupID
 	g.fieldMap["group_name"] = g.GroupName
 	g.fieldMap["create_by_user_id"] = g.CreateByUserID
-
 }
 
 func (g group) clone(db *gorm.DB) group {
 	g.groupDo.ReplaceConnPool(db.Statement.ConnPool)
-	g.Users.db = db.Session(&gorm.Session{Initialized: true})
-	g.Users.db.Statement.ConnPool = db.Statement.ConnPool
-	g.Managers.db = db.Session(&gorm.Session{Initialized: true})
-	g.Managers.db.Statement.ConnPool = db.Statement.ConnPool
 	return g
 }
 
 func (g group) replaceDB(db *gorm.DB) group {
 	g.groupDo.ReplaceDB(db)
-	g.Users.db = db.Session(&gorm.Session{})
-	g.Managers.db = db.Session(&gorm.Session{})
 	return g
-}
-
-type groupManyToManyUsers struct {
-	db *gorm.DB
-
-	field.RelationField
-
-	Tempchat struct {
-		field.RelationField
-	}
-	PrivateChat struct {
-		field.RelationField
-	}
-	Groups struct {
-		field.RelationField
-		Users struct {
-			field.RelationField
-		}
-		Managers struct {
-			field.RelationField
-		}
-	}
-}
-
-func (a groupManyToManyUsers) Where(conds ...field.Expr) *groupManyToManyUsers {
-	if len(conds) == 0 {
-		return &a
-	}
-
-	exprs := make([]clause.Expression, 0, len(conds))
-	for _, cond := range conds {
-		exprs = append(exprs, cond.BeCond().(clause.Expression))
-	}
-	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
-	return &a
-}
-
-func (a groupManyToManyUsers) WithContext(ctx context.Context) *groupManyToManyUsers {
-	a.db = a.db.WithContext(ctx)
-	return &a
-}
-
-func (a groupManyToManyUsers) Session(session *gorm.Session) *groupManyToManyUsers {
-	a.db = a.db.Session(session)
-	return &a
-}
-
-func (a groupManyToManyUsers) Model(m *model.Group) *groupManyToManyUsersTx {
-	return &groupManyToManyUsersTx{a.db.Model(m).Association(a.Name())}
-}
-
-func (a groupManyToManyUsers) Unscoped() *groupManyToManyUsers {
-	a.db = a.db.Unscoped()
-	return &a
-}
-
-type groupManyToManyUsersTx struct{ tx *gorm.Association }
-
-func (a groupManyToManyUsersTx) Find() (result []*model.User, err error) {
-	return result, a.tx.Find(&result)
-}
-
-func (a groupManyToManyUsersTx) Append(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Append(targetValues...)
-}
-
-func (a groupManyToManyUsersTx) Replace(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Replace(targetValues...)
-}
-
-func (a groupManyToManyUsersTx) Delete(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Delete(targetValues...)
-}
-
-func (a groupManyToManyUsersTx) Clear() error {
-	return a.tx.Clear()
-}
-
-func (a groupManyToManyUsersTx) Count() int64 {
-	return a.tx.Count()
-}
-
-func (a groupManyToManyUsersTx) Unscoped() *groupManyToManyUsersTx {
-	a.tx = a.tx.Unscoped()
-	return &a
-}
-
-type groupManyToManyManagers struct {
-	db *gorm.DB
-
-	field.RelationField
-}
-
-func (a groupManyToManyManagers) Where(conds ...field.Expr) *groupManyToManyManagers {
-	if len(conds) == 0 {
-		return &a
-	}
-
-	exprs := make([]clause.Expression, 0, len(conds))
-	for _, cond := range conds {
-		exprs = append(exprs, cond.BeCond().(clause.Expression))
-	}
-	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
-	return &a
-}
-
-func (a groupManyToManyManagers) WithContext(ctx context.Context) *groupManyToManyManagers {
-	a.db = a.db.WithContext(ctx)
-	return &a
-}
-
-func (a groupManyToManyManagers) Session(session *gorm.Session) *groupManyToManyManagers {
-	a.db = a.db.Session(session)
-	return &a
-}
-
-func (a groupManyToManyManagers) Model(m *model.Group) *groupManyToManyManagersTx {
-	return &groupManyToManyManagersTx{a.db.Model(m).Association(a.Name())}
-}
-
-func (a groupManyToManyManagers) Unscoped() *groupManyToManyManagers {
-	a.db = a.db.Unscoped()
-	return &a
-}
-
-type groupManyToManyManagersTx struct{ tx *gorm.Association }
-
-func (a groupManyToManyManagersTx) Find() (result []*model.User, err error) {
-	return result, a.tx.Find(&result)
-}
-
-func (a groupManyToManyManagersTx) Append(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Append(targetValues...)
-}
-
-func (a groupManyToManyManagersTx) Replace(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Replace(targetValues...)
-}
-
-func (a groupManyToManyManagersTx) Delete(values ...*model.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Delete(targetValues...)
-}
-
-func (a groupManyToManyManagersTx) Clear() error {
-	return a.tx.Clear()
-}
-
-func (a groupManyToManyManagersTx) Count() int64 {
-	return a.tx.Count()
-}
-
-func (a groupManyToManyManagersTx) Unscoped() *groupManyToManyManagersTx {
-	a.tx = a.tx.Unscoped()
-	return &a
 }
 
 type groupDo struct{ gen.DO }

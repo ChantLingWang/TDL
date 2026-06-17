@@ -3,6 +3,7 @@ package pgsql
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"chat_service/app/database/pgsql/model"
 	"chat_service/app/database/pgsql/query"
@@ -48,19 +49,10 @@ func (ugs *UserGroupService) GetUserGroups(userID string) ([]model.Group, error)
 
 // AddUserToGroup 将用户添加到指定组群
 func (ugs *UserGroupService) AddUserToGroup(userID, groupID string) error {
-	u := query.User
 	g := query.Group
 	ug := query.UserGroup
 
-	// 检查用户是否存在
-	if _, err := u.WithContext(context.Background()).Where(u.UserID.Eq(userID)).First(); err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return fmt.Errorf("user not found: %s", userID)
-		}
-		return err
-	}
-
-	// 检查组群是否存在
+// 检查组群是否存在
 	if _, err := g.WithContext(context.Background()).Where(g.GroupID.Eq(groupID)).First(); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return fmt.Errorf("group not found: %s", groupID)
@@ -109,11 +101,13 @@ func (ugs *UserGroupService) RemoveUserFromGroup(userID, groupID string) error {
 	return nil
 }
 
-// CreateGroup 创建新的组群
-func (ugs *UserGroupService) CreateGroup(groupID, groupName string) (*model.Group, error) {
+// CreateGroup 创建新的组群，传入创建者 ID 以填充 create_by_user_id 和创建时间
+func (ugs *UserGroupService) CreateGroup(groupID, groupName, creatorID string) (*model.Group, error) {
 	group := &model.Group{
-		GroupID:   groupID,
-		GroupName: groupName,
+		GroupID:        groupID,
+		GroupName:      groupName,
+		CreateByUserID: creatorID,
+		CreateTime:     time.Now(),
 	}
 
 	g := query.Group

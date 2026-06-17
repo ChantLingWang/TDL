@@ -1,6 +1,8 @@
 import smtplib
 import secrets
 import string
+import os
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
@@ -51,3 +53,5 @@ class EmailService:
         #将code存入redis，并设置TTL
         redis_client = RedisUserService()
         redis_client.set_code(to_email, code, 600)
+        print(f"DEBUG REDIS: stored code {code} for {to_email}")
+        return code

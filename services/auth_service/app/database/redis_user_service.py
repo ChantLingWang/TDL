@@ -8,7 +8,10 @@ class RedisUserService:
         self.redis_client.set_update_data(key, value, ttl)
         
     def get_code(self, key: str):
-        return self.redis_client.get_data(key)
+        data = self.redis_client.get_data(key)
+        if data is None:
+            return None
+        return data.decode('utf-8') if isinstance(data, bytes) else str(data)
     
     def delete_code(self, key: str):
         self.redis_client.redis_client.delete(key)

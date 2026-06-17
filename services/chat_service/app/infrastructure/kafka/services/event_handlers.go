@@ -65,11 +65,6 @@ func HandleChatMessageEvent(ctx context.Context, data json.RawMessage) error {
 	return nil
 }
 
-// HandleUserRegisteredEvent 处理用户注册事件（暂时为空实现）
-func HandleUserRegisteredEvent(ctx context.Context, data json.RawMessage) error {
-	log.Printf("收到用户注册事件，但暂未实现处理逻辑")
-	return nil
-}
 
 // HandleGroupChatMessageEvent 处理 Kafka 收到的群聊消息事件
 func HandleGroupChatMessageEvent(ctx context.Context, data json.RawMessage) error {

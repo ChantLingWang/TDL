@@ -4,8 +4,9 @@ from concurrent import futures
 import grpc
 
 # 添加项目根目录到 sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "infrastructure_sdk", "grpc", "token_auth_grpc", "proto"))
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2_grpc
 from app.services.jwt_service import JWTUtils
@@ -18,6 +19,7 @@ class AuthService(auth_pb2_grpc.AuthServiceServicer):
 
     def VerifyToken(self, request, context):
         """验证 Token 并返回用户信息"""
+        import traceback, sys
         token = request.token
 
         # 使用 JWTUtils 验证 token
@@ -28,7 +30,7 @@ class AuthService(auth_pb2_grpc.AuthServiceServicer):
             user_info = result.get("user_info", {})
             return auth_pb2.VerifyTokenResponse(
                 valid=True,
-                user_id=user_info.get("user_id", ""),
+                user_id=str(user_info.get("user_id", "")),
                 username=user_info.get("username", ""),
                 email=user_info.get("email", ""),
                 message="token is valid"
@@ -60,7 +62,7 @@ class AuthService(auth_pb2_grpc.AuthServiceServicer):
 
         return auth_pb2.GetUserByIDResponse(
             found=True,
-            user_id=user.get("user_id", ""),
+            user_id=str(user.get("user_id", "")),
             username=user.get("username", ""),
             email=user.get("email", ""),
             status=user.get("status", ""),

@@ -80,7 +80,9 @@ class JWTUtils:
         """
         try:
             # 解码token，验证签名和有效期
-            payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM]) #使用jwt库的decode方法解码token，SECRET_KEY：密钥，ALGORITHM：算法
+            print(f"JWT_DEBUG: token[:20]={token[:20]}... key_type={type(cls.SECRET_KEY).__name__}", flush=True)
+            payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
+            print(f"JWT_DEBUG: decode OK user_id={payload.get('user_id')}", flush=True)
             
             # 提取Go微服务需要的用户信息字段
             user_info = {
@@ -91,8 +93,12 @@ class JWTUtils:
             
             return {"status": "success", "payload": payload, "user_info": user_info}
         except jwt.ExpiredSignatureError:
-            # 处理过期的token
             return {"status": "error", "message": "Token已过期"}
         except jwt.InvalidTokenError:
-            # 处理无效的token
             return {"status": "error", "message": "无效的Token"}
+        except Exception as e:
+            import traceback, sys
+            with open('/tmp/jwt_error.log', 'w') as f:
+                traceback.print_exc(file=f)
+            print(f"JWT_FATAL: {e}", flush=True)
+            return {"status": "error", "message": f"Token验证失败: {e}"}

@@ -10,11 +10,12 @@ ENV CGO_ENABLED=0 \
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
+COPY services/chat_service/go.mod services/chat_service/go.sum ./
+COPY infrastructure_sdk /infrastructure_sdk/
+RUN GOWORK=off go mod download
 
-COPY . .
-RUN go build -ldflags="-w -s" -o chat-service .
+COPY services/chat_service/ .
+RUN GOWORK=off go build -ldflags="-w -s" -o chat-service .
 
 # ---------------------------------------------------------
 # 第二阶段：运行

@@ -26,6 +26,8 @@ func HandleWebSocket(c *gin.Context) {
 		return
 	}
 
+	log.Printf("WS upgrade OK for user %s", userInfo.UserID)
+
 	// 3. 初始化连接包装器
 	wsConn := services.NewWSConnection(conn)
 
@@ -38,10 +40,15 @@ func HandleWebSocket(c *gin.Context) {
 	// 6. 注册到 Hub
 	hub.Register(client)
 
-	// 7. 启动写泵 (WritePump) - 负责下行消息
+	// 7. 启动写泵 (WritePump) - 负责下行消息（必须在发送消息之前启动）
 	go client.WritePump()
 
-	// 8. 启动读泵 (ReadLoop) - 负责上行消息
+	// 8. 发送欢迎消息
+	welcomeMsg := `{"type":"system","content":{"message":"Connected to chat-local"}}`
+	client.Send <- []byte(welcomeMsg)
+	log.Printf("WS welcome sent to %s", userInfo.UserID)
+
+	// 9. 启动读泵 (ReadLoop) - 负责上行消息
 	// 这里的匿名函数就是 "Callback"（回调函数），ReadLoop 每收到一条消息，就会调用它一次
 	wsConn.ReadLoop(func(messageType int, data []byte) error {
 		var msg models.IncomingMessage
@@ -64,11 +71,12 @@ func HandleWebSocket(c *gin.Context) {
 		return nil
 	})
 
-	// 9. 连接断开后的清理工作
+	// 10. 连接断开后的清理工作
 	// ReadLoop 返回意味着连接已关闭
+	log.Printf("WS connection closed for user %s", userInfo.UserID)
 	hub.Unregister(client)
 
-	// 10. 用户离线，通过 gRPC 更新用户最后离线时间
+	// 11. 用户离线，通过 gRPC 更新用户最后离线时间
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

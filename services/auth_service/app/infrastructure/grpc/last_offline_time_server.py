@@ -1,26 +1,25 @@
 import os
 import sys
 import time
+import asyncio
 from concurrent import futures
 import grpc
-import asyncio
 
 # 添加项目根目录到 sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from infrastructure_sdk.grpc.last_offline_time_grpc.proto import last_offline_time_pb2
 from infrastructure_sdk.grpc.last_offline_time_grpc.proto import last_offline_time_pb2_grpc
 from app.database.mongodb_user_service import MongoDBUserService
+from app.database.mongodb_service import db_manager
 
 
 class LastOfflineTimeService(last_offline_time_pb2_grpc.LastOfflineTimeServiceServicer):
     """LastOfflineTimeService gRPC 实现"""
 
-    def __init__(self):
-        self.user_service = MongoDBUserService()
-
     async def UpdateLastOfflineTime(self, request, context):
         """更新用户最后离线时间"""
+        user_service = MongoDBUserService(db_manager)
         user_id = request.user_id
 
         if not user_id:
@@ -31,9 +30,9 @@ class LastOfflineTimeService(last_offline_time_pb2_grpc.LastOfflineTimeServiceSe
         try:
             # 使用当前时间戳（秒）
             current_time = int(time.time())
-            
+
             # 更新到 MongoDB 用户表中
-            success = await self.user_service.update_last_offline_time(user_id, current_time)
+            success = await user_service.update_last_offline_time(user_id, current_time)
 
             return last_offline_time_pb2.UpdateLastOfflineTimeResponse(
                 success=success
@@ -46,6 +45,7 @@ class LastOfflineTimeService(last_offline_time_pb2_grpc.LastOfflineTimeServiceSe
 
     async def GetLastOfflineTime(self, request, context):
         """获取用户最后离线时间"""
+        user_service = MongoDBUserService(db_manager)
         user_id = request.user_id
 
         if not user_id:
@@ -55,7 +55,7 @@ class LastOfflineTimeService(last_offline_time_pb2_grpc.LastOfflineTimeServiceSe
 
         try:
             # 从 MongoDB 获取
-            last_time = await self.user_service.get_last_offline_time(user_id)
+            last_time = await user_service.get_last_offline_time(user_id)
 
             if last_time is not None:
                 return last_offline_time_pb2.GetLastOfflineTimeResponse(
@@ -73,17 +73,20 @@ class LastOfflineTimeService(last_offline_time_pb2_grpc.LastOfflineTimeServiceSe
             )
 
 
-def serve(port=50052):
-    """启动 gRPC 服务器"""
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+async def serve(port=50052):
+    """启动 gRPC aio 服务器（持久事件循环，支持 async MongoDB 操作）"""
+    # 初始化 MongoDB 连接（在持久事件循环中）
+    await db_manager.connect()
+
+    server = grpc.aio.server()
     last_offline_time_pb2_grpc.add_LastOfflineTimeServiceServicer_to_server(
         LastOfflineTimeService(), server
     )
     server.add_insecure_port(f'[::]:{port}')
-    server.start()
+    await server.start()
     print(f"gRPC LastOfflineTime Service started on port {port}")
-    server.wait_for_termination()
+    await server.wait_for_termination()
 
 
 if __name__ == '__main__':
-    serve()
+    asyncio.run(serve())

@@ -21,7 +21,6 @@ var (
 	Group        *group
 	PrivateChat  *privateChat
 	TempChat     *tempChat
-	User         *user
 	UserGroup    *userGroup
 )
 
@@ -31,7 +30,6 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Group = &Q.Group
 	PrivateChat = &Q.PrivateChat
 	TempChat = &Q.TempChat
-	User = &Q.User
 	UserGroup = &Q.UserGroup
 }
 
@@ -42,7 +40,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Group:        newGroup(db, opts...),
 		PrivateChat:  newPrivateChat(db, opts...),
 		TempChat:     newTempChat(db, opts...),
-		User:         newUser(db, opts...),
 		UserGroup:    newUserGroup(db, opts...),
 	}
 }
@@ -54,7 +51,6 @@ type Query struct {
 	Group        group
 	PrivateChat  privateChat
 	TempChat     tempChat
-	User         user
 	UserGroup    userGroup
 }
 
@@ -67,7 +63,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Group:        q.Group.clone(db),
 		PrivateChat:  q.PrivateChat.clone(db),
 		TempChat:     q.TempChat.clone(db),
-		User:         q.User.clone(db),
 		UserGroup:    q.UserGroup.clone(db),
 	}
 }
@@ -87,7 +82,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Group:        q.Group.replaceDB(db),
 		PrivateChat:  q.PrivateChat.replaceDB(db),
 		TempChat:     q.TempChat.replaceDB(db),
-		User:         q.User.replaceDB(db),
 		UserGroup:    q.UserGroup.replaceDB(db),
 	}
 }
@@ -97,7 +91,6 @@ type queryCtx struct {
 	Group        IGroupDo
 	PrivateChat  IPrivateChatDo
 	TempChat     ITempChatDo
-	User         IUserDo
 	UserGroup    IUserGroupDo
 }
 
@@ -107,7 +100,6 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Group:        q.Group.WithContext(ctx),
 		PrivateChat:  q.PrivateChat.WithContext(ctx),
 		TempChat:     q.TempChat.WithContext(ctx),
-		User:         q.User.WithContext(ctx),
 		UserGroup:    q.UserGroup.WithContext(ctx),
 	}
 }

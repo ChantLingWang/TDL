@@ -20,6 +20,18 @@ func NewRouter() *Router {
 
 // SetupRoutes 设置路由
 func (r *Router) SetupRoutes() *gin.RouterGroup {
+	// CORS — 前端 dev server 在 5173，后端在 8080/8083
+	r.Engine.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Headers", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
+
 	// 创建API v1路由组，并应用全局认证中间件
 	v1 := r.Engine.Group("/api/v1")
 	v1.Use(auth_token.Auth())
@@ -29,8 +41,6 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 	{
 		// 根据用户ID获取用户信息
 		users.GET("/:user_id", handlers.GetUser)
-		// 初始化测试用户 (POST /api/v1/users/:user_id/init)
-		users.POST("/:user_id/init", handlers.InitTestUser)
 		// 获取用户群组
 		users.GET("/:user_id/groups", handlers.GetUserGroups)
 	}

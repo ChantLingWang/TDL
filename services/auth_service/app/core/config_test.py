@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     port: int = 9030
     
     # mongo数据库配置
-    mongodb_url: str = "mongodb://mongodb:27017"
+    mongodb_url: str = "mongodb://localhost:27017"
     database_name: str = "auth"
     
     # JWT配置
@@ -32,10 +32,10 @@ class Settings(BaseSettings):
     smtp_server: str = "smtp.qq.com"
     smtp_port: int = 587
     smtp_username: str = "809595872@qq.com"
-    smtp_password: str = "flvvqalxrcmlbdhj"
+    smtp_password: str = "xpmoqdvhnngqbbhi"
     
     # Redis配置
-    redis_host: str = "redis"
+    redis_host: str = "localhost"
     redis_port: int = 6379
     redis_db: int = 0
     

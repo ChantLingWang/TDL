@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,6 +17,8 @@ var WSUpgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+const pongWait = 60 * time.Second
 
 // WSConnection 封装WebSocket连接，提供线程安全的写操作
 type WSConnection struct {
@@ -43,10 +46,21 @@ func (c *WSConnection) ReadLoop(handleMessage func(messageType int, data []byte)
 		c.Conn.Close()
 	}()
 
+	// 设置 Pong 处理器：客户端回复 Pong 后刷新读超时
+	c.Conn.SetPongHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
+		// 设置读超时（比 ping 周期长，防止连接僵死）
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+
 		messageType, message, err := c.Conn.ReadMessage()
 		if err != nil {
+			log.Printf("WS ReadMessage error: %v", err)
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Unexpected close: %v", err)
 			}
 			break
 		}

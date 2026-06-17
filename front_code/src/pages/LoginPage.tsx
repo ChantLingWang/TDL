@@ -68,7 +68,7 @@ const LoginPage: React.FC = () => {
       
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user_info', JSON.stringify(response.data.user));
-      
+      localStorage.setItem('refresh_token', response.data.refresh_token);      
       // Delay redirect slightly to show success message
       setTimeout(() => {
         navigate('/dashboard');

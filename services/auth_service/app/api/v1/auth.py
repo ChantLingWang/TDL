@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from datetime import timezone
 from fastapi import APIRouter, HTTPException
 from app.models.auth_model import LoginRequest,SendCodeRequest,VerifyCodeRequest,VerifyCodeLoginRequest,ResetPasswordRequest,RefreshTokenRequest,LogoutRequest
 from app.database.mongodb_user_service import MongoDBUserService,db_manager
@@ -9,12 +10,9 @@ from app.database.mongodb_user_token_service import MongoDBUserTokenService
 from app.services.email_service import EmailService
 from app.services.jwt_service import JWTUtils
 from app.utils.error_code import ErrorCodeEnum
-from app.infrastructure.kafka.event_publisher import event_publisher
-from app.models.events import UserRegisteredEvent
 from fastapi import Request
 import bcrypt
 from app.api.v1.const import Status
-from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,8 @@ async def get_user_service():
 
 async def get_user_token_service():
     """获取token服务实例并检查数据库连接"""
-    is_connected = await RedisUserService.test_connection()
+    redis_service = RedisUserService()
+    is_connected = redis_service.test_connection()
     if not is_connected:
         raise HTTPException(status_code=ErrorCodeEnum.REDIS_CONNECTION_ERROR.code, detail=ErrorCodeEnum.REDIS_CONNECTION_ERROR.message)
     return MongoDBUserTokenService(db_manager)
@@ -77,8 +76,9 @@ async def register(request:Request,data: VerifyCodeRequest):
         code = redis_client.get_code(data.email)    #redis返回的是bytes类型，需要在下面处理为字符串类型才能比较，否则无法比较
         
         # 检查验证码是否存在
+        print(f"DEBUG REGISTER: email={data.email} code={data.code}")
         if code is None:
-            raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+            raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
         
         # 将bytes类型转换为字符串进行比较
         code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
@@ -86,10 +86,10 @@ async def register(request:Request,data: VerifyCodeRequest):
         user_exist = await user_service.get_user_by_email(data.email)
         
         if user_exist:
-            raise HTTPException(status_code=ErrorCodeEnum.USER_ALREADY_EXISTS.code, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
+            raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_ALREADY_EXISTS.message)
         
         if code_str != data.code:
-            raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+            raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
         
         # 获取下一个用户ID
         user_id = await user_service.get_next_user_id()
@@ -98,13 +98,9 @@ async def register(request:Request,data: VerifyCodeRequest):
         redis_client.delete_code(data.email)
         
         # 添加创建时间字段，用于同步给其他微服务
-        current_time = datetime.now(datetime.timezone.utc).isoformat()
+        current_time = datetime.now(timezone.utc).isoformat()
         
-        # 缓存 SagaID -> UserID 的映射，用于后续 Saga 完成/失败时的回调处理
-        event_id = str(uuid4())
-        redis_client.set_code(f"saga:{event_id}:user_id", str(user_id), 3600)
-        
-        # 先构建核心用户信息（用于token生成和事件发布）
+	# 先构建核心用户信息（用于token生成和事件发布）
         user = {
             "user_id": user_id,
             "username": data.username,
@@ -119,33 +115,16 @@ async def register(request:Request,data: VerifyCodeRequest):
             "password": bcrypt.hashpw(data.password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8'),
         }
 
-        # 生成token（如果失败会抛出异常，整个注册流程就会失败）
+        # 生成token
         access_token = JWTUtils.create_access_token(user)
-        refresh_token = await MongoDBUserTokenService.create_user_token(user)
+        try:
+            token_service = MongoDBUserTokenService(db_manager)
+            refresh_token = await token_service.create_user_token(user)
+        except Exception as e:
+            logger.warning(f"refresh_token 创建失败（注册继续）: {e}")
+            refresh_token = ""
 
-        # TODO: 未来将增加saga事件的支持，但目前不添加，直接把用户字段存入数据库
-        # 构建用户注册事件的数据
-        # 将数据按步骤Topic组织，以便Orchestrator能精确匹配
-        # 这里 "sync_user_fields" 对应 user_register_sync.yaml 中的步骤 topic
-        # steps_data = {
-        #     "sync_user_fields": {
-        #         "user_id": str(user_id),
-        #         "username": data.username,
-        #         "email": data.email,
-        #         "created_at": current_time,
-        #     }
-        # }
-        
-        # event = UserRegisteredEvent(
-        #     event_id = event_id,
-        #     execution_mode = Status.PARALLEL,
-        #     user_data = steps_data
-        # )
-    
-        # # # 发送 Kafka 消息 (Start Saga)
-        # # event_publisher.publish_user_registered_event(event)
-
-        user_service.create_user(user_data)
+        await user_service.create_user(user_data)
 
         return {
             "message": Status.SUCCESS,
@@ -161,7 +140,7 @@ async def register(request:Request,data: VerifyCodeRequest):
     except Exception as e:
         logger.error(f"用户注册失败 - 错误类型: {type(e).__name__}, 错误信息: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=ErrorCodeEnum.USER_REGISTER_ERROR.code, 
+            status_code=400, 
             detail=f"{ErrorCodeEnum.USER_REGISTER_ERROR.message}: {str(e)[:100]}"
         )
 
@@ -190,7 +169,7 @@ async def verify_code_login(request:Request,data: VerifyCodeLoginRequest):
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
 
     if code_str != data.code:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     else:
         redis_client.delete_code(data.email)
 
@@ -235,6 +214,15 @@ async def login(request:Request,data: LoginRequest):
     # 生成token
     access_token = JWTUtils.create_access_token(user)
     refresh_token = JWTUtils.create_refresh_token(user)
+    
+    # 持久化refresh_token
+    try:
+        user_token_service = await get_user_token_service()
+        await user_token_service.update_user_refresh_token(user["user_id"], refresh_token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"refresh_token 持久化失败（登录继续）: {e}")
 
     
     return {
@@ -283,14 +271,14 @@ async def reset_password(request:Request,data: ResetPasswordRequest):
     
     # 检查验证码是否过期（验证码有时效性，过期则redis查不到）
     if code is None:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_EXPIRED.message)
     
     # 对验证码进行格式转换方便对比
     code_str = code.decode('utf-8') if isinstance(code, bytes) else str(code)
     
     #检验验证码是否正确，若不正确直接报错
     if code_str != data.code:
-        raise HTTPException(status_code=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.code, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
+        raise HTTPException(status_code=400, detail=ErrorCodeEnum.USER_VERIFICATION_CODE_INCORRECT.message)
     else:
         redis_service.delete_code(data.email)
     

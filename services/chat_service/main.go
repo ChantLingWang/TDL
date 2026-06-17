@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"log"
 	"os"
 	"os/signal"
@@ -88,16 +90,21 @@ func createApp() *gin.Engine {
 
 // startServer 启动HTTP服务器
 func startServer() {
-	// 创建应用实例
 	app := createApp()
 
-	// 启动HTTP服务器
-	if err := app.Run(":" + config.ServerConfig.Port); err != nil {
+	server := &http.Server{
+		Addr:    ":" + config.ServerConfig.Port,
+		Handler: app,
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
 }
 
 func main() {
+	gin.ForceConsoleColor()
 	// 0. 初始化配置
 	config.InitConfig("config.yaml")
 
