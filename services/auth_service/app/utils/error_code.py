@@ -29,7 +29,7 @@ class ErrorCodeEnum:
     DATABASE_CONNECTION_ERROR = ErrorCode(20001,"数据库连接失败")
     
     #邮箱相关错误码
-    EMAIL_SEND_ERROR = ErrorCode(30001,"邮件发送失败,请稍后重试")
+    EMAIL_SEND_ERROR = ErrorCode(500,"邮件发送失败,请稍后重试")
     
     #重置密码相关错误码
     USER_PASSWORD_SAME = ErrorCode(40001,"新密码与旧密码相同")
