@@ -4,7 +4,7 @@ import { chatApi } from '../api/chat';
 import type { Group } from '../api/chat';
 import styles from './ChatPage.module.scss';
 
-const WS_BASE = 'wss://1.12.248.26/api/v1/ws';
+const WS_BASE = import.meta.env.VITE_WS_URL;
 
 interface WsMessage {
   type: string;
@@ -87,7 +87,7 @@ const ChatPage: React.FC = () => {
 
   useEffect(() => {
     if (!userId) return;
-    chatApi.initUser(userId, username).catch(() => {});
+    chatApi.initUser(userId).catch(() => {});
     chatApi.getUserGroups(userId).then((res) => setGroups(res.groups || [])).catch(() => {});
   }, [userId, username]);
 
