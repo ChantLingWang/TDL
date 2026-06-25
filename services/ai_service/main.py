@@ -42,8 +42,17 @@ async def dispatch(producer: AIOKafkaProducer, event: BusinessEvent) -> None:
     # Kafka BusinessEvent 的 data 字段可能是 dict 或已解析对象
     data = event.data if isinstance(event.data, dict) else {}
 
-    # 非私聊消息不处理
-    if etype != "user.chat.private":
+    # 处理私聊消息 或 发给 ai-assistant 群组的消息
+    if etype == "user.chat.private":
+        target = data.get("target_user_id", "")
+        if target != AI_USER_ID:
+            return
+    elif etype == "user.chat.group" and data.get("group_id") == AI_USER_ID:
+        # 适配群消息格式为私聊格式
+        adapted = dict(data)
+        adapted["target_user_id"] = AI_USER_ID
+        return await handle_private_message(producer, adapted)
+    else:
         return
 
     # 不是发给 AI 的，忽略（如用户之间的私聊）
