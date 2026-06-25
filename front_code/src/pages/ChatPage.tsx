@@ -119,7 +119,7 @@ const ChatPage: React.FC = () => {
     const base = {
       type: 'chat',
       content: {
-        sender_id: userId,
+        sender_id: String(userId),
         text,
         message_id: msgId,
         message_type: 'text',
