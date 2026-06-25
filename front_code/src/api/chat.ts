@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const chatRequest = axios.create({
-  baseURL: 'http://127.0.0.1:8080/api/v1',
+  baseURL: 'https://1.12.248.26/api/v1',
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });

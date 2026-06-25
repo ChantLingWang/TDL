@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/health")
+async def health_check():
+    """健康检查端点"""
+    return {"status": "ok", "service": "auth_service"}
+
+
+
 async def get_user_service():
     """获取用户服务实例并检查数据库连接"""
     is_connected = await db_manager.test_connection()
