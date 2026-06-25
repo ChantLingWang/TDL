@@ -17,12 +17,12 @@ class ErrorCode():
 
 class ErrorCodeEnum:
     #用户登录注册相关错误码
-    USER_NOT_FOUND = ErrorCode(10001,"用户不存在")
-    USER_ALREADY_EXISTS = ErrorCode(10002,"用户已存在")
-    USER_PASSWORD_INCORRECT = ErrorCode(10003,"密码错误")
-    USER_VERIFICATION_CODE_INCORRECT = ErrorCode(10004,"验证码错误")
-    USER_VERIFICATION_CODE_EXPIRED = ErrorCode(10005,"验证码已过期或不存在")
-    USER_ID_INCORRECT = ErrorCode(10006,"用户id错误")
+    USER_NOT_FOUND = ErrorCode(503,"用户不存在")
+    USER_ALREADY_EXISTS = ErrorCode(503,"用户已存在")
+    USER_PASSWORD_INCORRECT = ErrorCode(503,"密码错误")
+    USER_VERIFICATION_CODE_INCORRECT = ErrorCode(400,"验证码错误")
+    USER_VERIFICATION_CODE_EXPIRED = ErrorCode(401,"验证码已过期或不存在")
+    USER_ID_INCORRECT = ErrorCode(404,"用户id错误")
     USER_REGISTER_ERROR = ErrorCode(10007,"用户注册失败")
     
     #数据库相关错误码

@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
     )
     
     # 注册路由
-    app.include_router(auth_router, prefix="/api/v1", tags=["认证"])
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["认证"])
     
     # 根路径
     @app.get("/", tags=["根路径"])
