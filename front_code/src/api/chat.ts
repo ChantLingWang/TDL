@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const chatRequest = axios.create({
-  baseURL: 'https://1.12.248.26/api/v1',
+  baseURL: import.meta.env.VITE_API_URL,
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -32,8 +32,8 @@ export interface ChatMessage {
 }
 
 export const chatApi = {
-  initUser: (userID: string, username: string) =>
-    chatRequest.post(`/users/${userID}/init`, null, { params: { username } }),
+  initUser: (userID: string) =>
+    chatRequest.get(`/users/${userID}`),
 
   getUserGroups: (userID: string) =>
     chatRequest.get<any, { groups: Group[] }>(`/users/${userID}/groups`),

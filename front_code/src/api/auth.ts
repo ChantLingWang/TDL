@@ -36,18 +36,18 @@ export interface LoginResponse {
 
 export const authApi = {
   sendCode: (data: SendCodeRequest) => {
-    return request.post<any, { message: string }>('/send_code', data);
+    return request.post<any, { message: string }>('/auth/send_code', data);
   },
   
   verifyCodeLogin: (data: VerifyCodeLoginRequest) => {
-    return request.post<any, LoginResponse>('/verify_code_login', data);
+    return request.post<any, LoginResponse>('/auth/verify_code_login', data);
   },
 
   login: (data: LoginRequest) => {
-    return request.post<any, LoginResponse>('/login', data);
+    return request.post<any, LoginResponse>('/auth/login', data);
   },
 
   register: (data: VerifyCodeRequest) => {
-    return request.post<any, LoginResponse>('/register', data);
+    return request.post<any, LoginResponse>('/auth/register', data);
   }
 };
