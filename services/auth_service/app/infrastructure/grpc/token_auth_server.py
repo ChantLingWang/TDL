@@ -4,9 +4,9 @@ from concurrent import futures
 import grpc
 
 # 添加项目根目录到 sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))))
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "infrastructure_sdk", "grpc", "token_auth_grpc", "proto"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))), "infrastructure_sdk", "grpc", "token_auth_grpc", "proto"))
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2
 from infrastructure_sdk.grpc.token_auth_grpc.proto import auth_pb2_grpc
 from app.services.jwt_service import JWTUtils
