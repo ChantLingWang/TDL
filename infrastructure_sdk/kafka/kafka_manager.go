@@ -36,7 +36,7 @@ func NewKafkaConnection(brokers []string, topic string, groupID string) (*KafkaC
 	// 写入配置
 	writerConfig := kafkago.WriterConfig{
 		Brokers:      brokers,
-		Topic:        topic, // 明确设置 Topic
+		// Topic is set per-message in producer.writeMessage, not on the Writer
 		BatchSize:    1,     // 立即发送，不等待批量
 		BatchTimeout: 0,
 		WriteTimeout: 10 * time.Second,
