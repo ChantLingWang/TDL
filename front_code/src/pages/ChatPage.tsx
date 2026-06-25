@@ -115,18 +115,27 @@ const ChatPage: React.FC = () => {
     const text = input.trim();
     if (!text || !activeGroup) return;
     const isAI = activeGroup === 'ai-assistant';
+    const msgId = `${userId}-${Date.now()}`;
     const base = {
       type: 'chat',
       content: {
         sender_id: userId,
         text,
-        message_id: `${userId}-${Date.now()}`,
+        message_id: msgId,
         message_type: 'text',
       },
     };
     const msg = isAI
-      ? { ...base, content: { ...base.content, conversation_type: 'private', target_user_id: 'ai-assistant' } }
+      ? { ...base, content: { ...base.content, conversation_type: 'group', group_id: 'ai-assistant' } }
       : { ...base, content: { ...base.content, conversation_type: 'group', group_id: activeGroup } };
+    // Optimistically show user message
+    setMessages((prev) => [...prev, {
+      type: 'chat',
+      sender: username,
+      content: text,
+      time: Date.now(),
+      conversation_id: activeGroup,
+    }]);
     wsRef.current?.send(JSON.stringify(msg));
     setInput('');
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
