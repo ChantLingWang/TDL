@@ -51,7 +51,7 @@ async def send_code(request:Request,data: SendCodeRequest):
     """发送验证码接口"""
     email_service = EmailService()
     try:
-        email_service.send_email(data.email)
+        await asyncio.to_thread(email_service.send_email, data.email)
         
         return{
             "message": "验证码发送成功",
