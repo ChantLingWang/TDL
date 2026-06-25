@@ -1,3 +1,4 @@
+import threading
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config_test import settings
 from app.api.v1.auth import router as auth_router
 from app.database.mongodb_service import db_manager
+from app.infrastructure.grpc.token_auth_server import serve as start_grpc_server
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,6 +17,9 @@ async def lifespan(app: FastAPI):
     # 启动时执行
     print(f"启动 {settings.app_name}")
     await db_manager.connect()
+    # 在后台线程启动 gRPC 服务，供 chat_service 远程调用
+    threading.Thread(target=start_grpc_server, kwargs={"port": 50051}, daemon=True).start()
+    print("gRPC server starting on port 50051")
     
     print(f"🚀 {settings.app_name} 启动完成")
     
