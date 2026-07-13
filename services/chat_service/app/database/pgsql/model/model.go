@@ -2,77 +2,52 @@ package model
 
 import (
 	"time"
-	
+
 	"gorm.io/gorm"
 )
 
-
 // Group 组群模型
 type Group struct {
-	CreateTime    time.Time `gorm:"not null"`
-	GroupID       string    `gorm:"primaryKey"`
-	GroupName     string    `gorm:"not null"`
-	CreateByUserID string   `gorm:"not null"` // 创建者ID (单人)
+	GroupID        string    `gorm:"primaryKey" json:"group_id"`
+	GroupName      string    `gorm:"not null" json:"group_name"`
+	GroupType      string    `gorm:"default:normal" json:"group_type"` // "ai" | "normal"
+	CreateByUserID string    `gorm:"not null" json:"create_by_user_id"`
+	CreateTime     time.Time `gorm:"not null" json:"create_time"`
 }
 
-
-// UserGroup 用户组群关联模型（多对多关系）
+// UserGroup 用户组群关联模型
 type UserGroup struct {
-	UserID  string `gorm:"primaryKey"`
-	GroupID string `gorm:"primaryKey"`
-	// 可以根据需要添加其他关联字段，如加入时间等
+	UserID  string `gorm:"primaryKey" json:"user_id"`
+	GroupID string `gorm:"primaryKey" json:"group_id"`
 }
 
-
-// 定义私有chat模型
+// PrivateChat 私有chat模型
 type PrivateChat struct {
-	UserID string `gorm:"primaryKey"`
-	AddTime time.Time `gorm:"primaryKey"`
+	UserID  string    `gorm:"primaryKey" json:"user_id"`
+	AddTime time.Time `gorm:"primaryKey" json:"add_time"`
 }
 
-
-// 定义临时chat模型
+// TempChat 临时chat模型
 type TempChat struct {
-	UserID string `gorm:"primaryKey"`
-	Source string `gorm:"primaryKey"`
+	UserID string `gorm:"primaryKey" json:"user_id"`
+	Source string `gorm:"primaryKey" json:"source"`
 }
 
-
-// Conversation 会话模型（用于跟踪用户对会话的已读状态）
+// Conversation 会话模型（已读状态追踪）
 type Conversation struct {
-	UserID           string    `gorm:"primaryKey"`        // 用户ID
-	ConversationID   string    `gorm:"primaryKey"`        // 会话ID (群ID 或 userA_userB)
-	ConversationType string    `gorm:"not null"`          // 会话类型: "private" 或 "group"
-	LastReadTime     time.Time // 最后已读时间
-	UpdateTime       time.Time // 更新时间
+	UserID           string    `gorm:"primaryKey" json:"user_id"`
+	ConversationID   string    `gorm:"primaryKey" json:"conversation_id"`
+	ConversationType string    `gorm:"not null" json:"conversation_type"`
+	LastReadTime     time.Time `json:"last_read_time"`
+	UpdateTime       time.Time `json:"update_time"`
 }
 
-// TableName 指定Group表名
-func (Group) TableName() string {
-	return "groups"
-}
+func (Group) TableName() string        { return "groups" }
+func (UserGroup) TableName() string    { return "user_groups" }
+func (PrivateChat) TableName() string  { return "private_chats" }
+func (TempChat) TableName() string     { return "temp_chats" }
+func (Conversation) TableName() string { return "conversations" }
 
-// TableName 指定UserGroup表名
-func (UserGroup) TableName() string {
-	return "user_groups"
-}
-
-// TableName 指定PrivateChat表名
-func (PrivateChat) TableName() string {
-	return "private_chats"
-}
-
-// TableName 指定TempChat表名
-func (TempChat) TableName() string {
-	return "temp_chats"
-}
-
-// TableName 指定Conversation表名
-func (Conversation) TableName() string {
-	return "conversations"
-}
-
-// AutoMigrate 自动迁移数据库表结构
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(&Group{}, &UserGroup{}, &PrivateChat{}, &TempChat{}, &Conversation{})
 }

@@ -3,10 +3,10 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: #0a0a0a;
+  background-color: #f0f2f5;
   background-image: 
-    linear-gradient(rgba(0, 200, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 200, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px);
   background-size: 50px 50px;
   position: relative;
   overflow: hidden;
@@ -15,12 +15,12 @@
 .loginBox {
   width: 400px;
   padding: 40px;
-  background-color: rgba(30, 30, 30, 0.9);
-  border: 1px solid #333;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e5e7eb;
   position: relative;
   backdrop-filter: blur(10px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   
-  /* Cut corners */
   clip-path: polygon(
     20px 0, 100% 0, 
     100% calc(100% - 20px), calc(100% - 20px) 100%, 
@@ -95,7 +95,7 @@
   }
   
   button {
-    height: 42px; // Match input height approx
+    height: 42px;
     margin-bottom: 0;
   }
 }

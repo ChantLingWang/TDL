@@ -30,3 +30,9 @@ class DeepSeekLLM(OpenAICompatibleLLM):
         self._model = settings.deepseek_model
         self._key = settings.deepseek_api_key
         self._create_client()
+
+    def get_pricing(self, model: str | None = None) -> tuple[float, float]:
+        """返回 (input_price, output_price)，单位 $/百万token。"""
+        m = model or self._model
+        p = self.PRICING.get(m, self.PRICING["deepseek-chat"])
+        return {"input": p["input"], "output": p["output"]}

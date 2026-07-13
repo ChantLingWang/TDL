@@ -142,3 +142,8 @@ services:
       - chant-shared-network
     restart: on-failure
 
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:

@@ -1,44 +1,48 @@
-from collections import UserDict
 
 
 class ErrorCode():
-    def __init__(self,code:int,message:str):
+    def __init__(self, code: int, message: str, http_status: int = 500):
         self._code = code
         self._message = message
+        self._http_status = http_status
 
     @property
     def code(self):
         return self._code
-    
+
     @property
     def message(self):
         return self._message
 
+    @property
+    def http_status(self):
+        return self._http_status
+
 
 class ErrorCodeEnum:
     #用户登录注册相关错误码
-    USER_NOT_FOUND = ErrorCode(503,"用户不存在")
-    USER_ALREADY_EXISTS = ErrorCode(503,"用户已存在")
-    USER_PASSWORD_INCORRECT = ErrorCode(503,"密码错误")
-    USER_VERIFICATION_CODE_INCORRECT = ErrorCode(400,"验证码错误")
-    USER_VERIFICATION_CODE_EXPIRED = ErrorCode(401,"验证码已过期或不存在")
-    USER_ID_INCORRECT = ErrorCode(404,"用户id错误")
-    USER_REGISTER_ERROR = ErrorCode(10007,"用户注册失败")
+    USER_NOT_FOUND = ErrorCode(10001, "用户不存在", 404)
+    USER_ALREADY_EXISTS = ErrorCode(10002, "用户已存在", 409)
+    USER_PASSWORD_INCORRECT = ErrorCode(10003, "密码错误", 401)
+    USER_VERIFICATION_CODE_INCORRECT = ErrorCode(10004, "验证码错误", 400)
+    USER_VERIFICATION_CODE_EXPIRED = ErrorCode(10005, "验证码已过期或不存在", 401)
+    USER_ID_INCORRECT = ErrorCode(10006, "用户id错误", 404)
+    USER_REGISTER_ERROR = ErrorCode(10007, "用户注册失败", 500)
     
     #数据库相关错误码
-    DATABASE_CONNECTION_ERROR = ErrorCode(20001,"数据库连接失败")
+    DATABASE_CONNECTION_ERROR = ErrorCode(20001, "数据库连接失败", 500)
     
     #邮箱相关错误码
-    EMAIL_SEND_ERROR = ErrorCode(500,"邮件发送失败,请稍后重试")
+    EMAIL_SEND_ERROR = ErrorCode(30001, "邮件发送失败,请稍后重试", 500)
     
     #重置密码相关错误码
-    USER_PASSWORD_SAME = ErrorCode(40001,"新密码与旧密码相同")
-    USER_PASSWORD_RESET_FAILED = ErrorCode(40002,"密码重置失败")
+    USER_PASSWORD_SAME = ErrorCode(40001, "新密码与旧密码相同", 400)
+    USER_PASSWORD_RESET_FAILED = ErrorCode(40002, "密码重置失败", 500)
     
     #刷新token相关错误码
-    USER_REFRESH_TOKEN_INCORRECT = ErrorCode(50001,"刷新token错误")
+    USER_REFRESH_TOKEN_INCORRECT = ErrorCode(50001, "刷新token错误", 401)
     
     #redis相关错误码
-    REDIS_CONNECTION_ERROR = ErrorCode(60001,"redis连接失败")
+    REDIS_CONNECTION_ERROR = ErrorCode(60001, "redis连接失败", 500)
     
     

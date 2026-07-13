@@ -1,27 +1,25 @@
 package handlers
 
 import (
-
-	"chat_service/app/infrastructure/grpc"
+	"chat_service/app/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-// GetUser 获取用户信息（通过 gRPC 向 auth service 查询）
+// GetUser 返回当前请求的用户信息。
+// 用户身份已由 auth_token 中间件验证并注入 context，不需要再次查 auth_service。
 func GetUser(c *gin.Context) {
-	userID := c.Param("user_id")
-
-	authClient := grpc.GetAuthClient()
-	resp, err := authClient.GetUserByID(c, userID)
-	if err != nil || !resp.Found {
-		c.JSON(404, gin.H{"error": "User not found"})
+	userInfo, exists := c.Get("userInfo")
+	if !exists {
+		c.JSON(401, gin.H{"error": "unauthorized"})
 		return
 	}
-
+	u := userInfo.(*services.UserInfo)
 	c.JSON(200, gin.H{
-		"user_id":  resp.UserId,
-		"username": resp.Username,
-		"email":    resp.Email,
-		"status":   resp.Status,
+		"user_id":  u.UserID,
+		"username": u.Username,
+		"email":    u.Email,
 	})
 }
+
+// GetUserGroups 由 group_handler.go 处理，不受影响。

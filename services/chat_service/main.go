@@ -150,10 +150,17 @@ func main() {
 		log.Printf("私聊消息已推送给本地在线用户: to=%s", targetUserID)
 	})
 
-	consumerRunner := kafka.NewConsumerRunner(
-		kafkaServices.HandleChatMessageEvent,
-		kafkaServices.HandleBroadcastMessageEvent,
-	)
+	kafkaServices.RegisterAiReplyBroadcast(func(targetUserID, groupID string, message []byte) {
+		hub := services.GetWSHub()
+		if groupID != "" {
+			hub.BroadcastToUser(groupID, message)
+		} else {
+			hub.BroadcastToUser(targetUserID, message)
+		}
+		log.Printf("AI回复已推送给本地在线用户: to=%s", targetUserID)
+	})
+
+	consumerRunner := kafka.NewConsumerRunner()
 
 	go func() {
 		for {

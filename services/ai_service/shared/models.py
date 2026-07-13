@@ -24,8 +24,19 @@ class PrivateChatData(BaseModel):
     sender_id: str
     target_user_id: str
     content: str
-    timestamp: int          # unix 毫秒
+    timestamp: int | str
     message_id: str
+    message_type: str = "text"
+
+
+class GroupChatData(BaseModel):
+    """user.chat.group 事件的 data 载荷"""
+    group_id: str
+    sender_id: str
+    content: str
+    timestamp: int
+    message_id: str
+    conversation_id: str = ""
     message_type: str = "text"
 
 
@@ -33,7 +44,7 @@ class ChatHistoryMessage(BaseModel):
     """chat_service GET /api/v1/messages/history 返回的单条消息"""
     sender_id: str
     content: str
-    timestamp: int
+    timestamp: int | str
     message_id: str = ""
     message_type: str = "text"
 

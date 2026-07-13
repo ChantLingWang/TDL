@@ -67,7 +67,7 @@ const RegisterPage: React.FC = () => {
         navigate('/dashboard');
       }, 1000);
     } catch (error) {
-      setMessage('注册失败。');
+      const msg = (error as any)?.response?.data?.detail || '注册失败'; setMessage(msg);
     } finally {
       setLoading(false);
     }

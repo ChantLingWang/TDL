@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"chat_service/app/database/pgsql/query"
 	"chat_service/app/database/pgsql/model"
 	"chat_service/app/database/pgsql"
@@ -133,4 +134,51 @@ func (s *ConversationService) GetUserConversationIDs(ctx context.Context, userID
 	}
 
 	return conversationIDs, nil
+}
+
+// ListConversations 列出用户的 AI 会话（群名以 ai_ 开头的群）
+func (s *ConversationService) ListConversations(ctx context.Context, userID, convType string) ([]map[string]interface{}, error) {
+	// 查 user_groups 联表 groups，过滤 ai_ 前缀
+	var results []struct {
+		GroupID   string
+		GroupName string
+	}
+	db := s.GetDB()
+	db.Table("user_groups").
+		Select("user_groups.group_id, groups.group_name").
+		Joins("JOIN groups ON groups.group_id = user_groups.group_id").
+		Where("user_groups.user_id = ? AND groups.group_id LIKE ?", userID, "ai_%").
+		Order("groups.create_time DESC").
+		Scan(&results)
+
+	list := make([]map[string]interface{}, len(results))
+	for i, r := range results {
+		list[i] = map[string]interface{}{
+			"group_id": r.GroupID,
+			"title":    r.GroupName,
+		}
+	}
+	return list, nil
+}
+
+// CreateAIConversation 创建新的 AI 会话（一群一会话）
+func (s *ConversationService) CreateAIConversation(ctx context.Context, userID, title string) (map[string]interface{}, error) {
+	groupID := fmt.Sprintf("ai_%d", time.Now().UnixNano())
+	now := time.Now()
+
+	group := &model.Group{
+		GroupID:        groupID,
+		GroupName:      title,
+		CreateByUserID: userID,
+		CreateTime:     now,
+	}
+	if err := s.GetDB().Create(group).Error; err != nil {
+		return nil, err
+	}
+	pgsql.NewUserGroupService(pgsql.GetDBManager()).AddUserToGroup(userID, groupID)
+
+	return map[string]interface{}{
+		"group_id": groupID,
+		"title":    title,
+	}, nil
 }

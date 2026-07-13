@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package chant.chat.v1;
+
+option go_package = "github.com/chant/chant/gen/go/chant/chat/v1;chatv1";
+
+// WsIncoming 前端通过 WebSocket 发送的消息外层。
+message WsIncoming {
+  // 消息类型: "chat", "ping"
+  string type = 1;
+  // 载荷，按 type 区分
+  oneof payload {
+    ChatContent chat = 2;
+    PingContent ping = 3;
+  }
+}
+
+// ChatContent WebSocket 聊天消息载荷。
+message ChatContent {
+  string sender_id = 1;
+  string text = 2;
+  string message_id = 3;
+  // text / image 等
+  string message_type = 4;
+  // "group" 或 "ai"
+  string conversation_type = 5;
+  string group_id = 6;
+}
+
+// PingContent WebSocket 心跳。
+message PingContent {}

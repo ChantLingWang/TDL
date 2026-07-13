@@ -80,9 +80,7 @@ class JWTUtils:
         """
         try:
             # 解码token，验证签名和有效期
-            print(f"JWT_DEBUG: token[:20]={token[:20]}... key_type={type(cls.SECRET_KEY).__name__}", flush=True)
             payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
-            print(f"JWT_DEBUG: decode OK user_id={payload.get('user_id')}", flush=True)
             
             # 提取Go微服务需要的用户信息字段
             user_info = {

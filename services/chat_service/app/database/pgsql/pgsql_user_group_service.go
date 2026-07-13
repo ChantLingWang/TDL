@@ -102,11 +102,12 @@ func (ugs *UserGroupService) RemoveUserFromGroup(userID, groupID string) error {
 }
 
 // CreateGroup 创建新的组群，传入创建者 ID 以填充 create_by_user_id 和创建时间
-func (ugs *UserGroupService) CreateGroup(groupID, groupName, creatorID string) (*model.Group, error) {
+func (ugs *UserGroupService) CreateGroup(groupID, groupName, creatorID, groupType string) (*model.Group, error) {
 	group := &model.Group{
 		GroupID:        groupID,
 		GroupName:      groupName,
 		CreateByUserID: creatorID,
+		GroupType:      groupType,
 		CreateTime:     time.Now(),
 	}
 

@@ -1,5 +1,4 @@
 import threading
-import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn

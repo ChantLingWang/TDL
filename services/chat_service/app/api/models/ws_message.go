@@ -2,6 +2,7 @@ package models
 
 // ChatMessageRequest 聊天消息请求结构
 type ChatMessageRequest struct {
+	ConversationID   string `json:"conversation_id,omitempty"` // AI 会话 ID
 	ConversationType string `json:"conversation_type"`      // 会话类型: "private", "group"
 	SenderID         string `json:"sender_id"`              // 发送者ID
 	TargetID         string `json:"target_id,omitempty"`    // 私聊接收者

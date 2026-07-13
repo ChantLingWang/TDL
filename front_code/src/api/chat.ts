@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const chatRequest = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: "/api/v1",
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -20,11 +20,13 @@ chatRequest.interceptors.response.use(
 export interface Group {
   group_id: string;
   group_name: string;
+  group_type: string;
+  create_by_user_id?: string;
   create_time?: string;
 }
 
 export interface ChatMessage {
-  conversation_id: string;
+  group_id: string;
   sender: string;
   content: string;
   time: number;
@@ -38,15 +40,19 @@ export const chatApi = {
   getUserGroups: (userID: string) =>
     chatRequest.get<any, { groups: Group[] }>(`/users/${userID}/groups`),
 
-  createGroup: (groupName: string, creatorID: string) =>
-    chatRequest.post<any, { group_id: string; group_name: string }>('/groups', {
-      group_name: groupName, creator_id: creatorID,
+  createGroup: (groupName: string, creatorID: string, groupType: string = 'normal') =>
+    chatRequest.post<any, Group>('/groups', {
+      group_name: groupName, creator_id: creatorID, group_type: groupType,
     }),
 
   joinGroup: (groupID: string, userID: string) =>
     chatRequest.post('/groups/join', { group_id: groupID, user_id: userID }),
 
-  getMessages: (params?: { conversation_id?: string; limit?: number }) =>
+  getMessages: (params?: { group_id?: string; limit?: number }) =>
     chatRequest.get<any, { messages: ChatMessage[]; total_unread_count: number }>(
       '/messages', { params }),
+
+  getHistory: (groupId: string, cursor: number, limit = 50) =>
+    chatRequest.get<any, { messages: ChatMessage[] }>(
+      '/messages/history', { params: { conversation_id: groupId, cursor, limit } }),
 };

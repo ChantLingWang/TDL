@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package chant.common.v1;
+
+option go_package = "github.com/chant/chant/gen/go/chant/common/v1;commonv1";
+
+// EventEnvelope 是所有 Kafka 事件的外层包装。
+// 每个事件的具体载荷放在 data 字段中，用 protojson 序列化。
+message EventEnvelope {
+  // 事件唯一 ID，用于去重和追踪
+  string event_id = 1;
+  // 事件类型，如 "chant.chat.v1.MessageSent"
+  string event_type = 2;
+  // 事件来源服务名，如 "chat-service"
+  string source = 3;
+  // 事件产生时间，Unix 毫秒
+  int64 timestamp = 4;
+  // 分布式追踪 ID
+  string trace_id = 5;
+  // 具体事件载荷的 protojson 序列化
+  bytes data = 6;
+}

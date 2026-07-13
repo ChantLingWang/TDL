@@ -74,7 +74,7 @@ const LoginPage: React.FC = () => {
         navigate('/dashboard');
       }, 1000);
     } catch (error) {
-      setMessage('登录失败。访问拒绝。');
+      const msg = (error as any)?.response?.data?.detail || '登录失败'; setMessage(msg);
     } finally {
       setLoading(false);
     }

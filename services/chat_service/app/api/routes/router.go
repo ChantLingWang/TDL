@@ -8,19 +8,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Router 用户路由器，类似于Python中的APIRouter
 type Router struct {
 	Engine *gin.Engine
 }
 
-// NewRouter 创建新的用户路由器
 func NewRouter() *Router {
 	return &Router{}
 }
 
-// SetupRoutes 设置路由
 func (r *Router) SetupRoutes() *gin.RouterGroup {
-	// CORS — 前端 dev server 在 5173，后端在 8080/8083
 	r.Engine.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Headers", "*")
@@ -32,46 +28,35 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 		c.Next()
 	})
 
-	// 创建API v1路由组，并应用全局认证中间件
+	// 内部接口，无需鉴权（供 ai_service 拉取历史消息）
+	r.Engine.GET("/api/v1/messages/history", handlers.GetMessageHistory)
+
 	v1 := r.Engine.Group("/api/v1")
 	v1.Use(auth_token.Auth())
 
-	// 用户相关路由
 	users := v1.Group("/users")
 	{
-		// 根据用户ID获取用户信息
 		users.GET("/:user_id", handlers.GetUser)
-		// 获取用户群组
 		users.GET("/:user_id/groups", handlers.GetUserGroups)
 	}
 
-	// 群组相关路由
 	groups := v1.Group("/groups")
 	{
-		// 创建群组 (POST /api/v1/groups)
 		groups.POST("", handlers.CreateGroup)
-		// 加入群组 (POST /api/v1/groups/join)
 		groups.POST("/join", handlers.JoinGroup)
 	}
 
-	// WebSocket 路由,负责发送和接收消息
 	v1.GET("/ws", websocket.HandleWebSocket)
 
-	// 消息相关路由
 	messages := v1.Group("/messages")
 	{
-		// 获取消息列表（包含未读消息）
 		messages.GET("", handlers.GetMessages)
-		// 标记消息已读
 		messages.POST("/read", handlers.MarkMessagesAsRead)
-		// 获取历史消息（支持时间范围和关键字搜索）
-		messages.GET("/history", handlers.GetMessageHistory)
 	}
 
 	return v1
 }
 
-// GetRouter 获取路由器实例
 func GetRouter() *Router {
 	return NewRouter()
 }

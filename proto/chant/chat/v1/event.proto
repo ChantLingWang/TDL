@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package chant.chat.v1;
+
+option go_package = "github.com/chant/chant/gen/go/chant/chat/v1;chatv1";
+
+// MessageSent 用户发送了一条聊天消息。
+// 生产者: chat_service
+// 消费者: ai_service 及其他消息消费者
+message MessageSent {
+  string sender_id = 1;
+  // 私聊目标用户 ID；群聊时可为空
+  string target_user_id = 2;
+  // 群组 ID；私聊时可为空
+  string group_id = 3;
+  string content = 4;
+  string message_id = 5;
+  // text / image / file 等
+  string message_type = 6;
+  // 会话类型: "private" 或 "group"
+  string conversation_type = 7;
+}
+
+// AiReplyGenerated AI 生成了一条回复。
+// 生产者: ai_service
+// 消费者: chat_service（用于持久化和 WS 推送）
+message AiReplyGenerated {
+  // AI 用户 ID，如 "ai-assistant"
+  string sender_id = 1;
+  // 回复的目标用户
+  string target_user_id = 2;
+  string content = 3;
+  // 回复的是哪条消息
+  string reply_to_msg_id = 4;
+  string message_id = 5;
+  // 私聊目标；群聊时填写 group_id
+  string group_id = 6;
+  string conversation_type = 7;
+}

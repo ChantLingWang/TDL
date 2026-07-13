@@ -342,3 +342,4 @@ func (service *PrivateMessageHistoryService) GetHistoryMessagesByTimeRange(sessi
 
 	return allMessages, nil
 }
+

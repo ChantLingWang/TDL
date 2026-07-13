@@ -38,4 +38,6 @@ const (
 	ConversationTypePrivate = "private"
 	// ConversationTypeGroup 群聊
 	ConversationTypeGroup = "group"
+	// ConversationTypeAI AI会话
+	ConversationTypeAI = "ai"
 )

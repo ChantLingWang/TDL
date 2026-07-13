@@ -21,6 +21,12 @@ export interface VerifyCodeRequest {
   code: string;
 }
 
+export interface RefreshTokenRequest {
+  user_id: string;
+  email: string;
+  refresh_token: string;
+}
+
 export interface LoginResponse {
   message: string;
   data: {
@@ -49,5 +55,9 @@ export const authApi = {
 
   register: (data: VerifyCodeRequest) => {
     return request.post<any, LoginResponse>('/auth/register', data);
-  }
+  },
+
+  refreshToken: (data: RefreshTokenRequest) => {
+    return request.post<any, { message: string; data: { access_token: string; refresh_token: string } }>('/auth/refresh_token', data);
+  },
 };

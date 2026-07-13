@@ -1,70 +1,56 @@
-"""ai_service —— 后台 Kafka 消费者。
-
-职责：
-    消费 chat_service 发来的私聊消息 → 路由到 chat / agent 模块 →
-    调用 LLM 生成回复 → 通过 Kafka 发回 chat_service → 前端收到。
-
-架构要点：
-    - 无 HTTP 端口，纯后台 worker
-    - 使用独立的 Kafka consumer group（ai_service_group），和 chat_service 互不争抢
-    - 优雅关闭：SIGINT / SIGTERM → 停止消费 → 关闭 producer → 退出
-"""
+"""ai_service —— 后台 Kafka 消费者（proto 版）。"""
 
 import asyncio
 import logging
 import signal
+import sys
+from pathlib import Path
+
+# 将 proto 生成的 Python 代码加入搜索路径
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'proto' / 'gen' / 'python'))
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
-# 显式导入 provider，触发 @register 注册（必须在 get_llm 调用之前）
-import shared.llm.providers.openai_compatible  # noqa: F401
+import shared.llm.providers.openai_compatible  # noqa: F401 触发 @register
 import shared.llm.providers.deepseek  # noqa: F401
 
 from chat.service import handle_private_message
 from shared.cost import store as cost_store
-from config.settings import settings
 from shared.kafka.consumer import consume_loop, create_consumer
 from shared.kafka.producer import create_producer
-from shared.models import BusinessEvent
+from shared.proto_adapter import parse_message_sent, parse_ai_reply
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
 AI_USER_ID = settings.ai_user_id
 
 
-async def dispatch(producer: AIOKafkaProducer, event: BusinessEvent) -> None:
-    """事件分发入口。
+async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
+    """事件分发入口 —— 接收 proto EventEnvelope，按 event_type 路由。"""
+    etype = envelope.event_type
 
-    目前只处理 event_type == "user.chat.private" 且 target 是 AI 用户的消息。
-    后续可按消息前缀（如 "/agent"）或 content 特征分流到 agent 模块。
-    """
-    etype = event.common_params.event_type
-    # Kafka BusinessEvent 的 data 字段可能是 dict 或已解析对象
-    data = event.data if isinstance(event.data, dict) else {}
+    if etype == 'chant.chat.v1.MessageSent':
+        msg = parse_message_sent(envelope)
+        # 只处理发给 AI 的私聊或 ai_ 前缀群组
+        if msg.target_user_id == AI_USER_ID or msg.group_id.startswith('ai_'):
+            data = {
+                'sender_id': msg.sender_id,
+                'target_user_id': msg.target_user_id or AI_USER_ID,
+                'content': msg.content,
+                'message_id': msg.message_id,
+                'group_id': msg.group_id,
+            }
+            await handle_private_message(producer, data)
 
-    # 处理私聊消息 或 发给 ai-assistant 群组的消息
-    if etype == "user.chat.private":
-        target = data.get("target_user_id", "")
-        if target != AI_USER_ID:
-            return
-    elif etype == "user.chat.group" and data.get("group_id") == AI_USER_ID:
-        # 适配群消息格式为私聊格式
-        adapted = dict(data)
-        adapted["target_user_id"] = AI_USER_ID
-        return await handle_private_message(producer, adapted)
+    elif etype == 'chant.chat.v1.AiReplyGenerated':
+        # AI 自己的回复，忽略避免循环
+        pass
+
     else:
-        return
-
-    # 不是发给 AI 的，忽略（如用户之间的私聊）
-    target = data.get("target_user_id", "")
-    if target != AI_USER_ID:
-        return
-
-    await handle_private_message(producer, data)
+        logger.debug('忽略事件类型: %s', etype)
 
 
 async def main() -> None:
-    """服务入口：初始化 → 创建 Kafka 消费/生产连接 → 进入消费循环 → 等待关闭信号。"""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s  %(levelname)-7s %(name)s  %(message)s",
@@ -74,7 +60,6 @@ async def main() -> None:
     consumer: AIOKafkaConsumer | None = None
     producer: AIOKafkaProducer | None = None
 
-    # 用 asyncio.Event 阻塞主协程，收到信号后 set 触发退出
     stop_event = asyncio.Event()
 
     def _signal_handler() -> None:
@@ -86,22 +71,18 @@ async def main() -> None:
     loop.add_signal_handler(signal.SIGTERM, _signal_handler)
 
     try:
-        # 先建立连接；任一失败会抛异常退出
         consumer = await create_consumer()
         producer = await create_producer()
 
-        # 初始化成本审计数据库连接池（失败不阻塞启动）
         try:
             await cost_store.init_pool()
         except Exception:
             logger.warning("成本审计数据库连接失败，成本记录功能停用")
 
-        async def handler(event: BusinessEvent) -> None:
-            await dispatch(producer, event)
+        async def handler(envelope) -> None:
+            await dispatch(producer, envelope)
 
-        # consumer 在后台运行，主协程等待关闭信号
         consumer_task = asyncio.create_task(consume_loop(consumer, handler))
-
         await stop_event.wait()
         consumer_task.cancel()
         try:
@@ -109,7 +90,6 @@ async def main() -> None:
         except asyncio.CancelledError:
             pass
     finally:
-        # 确保资源清理
         if consumer:
             await consumer.stop()
         if producer:
@@ -121,5 +101,5 @@ async def main() -> None:
         logger.info("ai_service 已停止")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())

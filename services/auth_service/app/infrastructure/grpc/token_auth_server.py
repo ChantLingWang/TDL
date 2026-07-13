@@ -1,4 +1,5 @@
 import os
+import asyncio
 import sys
 from concurrent import futures
 import grpc
@@ -47,7 +48,7 @@ class AuthService(auth_pb2_grpc.AuthServiceServicer):
         user_service = MongoDBUserService(db_manager)
 
         try:
-            user = user_service.get_user_by_user_id(user_id)
+            user = asyncio.run(user_service.get_user_by_user_id(user_id))
         except Exception as e:
             return auth_pb2.GetUserByIDResponse(
                 found=False,

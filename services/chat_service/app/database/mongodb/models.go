@@ -11,7 +11,8 @@ type Message struct {
 	Content     string    `bson:"content"`      // 消息内容
 	PrivateID   string    `bson:"private_id"`   // 私聊接收者ID（仅私聊时使用）
 	GroupID     string    `bson:"group_id"`     // 群ID（仅群聊时使用）
-	MessageID   string    `bson:"message_id"`   // 消息ID
+	MessageID       string    `bson:"message_id"`       // 消息ID
+	ConversationID  string    `bson:"conversation_id,omitempty"` // AI 会话 ID
 	MessageType string    `bson:"message_type"` // 消息类型
 	IsActive    bool      `bson:"is_active"`    // 是否可见
 	Read        bool      `bson:"read"`         // 是否已读

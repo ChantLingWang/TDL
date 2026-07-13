@@ -2,38 +2,30 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
+
 	config "chat_service/app/config"
 
 	sdk_kafka "infrastructure_sdk/kafka"
 )
 
-// ConsumerRunner 负责管理 Kafka 消费者的生命周期
+// ConsumerRunner 负责管理 Kafka 消费者的生命周期（proto 版）
 type ConsumerRunner struct {
-	config           config.KafkaConfig
-	chatHandler      func(context.Context, json.RawMessage) error
-	broadcastHandler func(context.Context, json.RawMessage) error
+	config config.KafkaConfig
 }
 
 // NewConsumerRunner 创建新的消费者运行器
-func NewConsumerRunner(
-	chatHandler func(context.Context, json.RawMessage) error,
-	broadcastHandler func(context.Context, json.RawMessage) error,
-) *ConsumerRunner {
+func NewConsumerRunner() *ConsumerRunner {
 	return &ConsumerRunner{
-		config:           config.KafkaConfigInstance,
-		chatHandler:      chatHandler,
-		broadcastHandler: broadcastHandler,
+		config: config.KafkaConfigInstance,
 	}
 }
 
-// Run 启动消费者，阻塞直到上下文取消
+// Run 启动 proto 版消费循环，阻塞直到上下文取消
 func (r *ConsumerRunner) Run(ctx context.Context) error {
-	// 使用配置文件中的 GroupID（每个实例配置不同的 ID，实现多实例消息分发）
 	groupID := r.config.GroupID
-	log.Printf("Initializing Kafka consumer with GroupID: %s", groupID)
+	log.Printf("Initializing Kafka proto consumer with GroupID: %s", groupID)
 
 	connection, err := sdk_kafka.NewKafkaConnection(r.config.Brokers, r.config.Topic, groupID)
 	if err != nil {
@@ -44,17 +36,10 @@ func (r *ConsumerRunner) Run(ctx context.Context) error {
 		connection.Close()
 	}()
 
-	// 2. 创建事件处理器并注册回调
-	handler := NewUserEventHandler()
-	handler.SetChatMessageHandler(r.chatHandler)
-	handler.SetBroadcastMessageHandler(r.broadcastHandler)
-
-	// 3. 创建 SDK 消费者
 	consumer := sdk_kafka.NewBaseConsumer(connection)
 
-	// 4. 启动消费循环
-	if err := consumer.Start(ctx, handler.HandleEvent); err != nil {
-		// 如果是上下文取消导致的错误，通常不视为异常
+	// 注册 proto handler：根据 envelope.EventType 分发
+	if err := consumer.StartProto(ctx, HandleProtoEnvelope); err != nil {
 		if ctx.Err() != nil {
 			log.Println("Kafka consumer stopped due to context cancellation")
 			return nil
