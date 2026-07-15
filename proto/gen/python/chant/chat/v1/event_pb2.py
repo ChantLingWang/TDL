@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x63hant/chat/v1/event.proto\x12\rchant.chat.v1\"\xa0\x01\n\x0bMessageSent\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x10\n\x08group_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\x19\n\x11\x63onversation_type\x18\x07 \x01(\t\"\xa8\x01\n\x10\x41iReplyGenerated\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x17\n\x0freply_to_msg_id\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x10\n\x08group_id\x18\x06 \x01(\t\x12\x19\n\x11\x63onversation_type\x18\x07 \x01(\tB4Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x63hant/chat/v1/event.proto\x12\rchant.chat.v1\"\xa3\x02\n\x0bMessageSent\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x10\n\x08group_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\x19\n\x11\x63onversation_type\x18\x07 \x01(\t\x12\x14\n\x0ctimestamp_ms\x18\x08 \x01(\x03\x12:\n\x08metadata\x18\t \x03(\x0b\x32(.chant.chat.v1.MessageSent.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb0\x02\n\x10\x41iReplyGenerated\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x17\n\x0freply_to_msg_id\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x10\n\x08group_id\x18\x06 \x01(\t\x12\x19\n\x11\x63onversation_type\x18\x07 \x01(\t\x12\x14\n\x0ctimestamp_ms\x18\x08 \x01(\x03\x12?\n\x08metadata\x18\t \x03(\x0b\x32-.chant.chat.v1.AiReplyGenerated.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x34Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,8 +32,16 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chant.chat.v1.event_pb2', _
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1'
+  _globals['_MESSAGESENT_METADATAENTRY']._loaded_options = None
+  _globals['_MESSAGESENT_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_AIREPLYGENERATED_METADATAENTRY']._loaded_options = None
+  _globals['_AIREPLYGENERATED_METADATAENTRY']._serialized_options = b'8\001'
   _globals['_MESSAGESENT']._serialized_start=45
-  _globals['_MESSAGESENT']._serialized_end=205
-  _globals['_AIREPLYGENERATED']._serialized_start=208
-  _globals['_AIREPLYGENERATED']._serialized_end=376
+  _globals['_MESSAGESENT']._serialized_end=336
+  _globals['_MESSAGESENT_METADATAENTRY']._serialized_start=289
+  _globals['_MESSAGESENT_METADATAENTRY']._serialized_end=336
+  _globals['_AIREPLYGENERATED']._serialized_start=339
+  _globals['_AIREPLYGENERATED']._serialized_end=643
+  _globals['_AIREPLYGENERATED_METADATAENTRY']._serialized_start=289
+  _globals['_AIREPLYGENERATED_METADATAENTRY']._serialized_end=336
 # @@protoc_insertion_point(module_scope)

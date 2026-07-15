@@ -124,15 +124,6 @@ func GetMessageHistory(c *gin.Context) {
 
 	// AI 会话需要按 conversation_id 过滤
 	if isAI || isGroup {
-		if isAI {
-			filtered := make([]mongodb.Message, 0)
-			for _, m := range msgs {
-				if m.ConversationID == convID {
-					filtered = append(filtered, m)
-				}
-			}
-			msgs = filtered
-		}
 	} else {
 		// 私聊
 		privSvc := mongodb.GetPrivateMessageHistoryService()

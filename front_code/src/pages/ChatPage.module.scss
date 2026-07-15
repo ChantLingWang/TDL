@@ -113,3 +113,77 @@
   &:hover { background: #1d4ed8; }
   &:disabled { background: #d1d5db; color: #9ca3af; cursor: default; }
 }
+
+/* ---- Agent Mode Toggle ---- */
+.agentToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+
+  input { display: none; }
+}
+
+.toggleSlider {
+  width: 40px;
+  height: 22px;
+  background: #ccc;
+  border-radius: 11px;
+  position: relative;
+  transition: background .25s;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform .25s;
+  }
+}
+
+.agentToggle input:checked + .toggleSlider {
+  background: #e65100;
+  &::after { transform: translateX(18px); }
+}
+
+.toggleLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  min-width: 56px;
+  text-align: center;
+}
+
+.agentToggle input:checked ~ .toggleLabel {
+  color: #e65100;
+}
+
+/* Agent send button */
+.sendBtnAgent {
+  background: #e65100 !important;
+  &:hover { background: #bf360c !important; }
+}
+
+/* Progress / status messages */
+.progressMsg {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* Critique note */
+.critiqueNote {
+  background: #fff3e0;
+  border-left: 3px solid #e65100;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #666;
+  white-space: pre-wrap;
+}

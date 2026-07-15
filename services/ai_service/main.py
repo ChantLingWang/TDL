@@ -15,6 +15,7 @@ import shared.llm.providers.openai_compatible  # noqa: F401 触发 @register
 import shared.llm.providers.deepseek  # noqa: F401
 
 from chat.service import handle_private_message
+from agent.service import handle_agent_message
 from shared.cost import store as cost_store
 from shared.kafka.consumer import consume_loop, create_consumer
 from shared.kafka.producer import create_producer
@@ -23,6 +24,7 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 AI_USER_ID = settings.ai_user_id
+AI_RESEARCH_USER_ID = settings.ai_research_user_id
 
 
 async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
@@ -32,7 +34,22 @@ async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
     if etype == 'chant.chat.v1.MessageSent':
         msg = parse_message_sent(envelope)
         # 只处理发给 AI 的私聊或 ai_ 前缀群组
-        if msg.target_user_id == AI_USER_ID or msg.group_id.startswith('ai_'):
+        # agent 模式：conversation_type 为 ai-research 或发给 ai-research 的消息
+        is_agent = (
+            msg.conversation_type == 'ai-research'
+            or msg.target_user_id == AI_RESEARCH_USER_ID
+        )
+        if is_agent:
+            data = {
+                'sender_id': msg.sender_id,
+                'content': msg.content,
+                'message_id': msg.message_id,
+                'group_id': msg.group_id,
+            }
+            await handle_agent_message(producer, data)
+
+        # chat 模式：发给 ai-assistant 的消息走 chat
+        elif msg.target_user_id == AI_USER_ID or msg.group_id.startswith('ai_'):
             data = {
                 'sender_id': msg.sender_id,
                 'target_user_id': msg.target_user_id or AI_USER_ID,

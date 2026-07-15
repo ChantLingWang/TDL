@@ -47,6 +47,7 @@ const ChatPage: React.FC = () => {
   const [newGroupName, setNewGroupName] = useState('');
   const [joinGroupID, setJoinGroupID] = useState('');
   const [statusMsg, setStatusMsg] = useState('connecting...');
+  const [agentMode, setAgentMode] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
 
@@ -67,6 +68,7 @@ const ChatPage: React.FC = () => {
     ws.onmessage = (ev) => {
       try {
         const msg: WsMessage = JSON.parse(ev.data);
+        if (msg.sender === username) return; // 跳过自己发的消息（本地已渲染）
         setMessages((prev) => [...prev, msg]);
       } catch { /* ignore */ }
     };
@@ -142,7 +144,8 @@ const ChatPage: React.FC = () => {
   // ---- 新 AI 会话 = 创建 AI 群组 ----
   const handleNewChat = async () => {
     try {
-      const group = await chatApi.createGroup('新聊天', userId, 'ai');
+      const gtype = agentMode ? 'ai-research' : 'ai';
+      const group = await chatApi.createGroup('新聊天', userId, gtype);
       setGroups((prev) => [group, ...prev]);
       setSelectedGroupId(group.group_id);
       setActiveGroup('');
@@ -180,7 +183,7 @@ const ChatPage: React.FC = () => {
     const msgTime = Date.now();
     const msgId = `${userId}-${msgTime}`;
     const selGroup = groups.find(g => g.group_id === gid);
-    const convType = selGroup?.group_type === 'ai' ? 'ai' : 'group';
+    const convType = agentMode ? 'ai-research' : (selGroup?.group_type === 'ai' ? 'ai' : 'group');
 
     const payload: any = {
       type: 'chat',
@@ -284,7 +287,12 @@ const ChatPage: React.FC = () => {
         ) : (
           <>
             <div className={styles.chatHeader}>
-              {selectedGroupId ? `🤖 ${currentGroupName}` : currentGroupName || activeGroup}
+              <span>{selectedGroupId ? `🤖 ${currentGroupName}` : currentGroupName || activeGroup}</span>
+              <label className={styles.agentToggle} title={agentMode ? '研究模式开启' : '聊天模式'}>
+                <input type="checkbox" checked={agentMode} onChange={e => setAgentMode(e.target.checked)} />
+                <span className={styles.toggleSlider} />
+                <span className={styles.toggleLabel}>{agentMode ? 'Research' : 'Chat'}</span>
+              </label>
             </div>
                         <div className={styles.messageList}>
               {hasMoreHistory && (
@@ -330,7 +338,7 @@ const ChatPage: React.FC = () => {
                 placeholder="输入消息..."
                 rows={1}
               />
-              <button className={styles.sendBtn} onClick={handleSend} disabled={!input.trim()}>
+              <button className={`${styles.sendBtn} ${agentMode ? styles.sendBtnAgent : ''}`} onClick={handleSend} disabled={!input.trim()}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
                 </svg>

@@ -8,7 +8,9 @@ import (
 type Message struct {
 	SenderID    string    `bson:"sender_id"`    // 发送者ID
 	Timestamp   time.Time `bson:"timestamp"`    // 时间戳
+	TimestampMs int64     `bson:"timestamp_ms,omitempty"` // AI 生成时间戳（毫秒）
 	Content     string    `bson:"content"`      // 消息内容
+	Metadata    map[string]string `bson:"metadata,omitempty"` // 可扩展元数据
 	PrivateID   string    `bson:"private_id"`   // 私聊接收者ID（仅私聊时使用）
 	GroupID     string    `bson:"group_id"`     // 群ID（仅群聊时使用）
 	MessageID       string    `bson:"message_id"`       // 消息ID

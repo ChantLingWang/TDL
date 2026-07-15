@@ -31,14 +31,19 @@ async def send_ai_reply(
     content: str,
     message_id: str,
     group_id: str = '',
+    metadata: dict | None = None,
 ) -> None:
     """以 AI 用户身份发送一条回复。"""
+    import time
+    ts = int(time.time() * 1000)
     reply = new_ai_reply(
         target_user_id=user_id,
         content=content,
         reply_to_msg_id=message_id,
         message_id=f'ai-{message_id}',
         group_id=group_id,
+        timestamp_ms=ts,
+        metadata=metadata,
     )
     envelope = new_envelope('chant.chat.v1.AiReplyGenerated', 'ai-service', reply)
     payload = envelope_to_json(envelope)

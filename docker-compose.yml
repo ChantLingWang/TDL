@@ -142,8 +142,23 @@ services:
       - chant-shared-network
     restart: on-failure
 
+  searxng:
+    image: docker.m.daocloud.io/searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8888:8080"
+    environment:
+      - TZ=Asia/Shanghai
+
+    volumes:
+      - searxng_data:/etc/searxng
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - chant-shared-network
+    restart: on-failure
 
 volumes:
+  searxng_data:
   postgres_data:
   mongodb_data:
   redis_data:

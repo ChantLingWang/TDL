@@ -35,7 +35,7 @@ func HandleChat(content models.ChatMessageRequest) {
 	contentType := content.MessageType
 
 	switch content.ConversationType {
-	case chatconst.ConversationTypeGroup, chatconst.ConversationTypeAI:
+	case chatconst.ConversationTypeGroup, chatconst.ConversationTypeAI, chatconst.ConversationTypeAIResearch:
 		// 自动将用户加入 ai-assistant 群组
 		if content.ConversationType == chatconst.ConversationTypeAI && content.GroupID == "ai-assistant" {
 			// 保留原有加入群组逻辑（pgsql 调用不变）

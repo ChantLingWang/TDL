@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"chat_service/app/database/pgsql"
+	"chat_service/app/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,7 +16,7 @@ const aiAssistantID = "ai-assistant"
 type CreateGroupRequest struct {
 	GroupName string `json:"group_name" binding:"required"`
 	CreatorID string `json:"creator_id" binding:"required"`
-	GroupType string `json:"group_type"` // "ai" | "normal"，默认 "normal"
+	GroupType string `json:"group_type"`
 }
 
 type JoinGroupRequest struct {
@@ -35,7 +36,6 @@ func CreateGroup(c *gin.Context) {
 
 	service := pgsql.NewUserGroupService(pgsql.GetDBManager())
 
-	// 生成 group_id：AI 群用 ai_ 前缀，普通群用 Sequence
 	var groupID string
 	if req.GroupType == "ai" {
 		groupID = fmt.Sprintf("ai_%d", time.Now().UnixNano())
@@ -54,17 +54,18 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// 将创建者加入群组
 	if err := service.AddUserToGroup(req.CreatorID, groupID); err != nil {
 		service.DeleteGroup(groupID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add creator to group"})
 		return
 	}
 
-	// AI 群自动加入 ai-assistant
+	// 自动创建会话记录，使未读统计生效
+	convSvc := services.GetConversationService()
+	_ = convSvc.MarkMessageAsRead(c.Request.Context(), req.CreatorID, groupID)
+
 	if req.GroupType == "ai" {
 		if err := service.AddUserToGroup(aiAssistantID, groupID); err != nil {
-			// ai 加入失败不回滚，只打日志
 			_ = err
 		}
 	}
@@ -85,6 +86,10 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
+	// 自动创建会话记录
+	convSvc := services.GetConversationService()
+	_ = convSvc.MarkMessageAsRead(c.Request.Context(), req.UserID, req.GroupID)
+
 	c.JSON(http.StatusOK, gin.H{"message": "User added to group successfully"})
 }
 
@@ -102,6 +107,5 @@ func GetUserGroups(c *gin.Context) {
 		return
 	}
 
-	// json tag 已在 model 上，直接返回 struct 即可
 	c.JSON(http.StatusOK, gin.H{"groups": groups})
 }

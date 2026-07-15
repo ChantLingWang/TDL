@@ -22,4 +22,6 @@ const (
 	ConversationTypeGroup = "group"
 	// ConversationTypeAI AI会话
 	ConversationTypeAI = "ai"
+	// ConversationTypeAIResearch AI 研究模式（agent）
+	ConversationTypeAIResearch = "ai-research"
 )

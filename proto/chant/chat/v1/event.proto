@@ -19,6 +19,13 @@ message MessageSent {
   string message_type = 6;
   // 会话类型: "private" 或 "group"
   string conversation_type = 7;
+
+  // AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
+  int64 timestamp_ms = 8;
+
+  // 可扩展元数据（域名、报告摘要、方法论等）
+  // 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
+  map<string, string> metadata = 9;
 }
 
 // AiReplyGenerated AI 生成了一条回复。
@@ -36,4 +43,11 @@ message AiReplyGenerated {
   // 私聊目标；群聊时填写 group_id
   string group_id = 6;
   string conversation_type = 7;
+
+  // AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
+  int64 timestamp_ms = 8;
+
+  // 可扩展元数据（域名、报告摘要、方法论等）
+  // 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
+  map<string, string> metadata = 9;
 }

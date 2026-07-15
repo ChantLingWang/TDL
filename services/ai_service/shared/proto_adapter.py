@@ -56,8 +56,15 @@ def new_message_sent(sender_id: str, content: str, message_id: str,
 
 def new_ai_reply(target_user_id: str, content: str,
                  reply_to_msg_id: str, message_id: str,
-                 group_id: str = '') -> _event.AiReplyGenerated:
+                 group_id: str = '',
+                 timestamp_ms: int = 0,
+                 metadata: dict | None = None) -> _event.AiReplyGenerated:
     """构造一条 AI 回复。"""
+    kwargs: dict = {}
+    if timestamp_ms:
+        kwargs['timestamp_ms'] = timestamp_ms
+    if metadata:
+        kwargs['metadata'] = metadata
     return _event.AiReplyGenerated(
         sender_id='ai-assistant',
         target_user_id=target_user_id,
@@ -65,4 +72,5 @@ def new_ai_reply(target_user_id: str, content: str,
         reply_to_msg_id=reply_to_msg_id,
         message_id=message_id,
         group_id=group_id,
+        **kwargs,
     )

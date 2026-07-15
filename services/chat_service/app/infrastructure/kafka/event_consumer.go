@@ -30,7 +30,7 @@ func handleMessageSent(ctx context.Context, env *commonv1.EventEnvelope) error {
 		return err
 	}
 	switch msg.ConversationType {
-	case "group", "ai":
+	case "group", "ai", "ai-research":
 		return services.HandleGroupChatMessageEvent(ctx, env)
 	case "private":
 		return services.HandlePrivateChatMessageEvent(ctx, env)
@@ -50,7 +50,9 @@ func handleAiReply(ctx context.Context, env *commonv1.EventEnvelope) error {
 	msg := &mongodb.Message{
 		SenderID:    reply.SenderId,
 		Timestamp:   time.Now(),
+		TimestampMs: reply.TimestampMs,
 		Content:     reply.Content,
+		Metadata:    reply.Metadata,
 		MessageID:   reply.MessageId,
 		MessageType: "text",
 		IsActive:    true,
@@ -58,6 +60,7 @@ func handleAiReply(ctx context.Context, env *commonv1.EventEnvelope) error {
 
 	if reply.GroupId != "" {
 		msg.GroupID = reply.GroupId
+		msg.ConversationID = reply.GroupId
 		_ = mongodb.SaveMessage("ai", reply.SenderId, reply.GroupId, msg)
 	} else {
 		msg.PrivateID = reply.TargetUserId

@@ -1,0 +1,9 @@
+use_default_settings: true
+server:
+  secret_key: "chant-searxng-key-2024"
+  limiter: false
+general:
+  instance_name: "chant-search"
+formats:
+  - html
+  - json

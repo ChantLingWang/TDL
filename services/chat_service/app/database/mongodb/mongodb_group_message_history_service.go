@@ -175,7 +175,7 @@ func (service *GroupMessageHistoryService) GetUnreadMessages(conversationIDs []s
 
 	// 获取过去几天的 collection
 	now := time.Now()
-	for i := 0; i < 3; i++ { // 最多查最近3天
+	for i := 0; i < 30; i++ { // 最多查最近3天
 		collectionTime := now.AddDate(0, 0, -i)
 		collectionName := "group_message_history_" + collectionTime.Format("200601")
 		collection := db.Collection(collectionName)

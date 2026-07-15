@@ -16,6 +16,14 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
+    # ---- 网络代理 ----
+    http_proxy: str = ""
+    """HTTP 代理地址，如 http://127.0.0.1:7890，为空则不使用代理"""
+
+    # ---- SearXNG ----
+    searxng_base_url: str = "http://localhost:8888"
+    """SearXNG 服务地址"""
+
     # ---- 默认 LLM 配置（provider 未指定时的兜底） ----
     llm_provider: str = "deepseek"
     """当前使用的 provider 名称，需在 factory 中已注册"""
@@ -36,7 +44,10 @@ class Settings(BaseSettings):
 
     # ---- AI 身份 ----
     ai_user_id: str = "ai-assistant"
-    """AI 在 chat_service 中的用户 ID"""
+    """AI 在 chat_service 中的用户 ID（chat 模式）"""
+
+    ai_research_user_id: str = "ai-research"
+    """AI 研究型用户 ID（agent 模式，走 research 图）"""
 
     # ---- Kafka ----
     kafka_brokers: str = "localhost:9094"

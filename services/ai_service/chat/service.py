@@ -1,3 +1,4 @@
+import time
 """Chat 模式服务 —— 用户与 AI 对话的核心处理逻辑。
 
 完整链路：
@@ -55,7 +56,7 @@ async def _fetch_history(
     params = {
         "conversation_id": group_id,
         "limit": limit,
-        "cursor": int(uuid.uuid1().time),  # 用当前时间戳获取最新历史
+        "cursor": int(time.time()),  # Unix 秒级时间戳
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
         resp = await client.get(url, params=params)
