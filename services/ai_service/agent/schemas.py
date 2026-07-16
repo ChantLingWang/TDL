@@ -1,22 +1,9 @@
-"""Agent 状态定义 —— AgentState（聊天）和 ResearchState（研究）。"""
+"""Research 图状态定义。"""
 
 import operator
 from typing import Annotated, TypedDict
 from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage
-
-
-class AgentState(TypedDict):
-    """聊天图状态。"""
-
-    messages: Annotated[list[BaseMessage], add_messages]
-    mode: str
-    skill: str
-    next_step: str
-    tool_calls: list[dict]
-    tool_results: dict
-    final_answer: str
-    iteration: int
+from langchain_core.messages import BaseMessage  # noqa: F401
 
 
 class ResearchState(TypedDict):
@@ -46,10 +33,6 @@ class ResearchState(TypedDict):
     # search 节点输出（自动追加）
     knowledge_entries: Annotated[list[dict], operator.add]
 
-    # evaluate 节点输出
-    information_sufficient: bool
-    evaluation_gaps: str
-
     # analyze 节点输出
     analysis_report: str
 
@@ -66,3 +49,4 @@ class ResearchState(TypedDict):
     iteration: int
     max_iterations: int
     revision_count: int
+    group_id: str

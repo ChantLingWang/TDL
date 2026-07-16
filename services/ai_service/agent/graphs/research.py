@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from agent.schemas import ResearchState
 from agent.tools.time_tool import get_current_time_readable
 from agent.graphs.methodology import get_methodologies, is_analytical_domain, get_dimension_hints
+from agent.tools.conversation_store import query_history, format_history
 from agent.tools.wikipedia import search_wikipedia
 from agent.tools.searxng import search_searxng
 from agent.tools.wikidata import search_wikidata
@@ -39,7 +40,8 @@ INTENT_PROMPT = """你是智库级研究分析师。分析用户问题，输出 
     用户没有严谨讨论的意图，不需要深度研究
   - "rigorous"：学术探讨、产业分析、政策研究、技术评估等需要深度研究和结构化输出的问题
 
-然后分析意图和子问题。子问题应覆盖用户问题隐含的关键维度，
+然后分析意图和子问题。如果此前已经分析过相关内容（见历史摘要），
+可以生成跨轮次的对比或细化子问题。子问题应覆盖用户问题隐含的关键维度，
 每个子问题对应一个独立分析方向。
 
 输出 JSON（只输出 JSON）：
@@ -427,13 +429,27 @@ def _finalize_report(report: str, entries: list[dict]) -> dict:
 def build_research_graph(max_revisions: int = 2) -> StateGraph:
     builder = StateGraph(ResearchState)
     llm = _build_chat_model()
+    llm_json = llm.bind(response_format={"type": "json_object"})
 
     # ---- intent ----
     async def intent_node(state: ResearchState) -> dict:
         user_msg = state["messages"][-1].content
+
+        # ---- 查询历史研究报告 ----
+        gid = state.get("group_id", "")
+        history_context = ""
+        if gid:
+            try:
+                past = await query_history(gid, limit=5)
+                if past:
+                    history_context = "\n\n" + format_history(past)
+            except Exception as e:
+                logger.debug("查询历史失败: %s", e)
+
         prompt = INTENT_PROMPT.format(
-            time_context=f"当前时间：{get_current_time_readable()}", question=user_msg)
-        response = await llm.ainvoke([SystemMessage(content="输出严格的 JSON。"),
+            time_context=f"当前时间：{get_current_time_readable()}",
+            question=user_msg + history_context)
+        response = await llm_json.ainvoke([SystemMessage(content="输出严格的 JSON。"),
                                        HumanMessage(content=prompt)])
         try:
             p = _parse_json(response.content)
@@ -455,7 +471,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
         user_msg = state["messages"][-1].content
         sub_qs = "\n".join(f"  - {q}" for q in state.get("sub_questions", []))
         prompt = CASUAL_PLAN_PROMPT.format(question=user_msg, sub_questions=sub_qs)
-        response = await llm.ainvoke([
+        response = await llm_json.ainvoke([
             SystemMessage(content="输出严格的 JSON。"),
             HumanMessage(content=prompt),
         ])
@@ -506,7 +522,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
         domain = state.get("problem_domain", "")
         bias = "（提示：该领域通常需要分析评估而非简单事实罗列）" if is_analytical_domain(domain) else ""
         prompt = CLASSIFY_PROMPT.format(intent=state["user_intent"], domain=domain, bias=bias)
-        response = await llm.ainvoke([SystemMessage(content="输出严格的 JSON。"),
+        response = await llm_json.ainvoke([SystemMessage(content="输出严格的 JSON。"),
                                        HumanMessage(content=prompt)])
         try:
             p = _parse_json(response.content)
@@ -542,7 +558,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
             prompt = COGNITIVE_ANALYTICAL_PROMPT.format(
                 domain=domain, intent=state["user_intent"],
                 sub_questions=sub_qs, methodology_hint=methodology_hint)
-        response = await llm.ainvoke([SystemMessage(content="输出严格的 JSON。"),
+        response = await llm_json.ainvoke([SystemMessage(content="输出严格的 JSON。"),
                                        HumanMessage(content=prompt)])
         try:
             p = _parse_json(response.content)
@@ -564,7 +580,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
             time_context=f"当前时间：{state.get('current_time', get_current_time_readable())}",
             dimensions=_format_dimensions(state.get("analytical_dimensions", [])),
             existing_knowledge=_format_knowledge(existing) if existing else "首轮搜索")
-        response = await llm.ainvoke([SystemMessage(content="输出严格的 JSON。"),
+        response = await llm_json.ainvoke([SystemMessage(content="输出严格的 JSON。"),
                                        HumanMessage(content=prompt)])
         try:
             p = _parse_json(response.content)
@@ -655,7 +671,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
         audit_block = f"\n[引用审计]\n{audit}" if audit else ""
 
         # ---- 第一轮：正常 critique（引用一致性 + 逻辑） ----
-        response = await llm.ainvoke([
+        response = await llm_json.ainvoke([
             SystemMessage(content="输出严格的 JSON。"),
             HumanMessage(content=CRITIQUE_PROMPT.format(report=report[:8000]) + audit_block)
         ])
@@ -702,7 +718,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
 输出更新后的完整 critique JSON。"""
 
             try:
-                response2 = await llm.ainvoke([
+                response2 = await llm_json.ainvoke([
                     SystemMessage(content="输出严格的 JSON。"),
                     HumanMessage(content=verify_prompt),
                 ])
@@ -737,7 +753,7 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
 
         new_queries: list[str] = []
         try:
-            qr = await llm.ainvoke([
+            qr = await llm_json.ainvoke([
                 SystemMessage(content="输出严格的 JSON。"),
                 HumanMessage(content=query_prompt),
             ])
