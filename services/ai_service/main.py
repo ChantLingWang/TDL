@@ -13,6 +13,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
 import shared.llm.providers.openai_compatible  # noqa: F401 触发 @register
 import shared.llm.providers.deepseek  # noqa: F401
+from qdrant.client import init as init_qdrant
 
 from chat.service import handle_private_message
 from agent.service import handle_agent_message
@@ -95,6 +96,11 @@ async def main() -> None:
             await cost_store.init_pool()
         except Exception:
             logger.warning("成本审计数据库连接失败，成本记录功能停用")
+
+        try:
+            await init_qdrant()
+        except Exception:
+            logger.warning("Qdrant 连接失败，长期记忆功能停用")
 
         async def handler(envelope) -> None:
             await dispatch(producer, envelope)

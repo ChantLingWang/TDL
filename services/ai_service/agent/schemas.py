@@ -50,3 +50,5 @@ class ResearchState(TypedDict):
     max_iterations: int
     revision_count: int
     group_id: str
+    memories_prefetch_key: str
+    history_context: str  # intent_node 消费预取后填充，下游节点共用    user_id: str

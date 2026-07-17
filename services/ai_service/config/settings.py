@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     ai_user_id: str = "ai-assistant"
     """AI 在 chat_service 中的用户 ID（chat 模式）"""
 
+
+    # ---- Qdrant ----
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_collection: str = "long_term_memory"
     ai_research_user_id: str = "ai-research"
     """AI 研究型用户 ID（agent 模式，走 research 图）"""
 

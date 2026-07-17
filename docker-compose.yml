@@ -70,6 +70,20 @@ services:
       timeout: 5s
       retries: 5
 
+  qdrant:
+    image: docker.m.daocloud.io/qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - chant-shared-network
+    restart: on-failure
+
   mongodb:
     image: docker.m.daocloud.io/library/mongo:6
     container_name: mongodb
@@ -160,5 +174,6 @@ services:
 volumes:
   searxng_data:
   postgres_data:
+  qdrant_data:
   mongodb_data:
   redis_data:

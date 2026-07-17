@@ -1,0 +1,2 @@
+# new dependencies for long-term memory (Qdrant + embedding)
+qdrant-client>=1.9.0

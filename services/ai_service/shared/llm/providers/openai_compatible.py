@@ -136,6 +136,33 @@ class OpenAICompatibleLLM(AbstractLLM):
                         # 个别 chunk 解析失败不影响后续
                         continue
 
+    def langchain_model(
+        self, temperature: float = 0.3, max_tokens: int | None = None
+    ):
+        """Return a langchain ChatOpenAI instance with this provider's config.
+        Proxy is injected from settings.http_proxy when set.
+        """
+        from langchain_openai import ChatOpenAI
+
+        proxy = settings.http_proxy or None
+        http_client = (
+            httpx.AsyncClient(proxy=proxy, timeout=httpx.Timeout(60.0))
+            if proxy else None
+        )
+        return ChatOpenAI(
+            model=self._model,
+            api_key=self._key,
+            base_url=self._base,
+            temperature=temperature,
+            max_tokens=max_tokens or settings.llm_max_tokens,
+            http_async_client=http_client,
+        )
+
+    def get_pricing(self, model: str | None = None) -> dict[str, float]:
+        """Default pricing — override in subclass for accurate rates."""
+        return {"input": 0.0, "output": 0.0}
+
+
     async def close(self) -> None:
         """关闭底层 HTTP 连接。"""
         await self._client.aclose()

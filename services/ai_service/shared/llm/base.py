@@ -33,11 +33,13 @@ class LLMResponse:
 class AbstractLLM(ABC):
     """LLM 抽象基类。
 
-    两个核心方法：
-        chat()         —— 完整回复，等待 LLM 返回后一次性给出
-        chat_stream()  —— 流式输出，逐 token 异步迭代（v1 暂不使用，预留）
+    核心方法：
+        chat()            —— 完整回复，等待 LLM 返回后一次性给出
+        chat_stream()     —— 流式输出，逐 token 异步迭代（v1 暂不使用，预留）
+        langchain_model() —— 返回 langchain ChatOpenAI 实例，给 agent 图使用
+        get_pricing()     —— 返回指定模型的 (input, output) 定价
 
-    子类只需实现这两个方法，外部通过 factory.get_llm() 获取实例。
+    子类需实现这四个方法，外部通过 factory.get_llm() 获取实例。
     """
 
     @abstractmethod
@@ -53,3 +55,20 @@ class AbstractLLM(ABC):
     ) -> AsyncIterator[str]:
         """流式对话，逐 token 产出文本。"""
         ...
+    @abstractmethod
+    def langchain_model(
+        self, temperature: float = 0.3, max_tokens: int | None = None
+    ):
+        """Return a langchain ChatOpenAI instance configured with this provider's
+        api_key, base_url, model, and proxy settings.
+
+        The agent research graph uses langchain's .ainvoke / .bind interface;
+        this method keeps provider dispatch centralized in the LLM abstraction layer.
+        """
+        ...
+
+    @abstractmethod
+    def get_pricing(self, model: str | None = None) -> dict[str, float]:
+        """Return pricing dict {"input": 0.27, "output": 1.10} in USD per million tokens."""
+        ...
+

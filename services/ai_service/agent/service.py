@@ -3,9 +3,16 @@
 import json
 import logging
 
+import asyncio as _asyncio
 from langchain_core.messages import HumanMessage
 from agent.graphs.research import build_research_graph
 from shared.kafka.producer import send_ai_reply, send_error_reply
+from agent.tools.long_term_memory import store_memory, trigger_prefetch
+from shared.cost.agent_callback import CostTrackingCallback
+from shared.cost.store import insert_cost
+from shared.cost.tracker import compute_cost
+from shared.llm.factory import get_llm
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +36,19 @@ async def handle_agent_message(producer, event_data: dict) -> None:
     logger.info("agent research user=%s msg=%s", user_id, msg_id)
 
     graph = build_research_graph()
-    state = {"messages": [HumanMessage(content=content)], "group_id": group_id}
+    state = {"messages": [HumanMessage(content=content)], "group_id": group_id, "user_id": user_id}
 
+    # ---- 触发记忆预取（在 graph 启动前就开始，和首个节点并行） ----
+    prefetch_key = await trigger_prefetch(user_id, content)
+    state["memories_prefetch_key"] = prefetch_key
     # ---- 流式执行图，同时收集进度和累积最终状态 ----
     last_state = None
+    cost_cb = CostTrackingCallback()
     try:
-        async for chunk in graph.astream(state, stream_mode=["updates", "values"]):
+        async for chunk in graph.astream(
+            state, stream_mode=["updates", "values"],
+            config={"callbacks": [cost_cb]},
+        ):
             mode, data = chunk
             if mode == "updates":
                 for node_name, node_output in data.items():
@@ -105,6 +119,35 @@ async def handle_agent_message(producer, event_data: dict) -> None:
             + final_report
         )
 
+    # ---- 记录 LLM 成本 ----
+    if cost_cb.total_tokens > 0:
+        try:
+            llm = get_llm()
+            pricing = llm.get_pricing(cost_cb.model)
+            input_price, output_price, cost_usd = compute_cost(
+                pricing, cost_cb.prompt_tokens, cost_cb.completion_tokens,
+            )
+            await insert_cost(
+                user_id=user_id,
+                provider=settings.llm_provider,
+                model=cost_cb.model or settings.llm_provider,
+                prompt_tokens=cost_cb.prompt_tokens,
+                completion_tokens=cost_cb.completion_tokens,
+                total_tokens=cost_cb.total_tokens,
+                input_price=input_price,
+                output_price=output_price,
+                cost_usd=cost_usd,
+                message_id=msg_id,
+            )
+            logger.info("agent cost recorded: %d tokens $%.6f", cost_cb.total_tokens, cost_usd)
+        except Exception:
+            logger.exception("agent cost recording failed user=%s", user_id)
+
+    # ---- 写入长期记忆 ----
+    _asyncio.create_task(store_memory(
+        user_id=user_id, group_id=group_id, question=content,
+        report=final_report, domain=metadata.get("domain", ""),
+        methodology=metadata.get("methodology", "")))
     # ---- 发送最终报告 ----
     await send_ai_reply(
         producer, user_id, final_report, msg_id,

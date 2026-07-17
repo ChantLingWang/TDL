@@ -14,247 +14,32 @@ import re
 from typing import Literal
 
 from langgraph.graph import StateGraph, START, END
-from langchain_openai import ChatOpenAI
+from shared.llm.factory import get_llm
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from agent.schemas import ResearchState
 from agent.tools.time_tool import get_current_time_readable
 from agent.graphs.methodology import get_methodologies, is_analytical_domain, get_dimension_hints
-from agent.tools.conversation_store import query_history, format_history
+from agent.tools.long_term_memory import retrieve_memories, format_memories, consume_prefetch
 from agent.tools.wikipedia import search_wikipedia
 from agent.tools.searxng import search_searxng
 from agent.tools.wikidata import search_wikidata
 from config.settings import settings
 
+from agent.graphs.prompts import (
+    INTENT_PROMPT, CLASSIFY_PROMPT, COGNITIVE_FACTUAL_PROMPT,
+    COGNITIVE_ANALYTICAL_PROMPT, PLAN_PROMPT, ANALYZE_FACTUAL_PROMPT,
+    ANALYZE_ANALYTICAL_PROMPT, CRITIQUE_PROMPT, CASUAL_PLAN_PROMPT,
+    CASUAL_ANSWER_PROMPT, REVISE_PROMPT,
+)
 logger = logging.getLogger(__name__)
-
-# ==================== PROMPTS ====================
-
-INTENT_PROMPT = """你是智库级研究分析师。分析用户问题，输出 JSON。
-
-{time_context}
-用户问题：{question}
-
-首先判断问题类型：
-  - "casual"：日常闲聊、娱乐消遣型问题（聊游戏角色、最近有什么新电影、周末去哪玩、今天天气等）
-    用户没有严谨讨论的意图，不需要深度研究
-  - "rigorous"：学术探讨、产业分析、政策研究、技术评估等需要深度研究和结构化输出的问题
-
-然后分析意图和子问题。如果此前已经分析过相关内容（见历史摘要），
-可以生成跨轮次的对比或细化子问题。子问题应覆盖用户问题隐含的关键维度，
-每个子问题对应一个独立分析方向。
-
-输出 JSON（只输出 JSON）：
-{{
-  "question_type": "rigorous 或 casual",
-  "intent": "用户真实意图",
-  "problem_domain": "问题领域（经济学/政治学/科技/社会学/军事/其他）",
-  "sub_questions": ["拆解后的子问题"]
-}}"""
-
-CLASSIFY_PROMPT = """判断用户问题是事实调研还是分析评估。
-
-事实调研（factual）：用户只需要客观信息的罗列（「是什么」「有哪些」「数据多少」）。
-分析评估（analytical）：用户需要多维度综合判断（「如何」「为什么」「趋势」「挑战」）。
-
-用户意图：{intent}
-问题领域：{domain}
-{bias}
-
-输出 JSON：
-{{
-  "report_type": "factual 或 analytical",
-  "rationale": "判断理由"
-}}"""
-
-COGNITIVE_FACTUAL_PROMPT = """根据问题拆解调研维度——这是一个事实调研任务，不需要理论框架。
-
-用户意图：{intent}
-子问题：{sub_questions}
-
-输出 JSON：
-{{
-  "dimensions": [
-    {{"name": "维度名", "description": "调研要点", "search_hints": "搜索关键词"}},
-    ...
-  ]
-}}"""
-
-COGNITIVE_ANALYTICAL_PROMPT = """你是方法论专家。选择最合适的分析框架并拆解维度。
-
-问题领域：{domain}
-用户意图：{intent}
-子问题：{sub_questions}
-
-{methodology_hint}
-
-输出 JSON：
-{{
-  "methodology": "选用的方法论",
-  "rationale": "选择理由",
-  "dimensions": [
-    {{"name": "维度名", "description": "分析要点", "search_hints": "搜索关键词"}},
-    ...
-  ]
-}}"""
-
-PLAN_PROMPT = """根据分析/调研维度和已有知识，生成搜索关键词。
-
-{time_context}
-维度：{dimensions}
-已有知识：{existing_knowledge}
-
-每个维度生成 2-3 个搜索词。要求：
-  - 搜索词中包含时间限定（如"2025""2026""最新"），确保获取当期数据
-  - 搜索词中英文各半，提高 Wikipedia 和 SearXNG 的命中率
-
-输出 JSON：
-{{
-  "queries": ["搜索词1", ...]
-}}"""
-
-ANALYZE_FACTUAL_PROMPT = """你是智库级研究员。基于以下知识条目撰写事实调研报告。
-
-用户问题：{question}
-调研维度：
-{dimensions_text}
-
-知识条目（每个条目以 [N] 编号，编号即引用号）：
-{knowledge_text}
-
-格式要求：
-- 禁止任何开场白（如「好的」「遵照您的指示」「作为XX分析师」「我将严格遵循」）
-- 直接从报告正文的第一行开始写
-
-引用纪律（严格遵守）：
-1. 每个事实性陈述必须标注来源编号 [N]，不使用其他引用格式
-2. [N] 必须是知识条目列表中的真实编号，不要编造不存在的编号
-3. 一个陈述有多个来源时写 [1][3]，不要写 [1,3] 或 [1、3]
-4. 不确定来源编号时优先不引用，不要猜编号
-5. 禁止无引用的定量数据（数字必须带 [N]）
-6. 按照调研维度逐一展开，每个维度一个小节
-7. 禁止主观评价和理论演绎——只陈述事实
-8. 字数 1000-2000 字"""
-
-ANALYZE_ANALYTICAL_PROMPT = """你是智库级分析师。严格按指定方法论和分析维度撰写分析报告。
-
-用户问题：{question}
-选用方法论：{methodology}（{rationale}）
-分析维度：
-{dimensions_text}
-
-知识条目（每个条目以 [N] 编号，编号即引用号）：
-{knowledge_text}
-
-格式要求：
-- 禁止任何开场白（如「好的」「遵照您的指示」「作为XX分析师」「我将严格遵循」）
-- 直接从报告正文的第一行开始写
-
-引用纪律（严格遵守）：
-1. 每个事实性陈述和定量判断必须标注来源编号 [N]
-2. [N] 必须是知识条目列表中的真实编号，不要编造不存在的编号
-3. 不确定来源编号时优先不引用，不要猜编号
-4. 禁止无引用的定量数据和预测
-
-写作要求：
-5. 每个维度必须使用指定方法论的核心概念
-4. 跨维度分析必须指出矛盾、互补或因果关系
-5. 字数 1500-3000 字"""
-
-CRITIQUE_PROMPT = """你是智库审稿人。全面审视报告质量。
-
-报告：
-{report}
-
-审查维度（逐项检查，不可跳过）：
-  1. 前后一致性 — 各节之间、开头与结尾是否存在矛盾或自相冲突
-  2. 逻辑完整性 — 分析链条是否完整，推导是否存在跳跃
-  3. 引用准确性 — 报告中引用的 [N] 来源条目是否真实包含所声称的内容。
-     注意：找不到不代表报告编造——可能是引用编号标错了。发现不匹配时，
-     应指出「引用 [N] 未提及该内容，请核实来源或修正引用编号」，
-     不要直接断言「虚构」或「编造」。
-  4. 关键信息覆盖 — 核心子问题是否全部回应，有无明显遗漏
-  5. 结论可靠性 — 结论是否有明确的来源引用或分析推导支撑
-
-严重程度定义：
-  - high: 导致报告不可信或根本性错误（核心逻辑断裂、关键问题完全未答、
-    多处引用与来源严重不符、结论完全无支撑）
-  - medium: 降低了报告质量但不影响根本结论（个别引用不匹配、次要遗漏、推导不够严密）
-  - low: 措辞优化或补充性建议
-
-输出 JSON：
-{{
-  "overall_assessment": "整体评价（一句话）",
-  "passed": true/false,
-  "issues": [
-    {{"severity": "high/medium/low", "point": "具体问题", "suggestion": "改进建议"}}
-  ],
-  "confidence_adjustment": "可信度调整说明"
-}}
-
-passed 标准：无 high 问题且 medium 不超过 2 个（low 不阻塞）。"""
-
-# ---- casual 路径 prompts ----
-
-CASUAL_PLAN_PROMPT = """根据用户问题生成 2-3 个网络搜索关键词。
-
-用户问题：{question}
-子问题：{sub_questions}
-
-输出 JSON：
-{{
-  "queries": ["搜索词1", "搜索词2", ...]
-}}"""
-
-CASUAL_ANSWER_PROMPT = """根据搜索结果回答用户问题。
-
-用户问题：{question}
-
-搜索结果（每个条目以 [N] 编号）：
-{search_results}
-
-要求：
-1. 综合搜索结果给出信息丰富的回答，5-10 句话
-2. 引用搜索结果时标记 [N]
-3. 如果搜索结果不足以回答，如实说明并给出建议"""
-
-REVISE_PROMPT = """根据审稿意见修改报告。如有新增搜索结果，可引用以补充缺失信息。
-
-原报告：
-{report}
-
-审稿意见：
-{critique}
-
-新增搜索结果（编号从已有条目之后连续编号）：
-{new_knowledge}
-
-要求：
-1. 逐一处理审稿意见中的每条问题
-2. 补充缺失信息时优先引用新增搜索结果
-3. 修正错误的引用编号
-4. 输出完整修订版，不要开场白"""
-
 
 # ==================== HELPERS ====================
 
-def _build_chat_model() -> ChatOpenAI:
-    import httpx
-    provider = settings.llm_provider
-    proxy = settings.http_proxy or None
-    http_client = httpx.AsyncClient(proxy=proxy, timeout=httpx.Timeout(60.0)) if proxy else None
-
-    if provider == "deepseek":
-        return ChatOpenAI(model=settings.deepseek_model, api_key=settings.deepseek_api_key,
-                          base_url=settings.deepseek_base_url, temperature=0.3,
-                          max_tokens=settings.llm_max_tokens,
-                          http_async_client=http_client)
-    if provider == "openai":
-        return ChatOpenAI(model=settings.openai_model, api_key=settings.openai_api_key,
-                          base_url=settings.openai_base_url, temperature=0.3,
-                          max_tokens=settings.llm_max_tokens,
-                          http_async_client=http_client)
-    raise ValueError(f"不支持的 LLM provider: {provider}")
+def _build_chat_model(temp: float = 0.3) -> "ChatOpenAI":
+    """Return a langchain ChatOpenAI through the centralized LLM abstraction layer."""
+    from langchain_openai import ChatOpenAI  # noqa: F811  # type annotation only
+    return get_llm().langchain_model(temperature=temp)
 
 
 def _parse_json(text: str) -> dict:
@@ -432,23 +217,28 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
     llm_json = llm.bind(response_format={"type": "json_object"})
 
     # ---- intent ----
+
+    # ---- intent ----
     async def intent_node(state: ResearchState) -> dict:
         user_msg = state["messages"][-1].content
 
-        # ---- 查询历史研究报告 ----
-        gid = state.get("group_id", "")
-        history_context = ""
-        if gid:
-            try:
-                past = await query_history(gid, limit=5)
-                if past:
-                    history_context = "\n\n" + format_history(past)
-            except Exception as e:
-                logger.debug("查询历史失败: %s", e)
+        # ---- 消费预取记忆，若失败则回退到直接检索 ----
+        prefetch_key = state.get("memories_prefetch_key", "")
+        memories = await consume_prefetch(prefetch_key) if prefetch_key else []
+        if not memories:
+            uid = state.get("user_id", "")
+            if uid:
+                try:
+                    memories = await retrieve_memories(user_id=uid, query=user_msg, limit=5)
+                except Exception as e:
+                    logger.debug("intent 直接检索历史失败: %s", e)
+                    memories = []
+
+        history_context = format_memories(memories) if memories else ""
 
         prompt = INTENT_PROMPT.format(
             time_context=f"当前时间：{get_current_time_readable()}",
-            question=user_msg + history_context)
+            question=user_msg + ("\n\n" + history_context if history_context else ""))
         response = await llm_json.ainvoke([SystemMessage(content="输出严格的 JSON。"),
                                        HumanMessage(content=prompt)])
         try:
@@ -463,8 +253,8 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
         return {"question_type": qt,
                 "user_intent": p["intent"], "problem_domain": p["problem_domain"],
                 "sub_questions": p.get("sub_questions", []),
-                "current_time": get_current_time_readable()}
-
+                "current_time": get_current_time_readable(),
+                "history_context": history_context}
     # ---- casual 路径：轻量搜索 → 回答 ----
     async def casual_plan_node(state: ResearchState) -> dict:
         """生成网络搜索关键词。"""
@@ -505,13 +295,26 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
         return {"knowledge_entries": entries}
 
     async def casual_answer_node(state: ResearchState) -> dict:
-        """综合搜索结果给出回答。"""
+        """综合搜索结果和历史记忆给出回答。"""
         user_msg = state["messages"][-1].content
+
+        # ---- 读取预取记忆（由 intent_node 消费后存入 state） ----
+        history_context = state.get("history_context", "")
+        if not history_context:
+            uid = state.get("user_id", "")
+            if uid:
+                try:
+                    memories = await retrieve_memories(user_id=uid, query=user_msg, limit=5)
+                    history_context = format_memories(memories) if memories else ""
+                except Exception as e:
+                    logger.debug("casual 回退检索失败: %s", e)
+
         entries = state.get("knowledge_entries", [])
         results_text = _format_knowledge(entries) if entries else "（无搜索结果）"
-        prompt = CASUAL_ANSWER_PROMPT.format(question=user_msg, search_results=results_text)
+        prompt = CASUAL_ANSWER_PROMPT.format(
+            question=user_msg, history_context=history_context, search_results=results_text)
         response = await llm.ainvoke([
-            SystemMessage(content="你是友好、信息准确的助手。"),
+            SystemMessage(content="你是友好、信息准确的助手。保持与历史对话一致的语气和风格。"),
             HumanMessage(content=prompt),
         ])
         logger.info("casual_answer: %d chars", len(response.content))
@@ -644,15 +447,28 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
     # ---- analyze ----
     async def analyze_node(state: ResearchState) -> dict:
         rt = state.get("report_type", "factual")
+
+        # ---- 读取预取记忆（由 intent_node 消费后存入 state） ----
+        history_context = state.get("history_context", "")
+        if not history_context:
+            uid = state.get("user_id", "")
+            if uid:
+                try:
+                    memories = await retrieve_memories(user_id=uid, query=state["user_intent"], limit=5)
+                    history_context = format_memories(memories) if memories else ""
+                except Exception as e:
+                    logger.debug("analyze 回退检索失败: %s", e)
+
         dims = _format_dimensions(state.get("analytical_dimensions", []))
         knowledge = _format_knowledge(state.get("knowledge_entries", []))
         if rt == "factual":
-            prompt = ANALYZE_FACTUAL_PROMPT.format(question=state["user_intent"],
+            prompt = ANALYZE_FACTUAL_PROMPT.format(history_context=history_context, question=state["user_intent"],
                                                     dimensions_text=dims, knowledge_text=knowledge)
             sys_msg = "你是智库研究员。只陈述事实，不做理论演绎。引用格式：[N] 对应该编号的知识条目。"
         else:
             prompt = ANALYZE_ANALYTICAL_PROMPT.format(
-                question=state["user_intent"], methodology=state.get("methodology", ""),
+                history_context=history_context, question=state["user_intent"],
+                methodology=state.get("methodology", ""),
                 rationale=state.get("methodology_rationale", ""),
                 dimensions_text=dims, knowledge_text=knowledge)
             sys_msg = "你是智库分析师。严格遵循方法论框架。引用格式：[N] 对应该编号的知识条目。"
@@ -660,7 +476,6 @@ def build_research_graph(max_revisions: int = 2) -> StateGraph:
                                        HumanMessage(content=prompt)])
         logger.info("analyze: type=%s report=%d chars", rt, len(response.content))
         return {"analysis_report": response.content}
-
     # ---- critique ----
     async def critique_node(state: ResearchState) -> dict:
         report = state.get("analysis_report", "")
