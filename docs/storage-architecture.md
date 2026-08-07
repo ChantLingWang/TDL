@@ -75,6 +75,25 @@ ai-assistant + smoke-user → ai-assistant_smoke-user
 - 按“最近 30 天”查询，但集合按月份命名，因此查询前会对**月份集合名去重**，避免同月重复读取
 - 群聊按 `group_id` 过滤，私聊按 `session_id` 过滤
 
+### 3.7 生产环境数据边界（双 MongoDB）
+
+开发环境使用一个 MongoDB 实例、两个数据库（`auth` / `chat`）即可；生产三机部署采用**双 MongoDB 实例**，把两类数据从物理上隔开：
+
+| 数据 | 实例 | 数据库 | 谁可写 | 其他服务如何读 |
+| --- | --- | --- | --- | --- |
+| 用户、refresh token、last_offline_time | 节点 1 | `auth` | 仅 auth-service | 通过 auth 的 gRPC / HTTP |
+| 群聊/私聊消息历史 | 节点 2 | `chat` | 仅 chat-service | 通过 chat_service 历史接口（HTTP） |
+
+**为什么要有数据边界：**
+
+- **领域归属**：auth 域（身份、凭据）与 chat 域（消息内容）是不同业务领域，各自的数据生命周期和访问者不同。
+- **安全边界**：用户表里是密码哈希、refresh token、邮箱；消息表里是聊天内容。两者混在一起时，任何能读 chat 库的漏洞/事故都可能波及凭据；物理隔离后，即使 chat 被攻破，也碰不到 auth 数据。
+- **访问边界**：chat-service、ai-service **不直接读 auth 库**，只能通过 auth 的 gRPC/HTTP 接口取用户信息；ai-service 也不直接读 chat 库，只能通过 chat_service 历史接口。跨库直连被架构性禁止。
+- **故障边界**：一个 Mongo 实例故障不影响另一个；chat 的写入压力不会拖垮 auth。
+- **运维边界**：两套实例可以分别备份、保留、加密和审计（auth 数据小而敏感，chat 数据大而高频）。
+
+> 可选：Redis 同样可以按库隔离（auth 用 db0 存验证码，chat 用 db1 存 last_offline_time 缓存），进一步缩小共享面。
+
 ---
 
 ## 4. PostgreSQL

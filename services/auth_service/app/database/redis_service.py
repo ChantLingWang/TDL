@@ -6,6 +6,7 @@ redis_pool = ConnectionPool(
     host=settings.redis_host,
     port=settings.redis_port,
     db=settings.redis_db,
+    password=settings.redis_password or None,
     max_connections=20,  # 设置最大连接数
     retry_on_timeout=True
 )

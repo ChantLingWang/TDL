@@ -38,12 +38,20 @@ func (manager *MongoDBManager) Connect() error {
 	port := config.MongoDBConfig.Port
 	dbname := config.MongoDBConfig.DBName
 
-	uri := fmt.Sprintf("mongodb://%s:%s/%s?sslmode=%s&timezone=%s",
-		host, port, dbname, config.MongoDBConfig.SSLMode, config.MongoDBConfig.TimeZone)
+	var uri string
+	if config.MongoDBConfig.User != "" {
+		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?sslmode=%s&timezone=%s",
+			config.MongoDBConfig.User, config.MongoDBConfig.Password,
+			host, port, dbname,
+			config.MongoDBConfig.SSLMode, config.MongoDBConfig.TimeZone)
+	} else {
+		uri = fmt.Sprintf("mongodb://%s:%s/%s?sslmode=%s&timezone=%s",
+			host, port, dbname, config.MongoDBConfig.SSLMode, config.MongoDBConfig.TimeZone)
+	}
 
 	// 创建客户端选项对象，配置连接池参数
 	clientOptions := options.Client().ApplyURI(uri)
-	
+
 	// 设置连接池配置参数
 	clientOptions.SetMaxPoolSize(uint64(config.MongoDBConfig.MaxPoolSize))
 	clientOptions.SetMinPoolSize(uint64(config.MongoDBConfig.MinPoolSize))

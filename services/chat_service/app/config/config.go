@@ -43,9 +43,10 @@ type KafkaConfig struct {
 
 // Redis配置
 type RedisConfig struct {
-	Host string `yaml:"host"`
-	Port string `yaml:"port"`
-	DB   int    `yaml:"db"`
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 // Config 定义全局配置结构
@@ -90,13 +91,16 @@ func InitConfig(path string) {
 	subEnv(&MongoDBConfig.Host, "MONGODB_HOST")
 	subEnv(&MongoDBConfig.Port, "MONGODB_PORT")
 	subEnv(&MongoDBConfig.DBName, "MONGODB_DB_NAME")
+	subEnv(&MongoDBConfig.User, "MONGO_USERNAME")
+	subEnv(&MongoDBConfig.Password, "MONGO_PASSWORD")
 	subEnv(&RedisConfigInstance.Host, "REDIS_HOST")
 	subEnv(&RedisConfigInstance.Port, "REDIS_PORT")
+	subEnv(&RedisConfigInstance.Password, "REDIS_PASSWORD")
 	subEnv(&ServerConfig.Port, "SERVER_PORT")
 	// Kafka brokers 从逗号分隔的环境变量读取
 	if brokers := os.Getenv("KAFKA_BROKERS"); brokers != "" {
 		globalConfig.Kafka.Brokers = strings.Split(brokers, ",")
-	}	// Kafka 消费者 GroupID：每台机器需要独立 group_id，各自消费全量消息并做本地广播。
+	} // Kafka 消费者 GroupID：每台机器需要独立 group_id，各自消费全量消息并做本地广播。
 	// 优先用环境变量 CHAT_GROUP_ID，未设置则以 hostname 为后缀。
 	groupID := os.Getenv("CHAT_GROUP_ID")
 	if groupID == "" {

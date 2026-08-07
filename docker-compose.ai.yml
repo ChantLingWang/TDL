@@ -1,0 +1,65 @@
+networks:
+  chant-shared-network:
+    driver: bridge
+
+services:
+  qdrant:
+    image: docker.m.daocloud.io/qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - chant-shared-network
+
+  searxng:
+    image: docker.m.daocloud.io/searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - searxng_data:/etc/searxng
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - chant-shared-network
+
+  ai-service:
+    build:
+      context: ./services/ai_service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-chat_group_message}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID:-ai_service_group}
+      CHAT_SERVICE_URL: ${CHAT_SERVICE_URL}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-long_term_memory}
+      SEARXNG_BASE_URL: http://searxng:8080
+      COST_DB_HOST: ${COST_DB_HOST}
+      COST_DB_PORT: ${COST_DB_PORT:-5432}
+      COST_DB_USER: ${COST_DB_USER:-postgres}
+      COST_DB_PASSWORD: ${COST_DB_PASSWORD}
+      COST_DB_NAME: ${COST_DB_NAME:-ai_audit}
+      COST_TABLE_NAME: ${COST_TABLE_NAME:-llm_api_costs}
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      AI_USER_ID: ${AI_USER_ID:-ai-assistant}
+      AI_RESEARCH_USER_ID: ${AI_RESEARCH_USER_ID:-ai-research}
+      SILICONFLOW_EMBEDDING_API_KEY: ${SILICONFLOW_EMBEDDING_API_KEY:-}
+      SILICONFLOW_RERANKER_API_KEY: ${SILICONFLOW_RERANKER_API_KEY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      TZ: Asia/Shanghai
+    depends_on:
+      - qdrant
+      - searxng
+    networks:
+      - chant-shared-network
+
+volumes:
+  qdrant_data:
+  searxng_data:
