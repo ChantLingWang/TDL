@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 
-	"chat_service/app/models"
-
 	chatv1 "github.com/chant/chant/gen/go/chant/chat/v1"
 	commonv1 "github.com/chant/chant/gen/go/chant/common/v1"
 	sdk_kafka "infrastructure_sdk/kafka"
@@ -29,16 +27,6 @@ func RegisterGroupMessageLocalBroadcast(fn func(groupID string, message []byte))
 // RegisterPrivateMessageLocalBroadcast 注册私聊消息本地广播函数
 func RegisterPrivateMessageLocalBroadcast(fn func(targetUserID string, message []byte)) {
 	privateMessageLocalBroadcast = fn
-}
-
-// HandleUserKickEvent 处理 Kafka 收到的踢人事件
-func HandleUserKickEvent(ctx context.Context, data json.RawMessage) error {
-	var kickData models.KickUserData
-	if err := json.Unmarshal(data, &kickData); err != nil {
-		return fmt.Errorf("解析踢人数据失败: %v", err)
-	}
-	log.Printf("用户 %s 已被踢出", kickData.UserID)
-	return nil
 }
 
 // HandleGroupChatMessageEvent 处理群聊消息 —— 从 proto envelope 解析
@@ -103,12 +91,18 @@ func BroadcastAiReply(reply *chatv1.AiReplyGenerated, ts int64) {
 	if aiReplyBroadcast == nil {
 		return
 	}
-	responseMsg, _ := json.Marshal(map[string]interface{}{
-		"type":    "private_chat",
+	payload := map[string]interface{}{
 		"sender":  reply.SenderId,
 		"content": reply.Content,
 		"time":    ts,
-	})
+	}
+	if reply.GroupId != "" {
+		payload["type"] = "group_chat"
+		payload["group_id"] = reply.GroupId
+	} else {
+		payload["type"] = "private_chat"
+	}
+	responseMsg, _ := json.Marshal(payload)
 	aiReplyBroadcast(reply.TargetUserId, reply.GroupId, responseMsg)
 }
 

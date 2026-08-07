@@ -6,18 +6,18 @@ import (
 
 // Message 消息结构体（群聊和私聊共用）
 type Message struct {
-	SenderID    string    `bson:"sender_id"`    // 发送者ID
-	Timestamp   time.Time `bson:"timestamp"`    // 时间戳
-	TimestampMs int64     `bson:"timestamp_ms,omitempty"` // AI 生成时间戳（毫秒）
-	Content     string    `bson:"content"`      // 消息内容
-	Metadata    map[string]string `bson:"metadata,omitempty"` // 可扩展元数据
-	PrivateID   string    `bson:"private_id"`   // 私聊接收者ID（仅私聊时使用）
-	GroupID     string    `bson:"group_id"`     // 群ID（仅群聊时使用）
-	MessageID       string    `bson:"message_id"`       // 消息ID
-	ConversationID  string    `bson:"conversation_id,omitempty"` // AI 会话 ID
-	MessageType string    `bson:"message_type"` // 消息类型
-	IsActive    bool      `bson:"is_active"`    // 是否可见
-	Read        bool      `bson:"read"`         // 是否已读
+	SenderID       string            `bson:"sender_id" json:"sender_id"`                                 // 发送者ID
+	Timestamp      time.Time         `bson:"timestamp" json:"timestamp"`                                 // 时间戳
+	TimestampMs    int64             `bson:"timestamp_ms,omitempty" json:"timestamp_ms,omitempty"`       // AI 生成时间戳（毫秒）
+	Content        string            `bson:"content" json:"content"`                                     // 消息内容
+	Metadata       map[string]string `bson:"metadata,omitempty" json:"metadata,omitempty"`               // 可扩展元数据
+	PrivateID      string            `bson:"private_id" json:"private_id"`                               // 私聊接收者ID（仅私聊时使用）
+	GroupID        string            `bson:"group_id" json:"group_id"`                                   // 群ID（仅群聊时使用）
+	MessageID      string            `bson:"message_id" json:"message_id"`                               // 消息ID
+	ConversationID string            `bson:"conversation_id,omitempty" json:"conversation_id,omitempty"` // AI 会话 ID
+	MessageType    string            `bson:"message_type" json:"message_type"`                           // 消息类型
+	IsActive       bool              `bson:"is_active" json:"is_active"`                                 // 是否可见
+	Read           bool              `bson:"read" json:"read"`                                           // 是否已读
 }
 
 // GroupMessageHistory 表示群聊聊天记录的结构

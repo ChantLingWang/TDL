@@ -66,33 +66,39 @@ func (service *PrivateMessageHistoryService) AddPrivateMessage(senderID, receive
 
 	sessionID := GenerateSessionID(senderID, receiverID)
 
-	// 幂等去重：message_id 已存在则跳过（Kafka 重试/重启回放保护）
-	dupFilter := bson.M{
-		"session_id":            sessionID,
-		"date_identifier":       getPrivateMessageHistoryDocTime(),
-		"messages.message_id":   message.MessageID,
+	dateIdentifier := getPrivateMessageHistoryDocTime()
+
+	// 1. 确保会话文档存在（$setOnInsert 幂等，重试不会重复建文档）
+	ensureFilter := bson.M{
+		"session_id":      sessionID,
+		"date_identifier": dateIdentifier,
 	}
-	if count, err := collection.CountDocuments(context.Background(), dupFilter); err == nil && count > 0 {
-		return nil
+	ensureUpdate := bson.M{
+		"$setOnInsert": bson.M{
+			"session_id":      sessionID,
+			"date_identifier": dateIdentifier,
+		},
+	}
+	if _, err := collection.UpdateOne(context.Background(), ensureFilter, ensureUpdate, options.Update().SetUpsert(true)); err != nil {
+		log.Printf("Failed to ensure private session %s: %v", sessionID, err)
+		return fmt.Errorf("failed to ensure private session: %w", err)
 	}
 
+	// 2. 原子追加：message_id 已存在则跳过（Kafka 重试/重启回放保护）。
+	// 注意不能带 upsert：否则 $ne 不匹配时反而会新建重复的会话文档。
 	filter := bson.M{
-		"session_id":      sessionID,
-		"date_identifier": getPrivateMessageHistoryDocTime(),
+		"session_id":          sessionID,
+		"date_identifier":     dateIdentifier,
+		"messages.message_id": bson.M{"$ne": message.MessageID},
 	}
 
 	update := bson.M{
-		"$setOnInsert": bson.M{
-			"session_id":      sessionID,
-			"date_identifier": getPrivateMessageHistoryDocTime(),
-			// "messages":        []Message{}, // 移除这行，避免与 $push 冲突
-		},
 		"$push": bson.M{
 			"messages": *message,
 		},
 	}
 
-	_, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+	_, err := collection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		log.Printf("Failed to upsert private message for session %s: %v", sessionID, err)
 		return fmt.Errorf("failed to upsert private message: %w", err)
@@ -125,10 +131,7 @@ func (service *PrivateMessageHistoryService) GetHistoryMessagesByCursor(sessionI
 	searchCursor := time.Unix(cursor, 0)
 	var allMessages []Message
 
-	now := time.Now()
-	for i := 0; i < 30; i++ {
-		collectionTime := now.AddDate(0, 0, -i)
-		collectionName := "private_message_history_" + collectionTime.Format("200601")
+	for _, collectionName := range historyCollectionNames("private_message_history_", 30, time.Now()) {
 		collection := db.Collection(collectionName)
 
 		filter := bson.M{
@@ -213,7 +216,6 @@ func (service *PrivateMessageHistoryService) GetHistoryMessagesByTimeRange(sessi
 	}
 
 	var allMessages []Message
-	now := time.Now()
 
 	// 时间范围查询的三种情况：
 	// 1. 只有 startTime：按 startTime 往后（更晚时间）查30条
@@ -222,9 +224,7 @@ func (service *PrivateMessageHistoryService) GetHistoryMessagesByTimeRange(sessi
 	hasStartTime := startTime > 0
 	hasEndTime := endTime > 0
 
-	for i := 0; i < 30; i++ {
-		collectionTime := now.AddDate(0, 0, -i)
-		collectionName := "private_message_history_" + collectionTime.Format("200601")
+	for _, collectionName := range historyCollectionNames("private_message_history_", 30, time.Now()) {
 		collection := db.Collection(collectionName)
 
 		// 构建基础过滤条件
@@ -342,4 +342,3 @@ func (service *PrivateMessageHistoryService) GetHistoryMessagesByTimeRange(sessi
 
 	return allMessages, nil
 }
-

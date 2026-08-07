@@ -5,7 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from app.database.redis_user_service import RedisUserService
-from app.core.config_test import settings
+from app.core.config import settings
 
 class EmailService:
     def __init__(self):

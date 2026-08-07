@@ -37,8 +37,13 @@ type MessageSent struct {
 	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
 	// 会话类型: "private" 或 "group"
 	ConversationType string `protobuf:"bytes,7,opt,name=conversation_type,json=conversationType,proto3" json:"conversation_type,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
+	TimestampMs int64 `protobuf:"varint,8,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// 可扩展元数据（域名、报告摘要、方法论等）
+	// 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
+	Metadata      map[string]string `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MessageSent) Reset() {
@@ -120,6 +125,20 @@ func (x *MessageSent) GetConversationType() string {
 	return ""
 }
 
+func (x *MessageSent) GetTimestampMs() int64 {
+	if x != nil {
+		return x.TimestampMs
+	}
+	return 0
+}
+
+func (x *MessageSent) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 // AiReplyGenerated AI 生成了一条回复。
 // 生产者: ai_service
 // 消费者: chat_service（用于持久化和 WS 推送）
@@ -136,8 +155,13 @@ type AiReplyGenerated struct {
 	// 私聊目标；群聊时填写 group_id
 	GroupId          string `protobuf:"bytes,6,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
 	ConversationType string `protobuf:"bytes,7,opt,name=conversation_type,json=conversationType,proto3" json:"conversation_type,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
+	TimestampMs int64 `protobuf:"varint,8,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// 可扩展元数据（域名、报告摘要、方法论等）
+	// 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
+	Metadata      map[string]string `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AiReplyGenerated) Reset() {
@@ -219,11 +243,25 @@ func (x *AiReplyGenerated) GetConversationType() string {
 	return ""
 }
 
+func (x *AiReplyGenerated) GetTimestampMs() int64 {
+	if x != nil {
+		return x.TimestampMs
+	}
+	return 0
+}
+
+func (x *AiReplyGenerated) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xf4\x01\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\x9a\x03\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x19\n" +
@@ -232,7 +270,12 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
 	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12+\n" +
-	"\x11conversation_type\x18\a \x01(\tR\x10conversationType\"\xfd\x01\n" +
+	"\x11conversation_type\x18\a \x01(\tR\x10conversationType\x12!\n" +
+	"\ftimestamp_ms\x18\b \x01(\x03R\vtimestampMs\x12D\n" +
+	"\bmetadata\x18\t \x03(\v2(.chant.chat.v1.MessageSent.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa8\x03\n" +
 	"\x10AiReplyGenerated\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x18\n" +
@@ -241,7 +284,12 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x19\n" +
 	"\bgroup_id\x18\x06 \x01(\tR\agroupId\x12+\n" +
-	"\x11conversation_type\x18\a \x01(\tR\x10conversationTypeB\xa9\x01\n" +
+	"\x11conversation_type\x18\a \x01(\tR\x10conversationType\x12!\n" +
+	"\ftimestamp_ms\x18\b \x01(\x03R\vtimestampMs\x12I\n" +
+	"\bmetadata\x18\t \x03(\v2-.chant.chat.v1.AiReplyGenerated.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\xa9\x01\n" +
 	"\x11com.chant.chat.v1B\n" +
 	"EventProtoP\x01Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1\xa2\x02\x03CCX\xaa\x02\rChant.Chat.V1\xca\x02\rChant\\Chat\\V1\xe2\x02\x19Chant\\Chat\\V1\\GPBMetadata\xea\x02\x0fChant::Chat::V1b\x06proto3"
 
@@ -257,17 +305,21 @@ func file_chant_chat_v1_event_proto_rawDescGZIP() []byte {
 	return file_chant_chat_v1_event_proto_rawDescData
 }
 
-var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_chant_chat_v1_event_proto_goTypes = []any{
 	(*MessageSent)(nil),      // 0: chant.chat.v1.MessageSent
 	(*AiReplyGenerated)(nil), // 1: chant.chat.v1.AiReplyGenerated
+	nil,                      // 2: chant.chat.v1.MessageSent.MetadataEntry
+	nil,                      // 3: chant.chat.v1.AiReplyGenerated.MetadataEntry
 }
 var file_chant_chat_v1_event_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: chant.chat.v1.MessageSent.metadata:type_name -> chant.chat.v1.MessageSent.MetadataEntry
+	3, // 1: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_chant_chat_v1_event_proto_init() }
@@ -281,7 +333,7 @@ func file_chant_chat_v1_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chant_chat_v1_event_proto_rawDesc), len(file_chant_chat_v1_event_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

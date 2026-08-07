@@ -2,7 +2,7 @@ import asyncio
 import ssl
 from typing import Optional
 from datetime import datetime
-from app.core.config_test import settings
+from app.core.config import settings
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 import logging

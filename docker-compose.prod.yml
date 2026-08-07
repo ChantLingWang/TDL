@@ -1,11 +1,9 @@
-version: '3.8'
-
 networks:
   chant-shared-network:
     driver: bridge
 
 services:
-  # 基础设施服务
+  # ==================== 基础设施 ====================
   zookeeper:
     image: docker.m.daocloud.io/wurstmeister/zookeeper
     container_name: zookeeper
@@ -49,7 +47,7 @@ services:
     image: docker.m.daocloud.io/provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "8083:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -141,28 +139,55 @@ services:
           cpus: ${CPU_LIMIT_REDIS:-0.2}
     restart: always
 
-  # 应用服务
+  qdrant:
+    image: docker.m.daocloud.io/qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - chant-shared-network
+    restart: always
+
+  searxng:
+    image: docker.m.daocloud.io/searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8888:8080"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - searxng_data:/etc/searxng
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - chant-shared-network
+    restart: always
+
+  # ==================== 应用服务 ====================
   auth-service:
     build:
-      context: ./services/auth_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/auth_service/Dockerfile
     container_name: auth-service
     ports:
       - "9030:9030"
+      - "50051:50051"
+      - "50052:50052"
     environment:
-      # 数据库配置
       MONGODB_URL: mongodb://mongodb:27017
       DATABASE_NAME: auth
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # Kafka配置
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_CLIENT_ID: auth-service
       KAFKA_TOPIC_SAGA_EVENTS: saga-events
       KAFKA_TOPIC_USER_REGISTERED: user-registrations
       KAFKA_TOPIC_USER_UPDATED: user-updates
       KAFKA_TOPIC_SYNC_USER_FIELDS: sync_user_fields
-      # 应用配置
       HOST: 0.0.0.0
       PORT: 9030
       DEBUG: ${AUTH_SERVICE_DEBUG:-false}
@@ -177,7 +202,7 @@ services:
     networks:
       - chant-shared-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9030/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9030/api/v1/auth/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -189,6 +214,95 @@ services:
           cpus: ${CPU_LIMIT_AUTH_SERVICE:-0.5}
     restart: always
 
+  chat-service:
+    build:
+      context: .
+      dockerfile: ./services/chat_service/Dockerfile
+    container_name: chat-service
+    ports:
+      - "8080:8080"
+    environment:
+      CHAT_GROUP_ID: chat-prod
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB_NAME: orchestrator
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MONGODB_DB_NAME: chat
+      KAFKA_BROKERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      AUTH_GRPC_ADDR: auth-service:50051
+      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      SERVER_PORT: "8080"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - chant-shared-network
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT_CHAT_SERVICE:-512m}
+          cpus: ${CPU_LIMIT_CHAT_SERVICE:-0.5}
+    restart: always
+
+  ai-service:
+    build:
+      context: ./services/ai_service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_TOPIC: chat_group_message
+      KAFKA_GROUP_ID: ai_service_group
+      CHAT_SERVICE_URL: http://chat-service:8080
+      QDRANT_URL: http://qdrant:6333
+      SEARXNG_BASE_URL: http://searxng:8080
+      COST_DB_HOST: postgres
+      COST_DB_PORT: "5432"
+      COST_DB_USER: ${POSTGRES_USER:-postgres}
+      COST_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      COST_DB_NAME: ai_audit
+      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      AI_USER_ID: ai-assistant
+      AI_RESEARCH_USER_ID: ai-research
+      SILICONFLOW_EMBEDDING_API_KEY: ${SILICONFLOW_EMBEDDING_API_KEY:-}
+      SILICONFLOW_RERANKER_API_KEY: ${SILICONFLOW_RERANKER_API_KEY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      TZ: Asia/Shanghai
+    depends_on:
+      kafka:
+        condition: service_started
+      qdrant:
+        condition: service_started
+      searxng:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    networks:
+      - chant-shared-network
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT_AI_SERVICE:-512m}
+          cpus: ${CPU_LIMIT_AI_SERVICE:-0.5}
+    restart: always
+
   orchestrator-service:
     build:
       context: ./services/orchestrator_service
@@ -197,21 +311,18 @@ services:
     ports:
       - "8081:8080"
     environment:
-      # Kafka配置
       KAFKA_BROKERS: kafka:29092
       KAFKA_GROUP_ID: orchestrator-group
       KAFKA_TOPIC: saga-events
       KAFKA_CLIENT_ID: orchestrator-service
-      # 数据库配置
       DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
+      DATABASE_PORT: "5432"
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_NAME: orchestrator
       DATABASE_SSLMODE: disable
       DATABASE_TIMEZONE: Asia/Shanghai
-      # 应用配置
-      SERVER_PORT: 8080
+      SERVER_PORT: "8080"
       SERVER_NAME: orchestrator-service
       DEFAULT_TIMEOUT: 30s
       DEFAULT_RETRY_COUNT: 3
@@ -225,12 +336,6 @@ services:
         condition: service_started
     networks:
       - chant-shared-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     deploy:
       resources:
         limits:
@@ -238,58 +343,9 @@ services:
           cpus: ${CPU_LIMIT_ORCHESTRATOR_SERVICE:-0.5}
     restart: always
 
-  user-service:
-    build:
-      context: ./services/user_service
-      dockerfile: Dockerfile
-    container_name: user-service
-    ports:
-      - "8082:8080"
-    environment:
-      # 服务器配置
-      SERVER_PORT: 8080
-      # PostgreSQL配置
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB_NAME: user_service
-      POSTGRES_SSL_MODE: disable
-      POSTGRES_TIMEZONE: Asia/Shanghai
-      # MongoDB配置
-      MONGODB_HOST: mongodb
-      MONGODB_PORT: 27017
-      MONGODB_DB_NAME: User_Database
-      MONGODB_SSL_MODE: disable
-      MONGODB_TIMEZONE: Asia/Shanghai
-      # Kafka配置
-      KAFKA_BROKERS: kafka:29092
-      KAFKA_TOPIC: user_registered_events
-      KAFKA_GROUP_ID: user_service_group
-      TZ: Asia/Shanghai
-    depends_on:
-      postgres:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    networks:
-      - chant-shared-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: ${MEMORY_LIMIT_USER_SERVICE:-512m}
-          cpus: ${CPU_LIMIT_USER_SERVICE:-0.5}
-    restart: always
-
 volumes:
+  searxng_data:
   postgres_data:
+  qdrant_data:
   mongodb_data:
   redis_data:

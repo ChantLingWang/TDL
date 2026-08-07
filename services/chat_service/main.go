@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"net/http"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -93,8 +93,8 @@ func startServer() {
 	app := createApp()
 
 	server := &http.Server{
-		Addr:    ":" + config.ServerConfig.Port,
-		Handler: app,
+		Addr:         ":" + config.ServerConfig.Port,
+		Handler:      app,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 	}
 
@@ -153,10 +153,20 @@ func main() {
 	kafkaServices.RegisterAiReplyBroadcast(func(targetUserID, groupID string, message []byte) {
 		hub := services.GetWSHub()
 		if groupID != "" {
-			hub.BroadcastToUser(groupID, message)
-		} else {
-			hub.BroadcastToUser(targetUserID, message)
+			// 群聊：查群成员并逐个推送给本地在线用户（与普通群消息一致）
+			userGroupService := pgsql.NewUserGroupService(pgsql.GetDBManager())
+			members, err := userGroupService.GetGroupMembers(groupID)
+			if err != nil {
+				log.Printf("获取群成员失败: group_id=%s, err=%v", groupID, err)
+				return
+			}
+			for _, userID := range members {
+				hub.BroadcastToUser(userID, message)
+			}
+			log.Printf("AI回复已推送给本地在线用户: group_id=%s, members=%d", groupID, len(members))
+			return
 		}
+		hub.BroadcastToUser(targetUserID, message)
 		log.Printf("AI回复已推送给本地在线用户: to=%s", targetUserID)
 	})
 

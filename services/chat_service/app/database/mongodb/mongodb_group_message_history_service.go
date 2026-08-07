@@ -64,30 +64,38 @@ func (service *GroupMessageHistoryService) AddGroupMessageByUser(groupID string,
 	// 获取集合
 	collection := db.Collection("group_message_history_" + getGroupMessageHistoryCollectionTime())
 
-	// 幂等去重：message_id 已存在则跳过（Kafka 重试/重启回放保护）
-	dupFilter := bson.M{
-		"group_id":              groupID,
-		"date_identifier":       getGroupMessageHistoryDocTime(),
-		"messages.message_id":   message.MessageID,
+	dateIdentifier := getGroupMessageHistoryDocTime()
+
+	// 1. 确保当前日期至少有一个未满的桶（$setOnInsert 幂等，桶满时自动新建）
+	ensureFilter := bson.M{
+		"group_id":        groupID,
+		"date_identifier": dateIdentifier,
+		"count":           bson.M{"$lt": MaxMessagesPerBucket}, // 每个桶最大消息数
 	}
-	if count, err := collection.CountDocuments(context.Background(), dupFilter); err == nil && count > 0 {
-		return nil
+	ensureUpdate := bson.M{
+		"$setOnInsert": bson.M{
+			"group_id":        groupID,
+			"date_identifier": dateIdentifier,
+			"start_time":      message.Timestamp, // 新建桶时设置起始时间
+			"count":           0,
+		},
+	}
+	if _, err := collection.UpdateOne(context.Background(), ensureFilter, ensureUpdate, options.Update().SetUpsert(true)); err != nil {
+		log.Printf("Failed to ensure group bucket for %s: %v", groupID, err)
+		return fmt.Errorf("failed to ensure group bucket: %w", err)
 	}
 
-	// 构造查找条件：增加消息数量限制，实现自动分桶
+	// 2. 原子追加：message_id 已存在则跳过（Kafka 重试/重启回放保护）。
+	// 注意不能带 upsert：否则 $ne 不匹配时反而会新建重复的桶。
 	filter := bson.M{
-		"group_id":        groupID,
-		"date_identifier": getGroupMessageHistoryDocTime(),
-		"count":           bson.M{"$lt": MaxMessagesPerBucket}, // 每个桶最大消息数
+		"group_id":            groupID,
+		"date_identifier":     dateIdentifier,
+		"count":               bson.M{"$lt": MaxMessagesPerBucket},
+		"messages.message_id": bson.M{"$ne": message.MessageID},
 	}
 
 	// 构建更新条件
 	update := bson.M{
-		"$setOnInsert": bson.M{
-			"group_id":        groupID,
-			"date_identifier": getGroupMessageHistoryDocTime(),
-			"start_time":      message.Timestamp, // 新建桶时设置起始时间
-		},
 		"$push": bson.M{
 			"messages": *message,
 		},
@@ -99,11 +107,10 @@ func (service *GroupMessageHistoryService) AddGroupMessageByUser(groupID string,
 		},
 	}
 
-	// 使用Upsert操作，自动处理文档存在性检查
-	_, err := collection.UpdateOne(context.Background(), filter, update, options.Update().SetUpsert(true))
+	_, err := collection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
-		log.Printf("Failed to upsert group message for group %s: %v", groupID, err)
-		return fmt.Errorf("failed to upsert group message: %w", err)
+		log.Printf("Failed to append group message for group %s: %v", groupID, err)
+		return fmt.Errorf("failed to append group message: %w", err)
 	}
 
 	return nil
@@ -173,11 +180,8 @@ func (service *GroupMessageHistoryService) GetUnreadMessages(conversationIDs []s
 	var allMessages []Message
 	var totalCount int
 
-	// 获取过去几天的 collection
-	now := time.Now()
-	for i := 0; i < 30; i++ { // 最多查最近3天
-		collectionTime := now.AddDate(0, 0, -i)
-		collectionName := "group_message_history_" + collectionTime.Format("200601")
+	// 获取过去几天的 collection（按月份去重，避免同月重复查询）
+	for _, collectionName := range historyCollectionNames("group_message_history_", 30, time.Now()) {
 		collection := db.Collection(collectionName)
 
 		// 查询条件：group_id 在会话列表中，且消息时间大于 afterTime
@@ -261,10 +265,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByCursor(conversati
 	searchCursor := time.Unix(cursor, 0)
 	var allMessages []Message
 
-	now := time.Now()
-	for i := 0; i < 30; i++ {
-		collectionTime := now.AddDate(0, 0, -i)
-		collectionName := "group_message_history_" + collectionTime.Format("200601")
+	for _, collectionName := range historyCollectionNames("group_message_history_", 30, time.Now()) {
 		collection := db.Collection(collectionName)
 
 		filter := bson.M{
@@ -349,7 +350,6 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(convers
 	}
 
 	var allMessages []Message
-	now := time.Now()
 
 	// 时间范围查询的三种情况：
 	// 1. 只有 startTime：按 startTime 往后（更晚时间）查30条
@@ -358,9 +358,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(convers
 	hasStartTime := startTime > 0
 	hasEndTime := endTime > 0
 
-	for i := 0; i < 30; i++ {
-		collectionTime := now.AddDate(0, 0, -i)
-		collectionName := "group_message_history_" + collectionTime.Format("200601")
+	for _, collectionName := range historyCollectionNames("group_message_history_", 30, time.Now()) {
 		collection := db.Collection(collectionName)
 
 		// 构建基础过滤条件

@@ -1,11 +1,9 @@
-version: '3.8'
-
 networks:
   chant-shared-network:
     driver: bridge
 
 services:
-  # 基础设施服务
+  # ==================== 基础设施 ====================
   zookeeper:
     image: docker.m.daocloud.io/wurstmeister/zookeeper
     container_name: zookeeper
@@ -37,7 +35,7 @@ services:
     image: docker.m.daocloud.io/provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "8083:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
@@ -119,28 +117,41 @@ services:
       timeout: 5s
       retries: 5
 
-  # 应用服务
+  searxng:
+    image: docker.m.daocloud.io/searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8888:8080"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - searxng_data:/etc/searxng
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - chant-shared-network
+    restart: on-failure
+
+  # ==================== 应用服务 ====================
   auth-service:
     build:
-      context: ./services/auth_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/auth_service/Dockerfile
     container_name: auth-service
     ports:
       - "9030:9030"
+      - "50051:50051"
+      - "50052:50052"
     environment:
-      # 数据库配置
       MONGODB_URL: mongodb://mongodb:27017
       DATABASE_NAME: auth
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # Kafka配置
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_CLIENT_ID: auth-service
       KAFKA_TOPIC_SAGA_EVENTS: saga-events
       KAFKA_TOPIC_USER_REGISTERED: user-registrations
       KAFKA_TOPIC_USER_UPDATED: user-updates
       KAFKA_TOPIC_SYNC_USER_FIELDS: sync_user_fields
-      # 应用配置
       HOST: 0.0.0.0
       PORT: 9030
       DEBUG: "true"
@@ -156,17 +167,76 @@ services:
       - chant-shared-network
     restart: on-failure
 
-  searxng:
-    image: docker.m.daocloud.io/searxng/searxng:latest
-    container_name: searxng
+  chat-service:
+    build:
+      context: .
+      dockerfile: ./services/chat_service/Dockerfile
+    container_name: chat-service
     ports:
-      - "8888:8080"
+      - "8080:8080"
     environment:
-      - TZ=Asia/Shanghai
+      CHAT_GROUP_ID: chat-local
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB_NAME: orchestrator
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: "27017"
+      MONGODB_DB_NAME: chat
+      KAFKA_BROKERS: kafka:29092
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      AUTH_GRPC_ADDR: auth-service:50051
+      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      SERVER_PORT: "8080"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - chant-shared-network
+    restart: on-failure
 
-    volumes:
-      - searxng_data:/etc/searxng
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+  orchestrator-service:
+    build:
+      context: ./services/orchestrator_service
+      dockerfile: Dockerfile
+    container_name: orchestrator-service
+    ports:
+      - "8081:8080"
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_GROUP_ID: orchestrator-group
+      KAFKA_TOPIC: saga-events
+      KAFKA_CLIENT_ID: orchestrator-service
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: orchestrator
+      DATABASE_SSLMODE: disable
+      DATABASE_TIMEZONE: Asia/Shanghai
+      SERVER_PORT: "8080"
+      SERVER_NAME: orchestrator-service
+      DEFAULT_TIMEOUT: 30s
+      DEFAULT_RETRY_COUNT: 3
+      COMPENSATION_TIMEOUT: 15s
+      SNOWFLAKE_NODE_ID: "1"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - chant-shared-network
     restart: on-failure

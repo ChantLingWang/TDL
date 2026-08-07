@@ -64,6 +64,7 @@ COPY --from=builder /app/orchestrator-service .
 # 从构建阶段复制模板文件目录
 # 注意：保持目录结构与代码中读取的路径一致
 COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/config ./config
 
 # 容器启动时默认执行的命令
 CMD ["./orchestrator-service"]

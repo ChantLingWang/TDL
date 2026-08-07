@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
 
+    # ---- SiliconFlow（embedding / rerank）----
+    siliconflow_embedding_api_key: str = ""
+    siliconflow_reranker_api_key: str = ""
+
     # ---- AI 身份 ----
     ai_user_id: str = "ai-assistant"
     """AI 在 chat_service 中的用户 ID（chat 模式）"""

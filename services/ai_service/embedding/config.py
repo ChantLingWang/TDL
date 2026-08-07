@@ -1,15 +1,9 @@
 """SiliconFlow API keys 和模型配置。"""
 
-import os
+from config.settings import settings
 
-EMBEDDING_API_KEY = os.getenv(
-    "SILICONFLOW_EMBEDDING_API_KEY",
-    "sk-tyusvruhvrgddrvqmtbvahsmmuikzmseeucmarevfqrrnleh",
-)
-RERANKER_API_KEY = os.getenv(
-    "SILICONFLOW_RERANKER_API_KEY",
-    "sk-ffoqjgptuqpxrnkelaciqfslbmmbfujohyclyqdoobclrbty",
-)
+EMBEDDING_API_KEY = settings.siliconflow_embedding_api_key
+RERANKER_API_KEY = settings.siliconflow_reranker_api_key
 
 EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"
 RERANKER_MODEL = "Qwen/Qwen3-Reranker-8B"

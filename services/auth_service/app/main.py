@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config_test import settings
+from app.core.config import settings
 from app.api.v1.auth import router as auth_router
 from app.database.mongodb_service import db_manager
 from app.infrastructure.grpc.token_auth_server import serve as start_grpc_server

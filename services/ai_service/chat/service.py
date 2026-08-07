@@ -49,12 +49,12 @@ def _get_memory(user_id: str) -> SlidingWindowMemory:
     wait=wait_exponential(multiplier=1, min=1, max=5),
 )
 async def _fetch_history(
-    group_id: str, limit: int = 30,
+    conversation_id: str, limit: int = 30,
 ) -> list[ChatHistoryMessage]:
     """调用 chat_service 拉取会话历史。"""
     url = f"{settings.chat_service_url}/api/v1/messages/history"
     params = {
-        "conversation_id": group_id,
+        "conversation_id": conversation_id,
         "limit": limit,
         "cursor": int(time.time()),  # Unix 秒级时间戳
     }
@@ -82,12 +82,12 @@ async def handle_private_message(producer, event_data: dict) -> None:
 
     # ---- 加载历史 ----
     try:
-    if not group_id and target != settings.ai_user_id:
-        return
-            history = await _fetch_history(group_id, limit=30)
-            for h in history:
-                role = "assistant" if h.sender_id == settings.ai_user_id else "user"
-                memory.add(role, h.content)
+        # 私聊会话 ID 是双方 ID 排序后的组合（与 chat_service 的 GenerateSessionID 一致）
+        conversation_id = group_id or "_".join(sorted([target, user_id]))
+        history = await _fetch_history(conversation_id, limit=30)
+        for h in history:
+            role = "assistant" if h.sender_id == settings.ai_user_id else "user"
+            memory.add(role, h.content)
     except Exception as e:
         logger.warning("拉取历史消息失败 user=%s err=%s", user_id, e)
 

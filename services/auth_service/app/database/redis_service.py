@@ -1,5 +1,5 @@
 from redis import Redis, ConnectionPool
-from app.core.config_test import settings
+from app.core.config import settings
 
 # 创建全局连接池
 redis_pool = ConnectionPool(

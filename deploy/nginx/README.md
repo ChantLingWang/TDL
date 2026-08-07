@@ -45,6 +45,14 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
 ```
 
+## 多节点 chat_service 负载均衡
+
+`chat-loadbalancer.conf` 是 chat_service 多实例部署时的 nginx 配置：
+
+- `ip_hash` 保证同一个用户的 WebSocket 连接固定落在同一台机器（Hub 状态一致）
+- 前置条件：docker 网络中有 `chat-1:8080`、`chat-2:8080` 两个实例
+- 用法：`sudo cp deploy/nginx/chat-loadbalancer.conf /etc/nginx/sites-available/chat-lb`
+
 ## 前端 baseURL 改动
 
 nginx 部署后前端 API 全部改为**相对路径**：

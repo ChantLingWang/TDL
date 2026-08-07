@@ -8,7 +8,7 @@ import ChatPage from './pages/ChatPage';
 import './styles/global.scss';
 
 function App() {
-  const refreshTimer = useRef<ReturnType<typeof setInterval>>();
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     const refresh = async () => {
