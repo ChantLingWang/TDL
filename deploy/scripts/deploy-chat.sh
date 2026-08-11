@@ -3,7 +3,11 @@
 set -e
 
 cd /opt/chant/repo
-git pull --ff-only
+for i in 1 2 3; do
+    git pull --ff-only && break
+    echo "git pull failed (attempt $i), retrying..."
+    sleep 3
+done
 
 export GOPROXY=https://goproxy.cn,direct
 # 2G 内存机器：串行编译 + 限制并行度，避免 go build 内存尖峰

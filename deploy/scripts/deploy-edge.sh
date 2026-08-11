@@ -3,7 +3,11 @@
 set -e
 
 cd /opt/chant/repo
-git pull --ff-only
+for i in 1 2 3; do
+    git pull --ff-only && break
+    echo "git pull failed (attempt $i), retrying..."
+    sleep 3
+done
 
 export PATH=/opt/node/bin:$PATH
 
