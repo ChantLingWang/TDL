@@ -90,7 +90,7 @@ const LoginPage: React.FC = () => {
       <div className={styles.loginBox}>
         <div className={styles.header}>
           <h1 className={styles.title}>
-            {loginMethod === 'code' ? 'Chant_ELink' : 'Chant_PLink'}
+            Chant AI
           </h1>
         </div>
         <div 

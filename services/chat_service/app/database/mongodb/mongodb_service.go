@@ -40,7 +40,8 @@ func (manager *MongoDBManager) Connect() error {
 
 	var uri string
 	if config.MongoDBConfig.User != "" {
-		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?sslmode=%s&timezone=%s",
+		// root 等管理用户建在 admin 库，必须显式指定 authSource=admin
+		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s?authSource=admin&sslmode=%s&timezone=%s",
 			config.MongoDBConfig.User, config.MongoDBConfig.Password,
 			host, port, dbname,
 			config.MongoDBConfig.SSLMode, config.MongoDBConfig.TimeZone)
