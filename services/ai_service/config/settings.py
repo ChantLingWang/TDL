@@ -64,6 +64,8 @@ class Settings(BaseSettings):
 
     # ---- chat_service ----
     chat_service_url: str = "http://localhost:8080"
+    internal_api_key: str = ""
+    """调用 chat_service 内部接口（历史）时使用的密钥"""
 
     # ---- 成本审计 ----
     cost_tracking_enabled: bool = True

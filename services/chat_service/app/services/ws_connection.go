@@ -3,8 +3,11 @@ package services
 import (
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"chat_service/app/config"
 
 	"github.com/gorilla/websocket"
 )
@@ -14,7 +17,16 @@ var WSUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // 非浏览器客户端（如测试脚本）允许
+		}
+		for _, allowed := range strings.Split(config.WSAllowedOrigins, ",") {
+			if strings.TrimSpace(allowed) == origin {
+				return true
+			}
+		}
+		return false
 	},
 }
 

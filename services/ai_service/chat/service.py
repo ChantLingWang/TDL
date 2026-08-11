@@ -59,7 +59,10 @@ async def _fetch_history(
         "cursor": int(time.time()),  # Unix 秒级时间戳
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
-        resp = await client.get(url, params=params)
+        resp = await client.get(
+            url, params=params,
+            headers={"X-Internal-Key": settings.internal_api_key},
+        )
         resp.raise_for_status()
         body = resp.json()
     messages_raw = body.get("messages") or []

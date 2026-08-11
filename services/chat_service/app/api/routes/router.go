@@ -1,8 +1,11 @@
 package routes
 
 import (
+	"net/http"
+
 	"chat_service/app/api/handlers"
 	"chat_service/app/api/websocket"
+	"chat_service/app/config"
 	"chat_service/app/middleware/auth_token"
 
 	"github.com/gin-gonic/gin"
@@ -17,10 +20,13 @@ func NewRouter() *Router {
 }
 
 func (r *Router) SetupRoutes() *gin.RouterGroup {
+	// CORS：生产环境通过 CORS_ALLOWED_ORIGIN 配置白名单；为空则不输出 CORS 头
 	r.Engine.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Headers", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		if origin := config.CORSAllowedOrigin; origin != "" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Internal-Key")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		}
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -28,8 +34,13 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 		c.Next()
 	})
 
-	// 内部接口，无需鉴权（供 ai_service 拉取历史消息）
-	r.Engine.GET("/api/v1/messages/history", handlers.GetMessageHistory)
+	// 健康检查
+	r.Engine.GET("/api/v1/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "chat_service"})
+	})
+
+	// 历史接口：支持前端 JWT 或 ai_service 内部密钥
+	r.Engine.GET("/api/v1/messages/history", authOrInternal(), handlers.GetMessageHistory)
 
 	v1 := r.Engine.Group("/api/v1")
 	v1.Use(auth_token.Auth())
@@ -55,6 +66,19 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 	}
 
 	return v1
+}
+
+// authOrInternal 允许两种调用方：
+//  1. 前端：携带 JWT（走 auth_token.Auth）
+//  2. ai_service：携带 X-Internal-Key（内部服务密钥）
+func authOrInternal() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if key := c.GetHeader("X-Internal-Key"); key != "" && key == config.InternalAPIKey {
+			c.Next()
+			return
+		}
+		auth_token.Auth()(c)
+	}
 }
 
 func GetRouter() *Router {

@@ -56,6 +56,13 @@ type Config struct {
 	MongoDB  DBConfig    `yaml:"mongodb"`
 	Kafka    KafkaConfig `yaml:"kafka"`
 	Redis    RedisConfig `yaml:"redis"`
+
+	// 内部服务调用密钥（ai_service 等调用内部接口时使用）
+	InternalAPIKey string `yaml:"internal_api_key"`
+	// CORS 允许的 Origin（为空则不输出 CORS 头，同源访问不受影响）
+	CORSAllowedOrigin string `yaml:"cors_allowed_origin"`
+	// WebSocket 允许的 Origin 列表（逗号分隔，为空时仅允许无 Origin 请求）
+	WSAllowedOrigins string `yaml:"ws_allowed_origins"`
 }
 
 // 全局变量，保持原有变量名以减少代码修改
@@ -65,6 +72,9 @@ var (
 	ServerConfig        ServerCfg
 	KafkaConfigInstance KafkaConfig
 	RedisConfigInstance RedisConfig
+	InternalAPIKey      string
+	CORSAllowedOrigin   string
+	WSAllowedOrigins    string
 )
 
 // InitConfig 初始化全局配置
@@ -112,6 +122,13 @@ func InitConfig(path string) {
 		Topic:   globalConfig.Kafka.Topic,
 		GroupID: groupID,
 	}
+	InternalAPIKey = globalConfig.InternalAPIKey
+	CORSAllowedOrigin = globalConfig.CORSAllowedOrigin
+	WSAllowedOrigins = globalConfig.WSAllowedOrigins
+
+	subEnv(&InternalAPIKey, "INTERNAL_API_KEY")
+	subEnv(&CORSAllowedOrigin, "CORS_ALLOWED_ORIGIN")
+	subEnv(&WSAllowedOrigins, "WS_ALLOWED_ORIGINS")
 }
 
 // subEnv 如果环境变量存在则覆盖指针指向的值

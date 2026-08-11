@@ -51,7 +51,15 @@ async def send_code(request:Request,data: SendCodeRequest):
     """发送验证码接口"""
     email_service = EmailService()
     try:
+        # 简单频率限制：同一邮箱 60 秒内只能发一次
+        redis_rate = RedisUserService()
+        if redis_rate.get_code(f"rate:code:{data.email}"):
+            raise HTTPException(
+                status_code=429,
+                detail="发送过于频繁，请稍后再试",
+            )
         await asyncio.to_thread(email_service.send_email, data.email)
+        redis_rate.set_code(f"rate:code:{data.email}", "1", 60)
         
         return{
             "message": "验证码发送成功",
@@ -76,6 +84,8 @@ async def send_code(request:Request,data: SendCodeRequest):
 async def register(request:Request,data: VerifyCodeRequest):
     """验证注册验证码接口"""
     try:
+        if len(data.password) < 8:
+            raise HTTPException(status_code=400, detail="密码长度至少 8 位")
         redis_client = RedisUserService()
         
         user_service = await get_user_service()

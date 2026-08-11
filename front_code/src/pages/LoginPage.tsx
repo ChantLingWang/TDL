@@ -63,7 +63,6 @@ const LoginPage: React.FC = () => {
         response = await authApi.login({ email, password });
       }
       
-      console.log('Login Success:', response);
       setMessage('登录成功。');
       
       localStorage.setItem('access_token', response.data.access_token);

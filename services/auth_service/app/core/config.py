@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 120
     
     # CORS配置
-    allowed_origins: list = ["*"]       #允许访问API的来源
+    allowed_origins: list = ["http://localhost:5173"]  # 允许访问API的来源（生产改为域名）
     allowed_methods: list = ["*"]       #允许访问API的方法
     allowed_headers: list = ["*"]       #允许访问API的请求头
     

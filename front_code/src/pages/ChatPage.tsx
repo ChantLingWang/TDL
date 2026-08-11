@@ -52,7 +52,7 @@ const ChatPage: React.FC = () => {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
 
   // 派生：AI 群组和普通群组
-  const aiGroups = groups.filter(g => g.group_type === 'ai');
+  const aiGroups = groups.filter(g => g.group_type === 'ai' || g.group_type === 'ai-research');
   const normalGroups = groups.filter(g => g.group_type !== 'ai');
 
   // ---- WebSocket ----
@@ -68,7 +68,7 @@ const ChatPage: React.FC = () => {
     ws.onmessage = (ev) => {
       try {
         const msg: WsMessage = JSON.parse(ev.data);
-        if (msg.sender === username) return; // 跳过自己发的消息（本地已渲染）
+        if (msg.sender === userId) return; // 跳过自己发的消息（本地已渲染）
         setMessages((prev) => [...prev, msg]);
       } catch { /* ignore */ }
     };
@@ -105,7 +105,7 @@ const ChatPage: React.FC = () => {
     const gid = selectedGroupId || activeGroup;
     if (!gid) return;
     setMessages([]);
-    chatApi.getHistory(gid, 50).then((res) => {
+    chatApi.getHistory(gid, 0, 50).then((res) => {
       const history: WsMessage[] = (res.messages || []).map((m: any) => ({
         type: 'chat',
         sender: m.sender_id,
@@ -113,7 +113,8 @@ const ChatPage: React.FC = () => {
         time: typeof m.timestamp === 'number' ? m.timestamp : Date.parse(m.timestamp),
         group_id: m.group_id || gid,
       }));
-      setMessages(history);
+      // 后端返回最新在前，前端需要旧 -> 新
+      setMessages([...history].reverse());
     }).catch(() => {});
   }, [selectedGroupId, activeGroup]);
 
@@ -134,9 +135,10 @@ const ChatPage: React.FC = () => {
         time: typeof m.timestamp === 'number' ? m.timestamp : Date.parse(m.timestamp),
         group_id: m.group_id || gid,
       }));
+      // more 为最新在前，转为旧 -> 新后整体前置
       more.reverse();
       setMessages((prev) => [...more, ...prev]);
-      setHasMoreHistory(more.length === 50);
+      setHasMoreHistory(res.messages?.length === 50);
     } catch { } finally { setLoadingHistory(false); }
   };
 
@@ -198,7 +200,7 @@ const ChatPage: React.FC = () => {
     };
 
     setMessages((prev) => [...prev, {
-      type: 'chat', sender: username, content: text,
+      type: 'chat', sender: userId, content: text,
       time: msgTime, group_id: gid,
     }]);
 

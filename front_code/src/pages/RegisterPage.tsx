@@ -57,11 +57,13 @@ const RegisterPage: React.FC = () => {
     try {
       setLoading(true);
       const response = await authApi.register({ email, code, username, password });
-      console.log('Register Success:', response);
       setMessage('注册成功,欢迎加入。');
       
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user_info', JSON.stringify(response.data.user));
+      if (response.data.refresh_token) {
+        localStorage.setItem('refresh_token', response.data.refresh_token);
+      }
       
       setTimeout(() => {
         navigate('/dashboard');
@@ -77,7 +79,7 @@ const RegisterPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.loginBox}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Chant_Registration</h1>
+          <h1 className={styles.title}>Chant AI</h1>
         </div>
         <div 
           className={styles.backButton}
