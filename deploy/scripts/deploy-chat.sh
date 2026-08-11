@@ -5,6 +5,8 @@ set -e
 cd /opt/chant/repo
 git pull --ff-only
 
+export GOPROXY=https://goproxy.cn,direct
+
 cd services/chat_service
 /usr/local/go/bin/go build -ldflags="-w -s" -o /opt/chant/chat-service .
 
