@@ -2,12 +2,14 @@ import jwt
 import time
 import uuid
 from typing import Dict,Any,Optional
-from app.core.secret_key import get_secret_key
+
+from app.core.config import settings
 
 
 class JWTUtils:
     #配置项
-    SECRET_KEY = get_secret_key()
+    # 从配置读取：环境变量 SECRET_KEY 可覆盖，未设置时回退到默认派生密钥
+    SECRET_KEY = settings.secret_key
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 120
     REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 # 30天
