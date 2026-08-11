@@ -8,7 +8,7 @@ git pull --ff-only
 export PATH=/opt/node/bin:$PATH
 
 cd services/auth_service
-/opt/chant/auth-venv/bin/pip install -q -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+/opt/chant/auth-venv/bin/python -m pip install -q -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 systemctl restart chant-auth
 
 cd /opt/chant/repo/front_code
