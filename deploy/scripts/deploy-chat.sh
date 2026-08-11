@@ -6,6 +6,9 @@ cd /opt/chant/repo
 git pull --ff-only
 
 export GOPROXY=https://goproxy.cn,direct
+# 2G 内存机器：串行编译 + 限制并行度，避免 go build 内存尖峰
+export GOFLAGS=-p=1
+export GOMAXPROCS=2
 
 cd services/chat_service
 /usr/local/go/bin/go build -ldflags="-w -s" -o /opt/chant/chat-service .
