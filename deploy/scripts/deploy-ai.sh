@@ -5,6 +5,9 @@ set -e
 cd /opt/chant/repo
 git pull --ff-only
 
+cd services/ai_service
+/opt/chant/ai-venv/bin/pip install -q -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 systemctl restart chant-ai
 systemctl status chant-ai --no-pager | head -5
 echo "ai deploy done"
