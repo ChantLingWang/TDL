@@ -4,7 +4,8 @@ import { chatApi } from '../api/chat';
 import type { Group } from '../api/chat';
 import styles from './ChatPage.module.scss';
 
-const WS_BASE = import.meta.env.VITE_WS_URL;
+const WS_BASE = import.meta.env.VITE_WS_URL
+  || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1/ws`;
 
 interface WsMessage {
   type: string;
