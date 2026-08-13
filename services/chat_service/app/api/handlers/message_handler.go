@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
+	"sort"
 
 	"chat_service/app/database/mongodb"
 	"chat_service/app/database/pgsql"
@@ -58,6 +58,7 @@ func GetMessages(c *gin.Context) {
 	if err != nil || lastOfflineTime == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"total_unread_count": 0,
+			"unread_counts":      map[string]int{},
 			"last_offline_time":  0,
 			"messages":           []interface{}{},
 		})
@@ -69,30 +70,79 @@ func GetMessages(c *gin.Context) {
 	if err != nil || len(conversationIDs) == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"total_unread_count": 0,
+			"unread_counts":      map[string]int{},
 			"last_offline_time":  lastOfflineTime,
 			"messages":           []interface{}{},
 		})
 		return
 	}
 
-	mongoService := mongodb.GetGroupMessageHistoryService()
-	messages, totalCount, err := mongoService.GetUnreadMessages(conversationIDs, lastOfflineTime, 1001)
+	// 只统计用户当前仍是成员的群会话，防止被移出群后仍能通过残留会话记录读到未读消息
+	groupSvc := pgsql.NewUserGroupService(pgsql.GetDBManager())
+	myGroups, err := groupSvc.GetUserGroups(userInfo.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	memberOf := make(map[string]struct{}, len(myGroups))
+	for _, g := range myGroups {
+		memberOf[g.GroupID] = struct{}{}
+	}
+	authorized := make([]string, 0, len(conversationIDs))
+	for _, convID := range conversationIDs {
+		if _, ok := memberOf[convID]; ok {
+			authorized = append(authorized, convID)
+			continue
+		}
+		// 不在成员列表里的会话 ID：私聊会话直接保留；是群但已不是成员则丢弃
+		if _, groupErr := groupSvc.GetGroupByID(convID); groupErr != nil {
+			authorized = append(authorized, convID)
+		}
+	}
+	conversationIDs = authorized
+
+	mongoService := mongodb.GetGroupMessageHistoryService()
+	unreadCounts := make(map[string]int, len(conversationIDs))
+	totalCount := 0
+	var allMessages []mongodb.Message
+	for _, convID := range conversationIDs {
+		// 以「最后已读时间」和「最后离线时间」的较晚者作为该会话的未读分界
+		cutoff := lastOfflineTime
+		lastRead, readErr := conversationService.GetLastReadTime(
+			c.Request.Context(), userInfo.UserID, convID,
+		)
+		if readErr == nil && !lastRead.IsZero() && lastRead.Unix() > cutoff {
+			cutoff = lastRead.Unix()
+		}
+
+		msgs, count, mongoErr := mongoService.GetUnreadMessages(
+			[]string{convID}, cutoff, 1001,
+		)
+		if mongoErr != nil {
+			continue
+		}
+		unreadCounts[convID] = count
+		totalCount += count
+		allMessages = append(allMessages, msgs...)
+	}
+
+	sort.Slice(allMessages, func(i, j int) bool {
+		return allMessages[i].Timestamp.After(allMessages[j].Timestamp)
+	})
 
 	displayCount := totalCount
 	if displayCount > MaxUnreadCount {
 		displayCount = MaxUnreadCount
 	}
-	responseMessages := messages
-	if len(messages) > MaxDisplayCount {
-		responseMessages = messages[:MaxDisplayCount]
+	responseMessages := allMessages
+	if len(allMessages) > MaxDisplayCount {
+		responseMessages = allMessages[:MaxDisplayCount]
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"total_unread_count": displayCount,
+		"unread_counts":      unreadCounts,
+		"last_offline_time":  lastOfflineTime,
 		"messages":           responseMessages,
 	})
 }
@@ -113,7 +163,22 @@ func GetMessageHistory(c *gin.Context) {
 	group, err := groupSvc.GetGroupByID(convID)
 
 	isGroup := err == nil && group != nil
-	isAI := isGroup && strings.HasPrefix(convID, "ai_")
+
+	// 越权校验：JWT 用户只能读取自己参与的会话。
+	// 内部服务（X-Internal-Key）没有 userInfo，视为可信，跳过校验。
+	if userInfoVal, exists := c.Get("userInfo"); exists {
+		userID := userInfoVal.(*services.UserInfo).UserID
+		if isGroup {
+			ok, checkErr := groupSvc.IsUserInGroup(userID, convID)
+			if checkErr != nil || !ok {
+				c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+				return
+			}
+		} else if !mongodb.IsPrivateParticipant(convID, userID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	}
 
 	mongoSvc := mongodb.GetGroupMessageHistoryService()
 	msgs, err := mongoSvc.GetHistoryMessages(convID, req.Cursor, req.StartTime, req.EndTime, req.Keyword, req.Limit)
@@ -122,9 +187,7 @@ func GetMessageHistory(c *gin.Context) {
 		return
 	}
 
-	// AI 会话需要按 conversation_id 过滤
-	if isAI || isGroup {
-	} else {
+	if !isGroup {
 		// 私聊
 		privSvc := mongodb.GetPrivateMessageHistoryService()
 		msgs, _ = privSvc.GetHistoryMessages(convID, req.Cursor, req.StartTime, req.EndTime, req.Keyword, req.Limit)

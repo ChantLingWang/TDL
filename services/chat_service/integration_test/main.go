@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -31,6 +32,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // JWT --------------------------------
@@ -87,6 +91,38 @@ func restPost(url string, body interface{}, token string) (*http.Response, error
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 	return http.DefaultClient.Do(req)
+}
+
+// ensureTestUsers 在 auth 库注册测试用户，供群主拉人时的用户存在性校验使用。
+func ensureTestUsers() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		return err
+	}
+	defer client.Disconnect(ctx)
+
+	coll := client.Database("auth").Collection("Users")
+	for _, u := range []map[string]interface{}{
+		{"user_id": "test-user-a", "username": "test-user-a", "email": "a@test.local"},
+		{"user_id": "test-user-b", "username": "test-user-b", "email": "b@test.local"},
+	} {
+		filter := bson.M{"user_id": u["user_id"]}
+		update := bson.M{
+			"$set": u,
+			"$setOnInsert": bson.M{
+				"password":   "",
+				"status":     "active",
+				"created_at": time.Now().UTC().Format(time.RFC3339),
+			},
+		}
+		if _, err := coll.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // 实例管理 ---------------------------
@@ -204,6 +240,9 @@ func main() {
 	log.Println("✅ client B connected to instance 2")
 
 	// 初始化测试用户
+	if err := ensureTestUsers(); err != nil {
+		log.Fatalf("❌ failed to ensure test users in auth DB: %v", err)
+	}
 	for _, c := range []struct {
 		baseURL string
 		userID  string
@@ -239,15 +278,14 @@ func main() {
 	}
 	log.Printf("✅ group created: %s", gr.GroupID)
 
-	// B 加入群组
-	resp, _ = restPost("http://localhost:18084/api/v1/groups/join", map[string]string{
-		"group_id": gr.GroupID,
-		"user_id":  "test-user-b",
-	}, tokenB)
+	// A（群主）将 B 拉入群组
+	resp, _ = restPost(fmt.Sprintf("http://localhost:18083/api/v1/groups/%s/members", gr.GroupID), map[string]string{
+		"user_id": "test-user-b",
+	}, tokenA)
 	if resp != nil && resp.StatusCode == http.StatusOK {
-		log.Println("✅ user B joined group")
+		log.Println("✅ creator A added user B to group")
 	} else {
-		log.Fatal("❌ user B failed to join group")
+		log.Fatal("❌ failed to add user B to group")
 	}
 
 	// 发送消息

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 
+	"chat_service/app/database/mongodb"
+
 	chatv1 "github.com/chant/chant/gen/go/chant/chat/v1"
 	commonv1 "github.com/chant/chant/gen/go/chant/common/v1"
 	sdk_kafka "infrastructure_sdk/kafka"
@@ -41,10 +43,11 @@ func HandleGroupChatMessageEvent(ctx context.Context, env *commonv1.EventEnvelop
 
 	responseMsg := map[string]interface{}{
 		"type":            "group_chat",
-		"conversation_id": msg.ConversationType,
+		"conversation_id": msg.GroupId,
 		"group_id":        msg.GroupId,
 		"sender":          msg.SenderId,
 		"content":         msg.Content,
+		"message_id":      msg.MessageId,
 		"time":            env.Timestamp,
 	}
 	msgBytes, _ := json.Marshal(responseMsg)
@@ -70,9 +73,10 @@ func HandlePrivateChatMessageEvent(ctx context.Context, env *commonv1.EventEnvel
 
 	responseMsg := map[string]interface{}{
 		"type":            "private_chat",
-		"conversation_id": msg.TargetUserId,
+		"conversation_id": mongodb.GenerateSessionID(msg.SenderId, msg.TargetUserId),
 		"sender":          msg.SenderId,
 		"content":         msg.Content,
+		"message_id":      msg.MessageId,
 		"time":            env.Timestamp,
 	}
 	msgBytes, _ := json.Marshal(responseMsg)
@@ -92,15 +96,20 @@ func BroadcastAiReply(reply *chatv1.AiReplyGenerated, ts int64) {
 		return
 	}
 	payload := map[string]interface{}{
-		"sender":  reply.SenderId,
-		"content": reply.Content,
-		"time":    ts,
+		"sender":          reply.SenderId,
+		"content":         reply.Content,
+		"message_id":      reply.MessageId,
+		"reply_to_msg_id": reply.ReplyToMsgId,
+		"metadata":        reply.Metadata,
+		"time":            ts,
 	}
 	if reply.GroupId != "" {
 		payload["type"] = "group_chat"
 		payload["group_id"] = reply.GroupId
+		payload["conversation_id"] = reply.GroupId
 	} else {
 		payload["type"] = "private_chat"
+		payload["conversation_id"] = mongodb.GenerateSessionID(reply.SenderId, reply.TargetUserId)
 	}
 	responseMsg, _ := json.Marshal(payload)
 	aiReplyBroadcast(reply.TargetUserId, reply.GroupId, responseMsg)

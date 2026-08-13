@@ -52,7 +52,7 @@ func (ugs *UserGroupService) AddUserToGroup(userID, groupID string) error {
 	g := query.Group
 	ug := query.UserGroup
 
-// 检查组群是否存在
+	// 检查组群是否存在
 	if _, err := g.WithContext(context.Background()).Where(g.GroupID.Eq(groupID)).First(); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return fmt.Errorf("group not found: %s", groupID)
@@ -171,6 +171,18 @@ func (ugs *UserGroupService) GetGroupMembers(groupID string) ([]string, error) {
 		memberIDs = append(memberIDs, item.UserID)
 	}
 	return memberIDs, nil
+}
+
+// IsUserInGroup 判断用户是否为指定群组的成员
+func (ugs *UserGroupService) IsUserInGroup(userID, groupID string) (bool, error) {
+	ug := query.UserGroup
+	count, err := ug.WithContext(context.Background()).
+		Where(ug.UserID.Eq(userID), ug.GroupID.Eq(groupID)).
+		Count()
+	if err != nil {
+		return false, fmt.Errorf("failed to check group membership: %w", err)
+	}
+	return count > 0, nil
 }
 
 // GenerateGroupID 使用 PostgreSQL Sequence 生成递增的 group_id

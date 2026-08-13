@@ -15,6 +15,10 @@ class RedisUserService:
     
     def delete_code(self, key: str):
         self.redis_client.redis_client.delete(key)
+
+    def try_set_nx(self, key: str, value: str, ttl: int) -> bool:
+        """SET key value EX ttl NX，返回是否成功设置（用于原子限流）。"""
+        return bool(self.redis_client.redis_client.set(key, value, ex=ttl, nx=True))
     
     def test_connection(self):
         return self.redis_client.test_connection()

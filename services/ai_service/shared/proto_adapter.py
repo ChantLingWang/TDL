@@ -1,5 +1,8 @@
 """proto adapter —— 封装 proto 消息的 JSON 编解码，替换手写的 models.py。"""
 
+import time
+import uuid
+
 from google.protobuf.json_format import Parse, MessageToJson
 
 from chant.common.v1 import envelope_pb2 as _envelope
@@ -34,8 +37,10 @@ def new_envelope(event_type: str, source: str, msg) -> _envelope.EventEnvelope:
     """创建一个事件信封。"""
     data_json = MessageToJson(msg, preserving_proto_field_name=True)
     return _envelope.EventEnvelope(
+        event_id=f"{event_type}-{uuid.uuid4()}",
         event_type=event_type,
         source=source,
+        timestamp=int(time.time() * 1000),
         data=data_json.encode('utf-8'),
     )
 

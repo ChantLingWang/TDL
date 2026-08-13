@@ -32,6 +32,7 @@ async def send_ai_reply(
     message_id: str,
     group_id: str = '',
     metadata: dict | None = None,
+    reply_to_msg_id: str | None = None,
 ) -> None:
     """以 AI 用户身份发送一条回复。"""
     import time
@@ -39,7 +40,7 @@ async def send_ai_reply(
     reply = new_ai_reply(
         target_user_id=user_id,
         content=content,
-        reply_to_msg_id=message_id,
+        reply_to_msg_id=reply_to_msg_id or message_id,
         message_id=f'ai-{message_id}',
         group_id=group_id,
         timestamp_ms=ts,
@@ -60,7 +61,9 @@ async def send_error_reply(
     producer: AIOKafkaProducer,
     user_id: str,
     message_id: str,
+    group_id: str = '',
 ) -> None:
     await send_ai_reply(
         producer, user_id, '[AI 暂时无法回复，请稍后重试]', f'err-{message_id}',
+        group_id=group_id, reply_to_msg_id=message_id,
     )

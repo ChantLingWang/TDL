@@ -58,13 +58,16 @@ func handleAiReply(ctx context.Context, env *commonv1.EventEnvelope) error {
 		IsActive:    true,
 	}
 
-	if reply.GroupId != "" {
-		msg.GroupID = reply.GroupId
-		msg.ConversationID = reply.GroupId
-		_ = mongodb.SaveMessage("ai", reply.SenderId, reply.GroupId, msg)
-	} else {
-		msg.PrivateID = reply.TargetUserId
-		_ = mongodb.SaveMessage("private", reply.SenderId, reply.TargetUserId, msg)
+	// 进度类消息只做实时推送，不落历史，避免污染消息记录
+	if reply.Metadata["kind"] != "progress" {
+		if reply.GroupId != "" {
+			msg.GroupID = reply.GroupId
+			msg.ConversationID = reply.GroupId
+			_ = mongodb.SaveMessage("ai", reply.SenderId, reply.GroupId, msg)
+		} else {
+			msg.PrivateID = reply.TargetUserId
+			_ = mongodb.SaveMessage("private", reply.SenderId, reply.TargetUserId, msg)
+		}
 	}
 
 	// WS 推送 — 委托 services 包处理（有 GetWSHub 可用）

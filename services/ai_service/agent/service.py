@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 
 import asyncio as _asyncio
 from langchain_core.messages import HumanMessage
@@ -22,7 +23,11 @@ async def _send_progress(producer, user_id: str, text: str,
     """发送进度状态消息。"""
     await send_ai_reply(
         producer, user_id, text,
-        f"progress-{msg_id}", group_id=group_id,
+        # 每条进度消息使用唯一 ID，便于前端去重与链路追踪
+        f"progress-{msg_id}-{int(time.time() * 1000)}",
+        group_id=group_id,
+        metadata={"kind": "progress"},
+        reply_to_msg_id=msg_id,
     )
 
 
@@ -81,17 +86,17 @@ async def handle_agent_message(producer, event_data: dict) -> None:
                 last_state = data
     except Exception:
         logger.exception("research graph 执行失败 user=%s", user_id)
-        await send_error_reply(producer, user_id, msg_id)
+        await send_error_reply(producer, user_id, msg_id, group_id=group_id)
         return
 
     if last_state is None:
         logger.error("research graph 未产出最终状态 user=%s", user_id)
-        await send_error_reply(producer, user_id, msg_id)
+        await send_error_reply(producer, user_id, msg_id, group_id=group_id)
         return
 
     final_report = last_state.get("final_report", "") or last_state.get("analysis_report", "")
     if not final_report:
-        await send_error_reply(producer, user_id, msg_id)
+        await send_error_reply(producer, user_id, msg_id, group_id=group_id)
         return
 
     # ---- 审核结果判断 ----
@@ -152,6 +157,7 @@ async def handle_agent_message(producer, event_data: dict) -> None:
     await send_ai_reply(
         producer, user_id, final_report, msg_id,
         group_id=group_id, metadata=metadata,
+        reply_to_msg_id=msg_id,
     )
 
     # ---- 审核未通过：附加 critique 内容供参考 ----
@@ -160,6 +166,7 @@ async def handle_agent_message(producer, event_data: dict) -> None:
         await send_ai_reply(
             producer, user_id, critique_note,
             f"{msg_id}-critique", group_id=group_id,
+            reply_to_msg_id=msg_id,
         )
 
     logger.info("agent research 完成 user=%s report=%d chars passed=%s",

@@ -103,7 +103,7 @@ async def handle_private_message(producer, event_data: dict) -> None:
         response = await route_chat(llm_messages)
     except Exception:
         logger.exception("LLM 调用失败 user=%s", user_id)
-        await send_error_reply(producer, user_id, msg_id)
+        await send_error_reply(producer, user_id, msg_id, group_id=group_id)
         return
 
     # ---- 记录成本 ----
@@ -134,4 +134,5 @@ async def handle_private_message(producer, event_data: dict) -> None:
     # ---- 通过 Kafka 发送回复 ----
     await send_ai_reply(
         producer, user_id, response.content, msg_id, group_id=group_id,
+        reply_to_msg_id=msg_id,
     )

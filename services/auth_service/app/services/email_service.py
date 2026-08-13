@@ -50,5 +50,4 @@ class EmailService:
         #将code存入redis，并设置TTL
         redis_client = RedisUserService()
         redis_client.set_code(to_email, code, 600)
-        print(f"DEBUG REDIS: stored code {code} for {to_email}")
         return code

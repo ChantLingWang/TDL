@@ -54,7 +54,9 @@ func (r *Router) SetupRoutes() *gin.RouterGroup {
 	groups := v1.Group("/groups")
 	{
 		groups.POST("", handlers.CreateGroup)
-		groups.POST("/join", handlers.JoinGroup)
+		groups.GET("/:group_id/members", handlers.GetGroupMembers)
+		groups.POST("/:group_id/members", handlers.AddGroupMember)
+		groups.DELETE("/:group_id/members/:user_id", handlers.RemoveGroupMember)
 	}
 
 	v1.GET("/ws", websocket.HandleWebSocket)

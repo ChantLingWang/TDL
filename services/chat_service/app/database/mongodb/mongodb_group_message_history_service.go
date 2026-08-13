@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,7 +278,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByCursor(conversati
 			filter["messages"] = bson.M{
 				"$elemMatch": bson.M{
 					"timestamp": timeCondition,
-					"content":   bson.M{"$regex": keyword, "$options": "i"},
+					"content":   bson.M{"$regex": regexpQuote(keyword), "$options": "i"},
 				},
 			}
 		} else {
@@ -308,8 +308,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByCursor(conversati
 					continue
 				}
 				if keyword != "" {
-					matched, err := regexp.MatchString(`(?i)`+keyword, msg.Content)
-					if err != nil || !matched {
+					if !strings.Contains(strings.ToLower(msg.Content), strings.ToLower(keyword)) {
 						continue
 					}
 				}
@@ -392,7 +391,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(convers
 				filter["messages"] = bson.M{
 					"$elemMatch": bson.M{
 						"timestamp": timeCondition,
-						"content":   bson.M{"$regex": keyword, "$options": "i"},
+						"content":   bson.M{"$regex": regexpQuote(keyword), "$options": "i"},
 					},
 				}
 			} else {
@@ -405,7 +404,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(convers
 		} else if keyword != "" {
 			filter["messages"] = bson.M{
 				"$elemMatch": bson.M{
-					"content": bson.M{"$regex": keyword, "$options": "i"},
+					"content": bson.M{"$regex": regexpQuote(keyword), "$options": "i"},
 				},
 			}
 		}
@@ -448,8 +447,7 @@ func (service *GroupMessageHistoryService) GetHistoryMessagesByTimeRange(convers
 				}
 				// 关键字过滤
 				if keyword != "" {
-					matched, err := regexp.MatchString(`(?i)`+keyword, msg.Content)
-					if err != nil || !matched {
+					if !strings.Contains(strings.ToLower(msg.Content), strings.ToLower(keyword)) {
 						continue
 					}
 				}

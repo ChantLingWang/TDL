@@ -45,12 +45,24 @@ export const chatApi = {
       group_name: groupName, creator_id: creatorID, group_type: groupType,
     }),
 
-  joinGroup: (groupID: string, userID: string) =>
-    chatRequest.post('/groups/join', { group_id: groupID, user_id: userID }),
+  getGroupMembers: (groupID: string) =>
+    chatRequest.get<unknown, { members: string[] }>(`/groups/${groupID}/members`),
 
-  getMessages: (params?: { group_id?: string; limit?: number }) =>
-    chatRequest.get<any, { messages: ChatMessage[]; total_unread_count: number }>(
-      '/messages', { params }),
+  addGroupMember: (groupID: string, userID: string) =>
+    chatRequest.post<unknown, { message: string }>(`/groups/${groupID}/members`, { user_id: userID }),
+
+  removeGroupMember: (groupID: string, userID: string) =>
+    chatRequest.delete<unknown, { message: string }>(`/groups/${groupID}/members/${userID}`),
+
+  getMessages: () =>
+    chatRequest.get<unknown, {
+      messages: ChatMessage[];
+      total_unread_count: number;
+      unread_counts: Record<string, number>;
+    }>('/messages'),
+
+  markMessagesAsRead: (conversationID: string) =>
+    chatRequest.post<unknown, { message: string }>('/messages/read', { conversation_id: conversationID }),
 
   getHistory: (groupId: string, cursor: number, limit = 50) =>
     chatRequest.get<any, { messages: ChatMessage[] }>(

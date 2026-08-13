@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"chat_service/app/database/pgsql"
+	"chat_service/app/infrastructure/grpc"
 	"chat_service/app/services"
 
 	"github.com/gin-gonic/gin"
@@ -21,8 +22,8 @@ type CreateGroupRequest struct {
 	GroupType string `json:"group_type"`
 }
 
-type JoinGroupRequest struct {
-	GroupID string `json:"group_id" binding:"required"`
+type AddMemberRequest struct {
+	UserID string `json:"user_id" binding:"required"`
 }
 
 func CreateGroup(c *gin.Context) {
@@ -82,26 +83,100 @@ func CreateGroup(c *gin.Context) {
 	c.JSON(http.StatusCreated, group)
 }
 
-func JoinGroup(c *gin.Context) {
-	var req JoinGroupRequest
+// AddGroupMember 群主将指定用户拉入群组。
+// 成员管理只允许群主（groups.create_by_user_id）操作，杜绝凭群号自行入群。
+func AddGroupMember(c *gin.Context) {
+	userInfo := c.MustGet("userInfo").(*services.UserInfo)
+	groupID := c.Param("group_id")
+
+	var req AddMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.UserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+		return
+	}
 
-	// 身份一律取自登录态
-	userInfo := c.MustGet("userInfo").(*services.UserInfo)
 	service := pgsql.NewUserGroupService(pgsql.GetDBManager())
-	if err := service.AddUserToGroup(userInfo.UserID, req.GroupID); err != nil {
+	group, err := service.GetGroupByID(groupID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "group not found"})
+		return
+	}
+	if group.CreateByUserID != userInfo.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only the group creator can manage members"})
+		return
+	}
+
+	// 校验目标用户真实存在，避免拉入无效 ID
+	authResp, authErr := grpc.GetAuthClient().GetUserByID(c.Request.Context(), req.UserID)
+	if authErr != nil || !authResp.Found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	if err := service.AddUserToGroup(req.UserID, groupID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// 自动创建会话记录
 	convSvc := services.GetConversationService()
-	_ = convSvc.MarkMessageAsRead(c.Request.Context(), userInfo.UserID, req.GroupID)
+	_ = convSvc.MarkMessageAsRead(c.Request.Context(), req.UserID, groupID)
 
-	c.JSON(http.StatusOK, gin.H{"message": "User added to group successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "member added"})
+}
+
+// GetGroupMembers 返回群成员 ID 列表，仅群成员可见。
+func GetGroupMembers(c *gin.Context) {
+	userInfo := c.MustGet("userInfo").(*services.UserInfo)
+	groupID := c.Param("group_id")
+
+	service := pgsql.NewUserGroupService(pgsql.GetDBManager())
+	isMember, err := service.IsUserInGroup(userInfo.UserID, groupID)
+	if err != nil || !isMember {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	members, err := service.GetGroupMembers(groupID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"members": members})
+}
+
+// RemoveGroupMember 群主将成员移出群组；群主本人不可被移除。
+func RemoveGroupMember(c *gin.Context) {
+	userInfo := c.MustGet("userInfo").(*services.UserInfo)
+	groupID := c.Param("group_id")
+	targetUserID := c.Param("user_id")
+
+	service := pgsql.NewUserGroupService(pgsql.GetDBManager())
+	group, err := service.GetGroupByID(groupID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "group not found"})
+		return
+	}
+	if group.CreateByUserID != userInfo.UserID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only the group creator can manage members"})
+		return
+	}
+	if targetUserID == group.CreateByUserID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot remove the group creator"})
+		return
+	}
+
+	if err := service.RemoveUserFromGroup(targetUserID, groupID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
 }
 
 func GetUserGroups(c *gin.Context) {

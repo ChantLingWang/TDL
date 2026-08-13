@@ -25,6 +25,8 @@ func HandleWebSocket(c *gin.Context) {
 		log.Printf("Failed to upgrade websocket: %v", err)
 		return
 	}
+	// 限制单条消息大小，防止超大消息占用内存
+	conn.SetReadLimit(64 * 1024)
 
 	log.Printf("WS upgrade OK for user %s", userInfo.UserID)
 
@@ -60,7 +62,7 @@ func HandleWebSocket(c *gin.Context) {
 		// 根据消息类型分发给不同的处理函数
 		switch msg.Type {
 		case kafka.WSMsgTypeChat:
-			services.HandleChat(msg.Content)
+			services.HandleChat(userInfo.UserID, msg.Content)
 		case kafka.WSMsgTypePing:
 			// 心跳包处理
 			log.Printf("Received ping from %s", userInfo.UserID)
