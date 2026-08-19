@@ -76,9 +76,25 @@ class Settings(BaseSettings):
     cost_db_password: str = "postgres"
     cost_db_name: str = "ai_audit"
 
-    # ---- 滑动窗口 ----
-    sliding_window_size: int = 20
-    sliding_window_summary_threshold: int = 10
+    # ---- 短期记忆（DSH 式：真相在历史 + 折叠检查点 + token 预算）----
+    # 数值全部对齐 DSH（dsh-compaction-basic / dsh-llm-deepseek）：
+    #   DeepSeek V4 上下文窗口 = 1,000,000 token（DEFAULT_CONTEXT_WINDOW = 1e6）
+    #   thresholdRatio = 0.8（触发线 = 窗口 × 0.8 = 80 万 token）
+    #   retainRatio    = 0.16（保留尾巴 = 窗口 × 0.16 = 16 万 token）
+    #   摘要 maxTokens  = 8192
+    memory_context_window: int = 1000000
+    """模型上下文窗口 token 数（DeepSeek V4 = 1,000,000，对齐 DSH DEFAULT_CONTEXT_WINDOW）"""
+    memory_summary_trigger_ratio: float = 0.8
+    """触发折叠的窗口占用比例（对齐 DSH thresholdRatio=0.8）"""
+    memory_retain_ratio: float = 0.16
+    """折叠后保留的原文尾巴比例（对齐 DSH retainRatio=0.16）"""
+    memory_summary_max_tokens: int = 8192
+    """摘要调用的输出 token 上限（对齐 DSH compaction maxTokens=8192）"""
+    memory_mongo_url: str = "mongodb://localhost:27017"
+    """折叠检查点存储（与 chat_service 历史同库）"""
+    memory_mongo_db: str = "chat"
+    memory_checkpoint_collection: str = "conversation_memory"
+    """折叠检查点集合：{conversation_id, watermark_ms, summary, updated_at_ms}"""
 
 
 settings = Settings()

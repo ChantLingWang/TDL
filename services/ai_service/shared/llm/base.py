@@ -26,8 +26,23 @@ class LLMMessage:
 class LLMResponse:
     """LLM 单次 chat 调用返回结果。"""
     content: str    # 回复文本
+    reasoning: str = ""  # 思考链文本（模型支持思考时才有）
     model: str = "" # 实际使用的模型名
     usage: dict = field(default_factory=dict)  # token 用量信息
+
+
+@dataclass
+class LLMStreamChunk:
+    """chat_stream 产出的单个流式增量块。
+
+    kind 取值：
+        "reasoning"  思考链文本增量
+        "content"    正文文本增量
+    usage 仅在流末尾的结算块携带（text 为空），其余块为空字典。
+    """
+    kind: str   # "reasoning" | "content"
+    text: str
+    usage: dict = field(default_factory=dict)
 
 
 class AbstractLLM(ABC):
@@ -52,8 +67,11 @@ class AbstractLLM(ABC):
     @abstractmethod
     async def chat_stream(
         self, messages: list[LLMMessage], **kwargs
-    ) -> AsyncIterator[str]:
-        """流式对话，逐 token 产出文本。"""
+    ) -> AsyncIterator[LLMStreamChunk]:
+        """流式对话，逐块产出（reasoning / content 分流）。
+
+        流末尾会额外产出一个带 usage 的空块用于成本结算。
+        """
         ...
     @abstractmethod
     def langchain_model(

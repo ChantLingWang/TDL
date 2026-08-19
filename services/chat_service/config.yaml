@@ -31,6 +31,8 @@ kafka:
   topic: chat_group_message
   group_id: chat_service_group
 
+internal_api_key: chant-internal-2026
+
 redis:
   host: localhost
   port: "6379"

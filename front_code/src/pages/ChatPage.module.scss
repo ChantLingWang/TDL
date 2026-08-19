@@ -1,241 +1,177 @@
-// ================================================================
-//  layout
-// ================================================================
 .wrapper {
-  display: flex; height: 100vh; width: 100vw;
-  background: #f3f4f6; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-// ================================================================
-//  sidebar
-// ================================================================
-.sidebar {
-  width: 268px; min-width: 268px; background: #ffffff;
-  display: flex; flex-direction: column; padding: 14px; gap: 12px;
-  border-right: 1px solid #e5e7eb; overflow-y: auto;
-}
-.sidebarHeaderRow { display: flex; align-items: center; gap: 8px; }
-.sidebarUser { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.statusDot { width: 8px; height: 8px; border-radius: 50%; background: #e5534b; &[data-online='true'] { background: #57ab5a; } }
-.statusLine { font-size: 11px; color: #9ca3af; }
-.logoutBtn { margin-left: auto; background: none; border: 1px solid #d1d5db; color: #6b7280; cursor: pointer; font-size: 11px; padding: 3px 8px; border-radius: 4px; &:hover { background: #f3f4f6; } }
-
-.section { display: flex; flex-direction: column; gap: 4px; }
-.sectionTitle { font-size: 10px; color: #9ca3af; letter-spacing: 1.5px; text-transform: uppercase; padding: 0 2px; margin-top: 4px; }
-
-.convItem {
-  display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px;
-  cursor: pointer; font-size: 13px; transition: background .1s;
-  &:hover { background: #f3f4f6; }
-}
-.convActive { background: #e5e7eb; color: #111827; }
-.unreadBadge {
-  margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
-  background: #2563eb; color: #ffffff; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 600; flex-shrink: 0;
-}
-
-.avatar {
-  width: 32px; height: 32px; border-radius: 50%; background: #e5e7eb; color: #4b5563;
-  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
-  flex-shrink: 0;
-}
-
-.smallInput {
-  background: #f9fafb; border: 1px solid #d1d5db; color: #1f2937;
-  padding: 6px 10px; font-size: 12px; border-radius: 5px; outline: none;
-  &:focus { border-color: #2563eb; }
-}
-.actionBtn {
-  background: #f3f4f6; border: 1px solid #d1d5db; color: #374151;
-  cursor: pointer; padding: 6px 10px; font-size: 12px; border-radius: 5px;
-  &:hover { background: #e5e7eb; }
-}
-
-// ================================================================
-//  chat area
-// ================================================================
-.chatArea { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 14px; }
-
-.chatHeader {
-  padding: 12px 18px; background: #ffffff; border-bottom: 1px solid #e5e7eb;
-  font-size: 14px; font-weight: 600; color: #111827; flex-shrink: 0;
-}
-
-// ---- 群主成员管理 ----
-.manageBtn {
-  margin-left: 12px; background: #f3f4f6; border: 1px solid #d1d5db; color: #374151;
-  cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 5px; flex-shrink: 0;
-  &:hover { background: #e5e7eb; }
-}
-.memberPanel {
-  background: #ffffff; border-bottom: 1px solid #e5e7eb;
-  padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
-}
-.memberPanelTitle { font-size: 12px; font-weight: 600; color: #374151; }
-.memberAddRow { display: flex; gap: 8px; align-items: center; }
-.memberAddRow .smallInput { flex: 1; max-width: 260px; }
-.memberList { display: flex; flex-wrap: wrap; gap: 6px; }
-.memberItem {
-  display: flex; align-items: center; gap: 6px;
-  background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 999px;
-  padding: 3px 8px 3px 10px; font-size: 12px; color: #374151;
-}
-.memberRemove {
-  border: none; background: none; color: #9ca3af; cursor: pointer; font-size: 12px; padding: 0;
-  &:hover { color: #dc2626; }
-}
-.memberEmpty { font-size: 12px; color: #9ca3af; }
-.memberStatus { font-size: 11px; color: #9ca3af; }
-
-.messageList {
-  flex: 1; overflow-y: auto; padding: 16px 20px;
-  display: flex; flex-direction: column; gap: 14px;
-}
-
-// ---- 消息组 ----
-.msgGroup { display: flex; gap: 10px; align-items: flex-end; }
-.msgGroupMine { flex-direction: row-reverse; }
-.msgAvatar {
-  width: 30px; height: 30px; border-radius: 50%; background: #d1d5db; color: #4b5563;
-  display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
-  flex-shrink: 0; align-self: flex-start; margin-top: 16px;
-}
-.msgBubbles { display: flex; flex-direction: column; gap: 2px; max-width: 72%; }
-
-// ---- 单个气泡 ----
-.msgBubble {
-  padding: 8px 13px; border-radius: 14px; font-size: 14px; line-height: 1.45;
-  word-break: break-word; position: relative;
-  .msgGroup:not(.msgGroupMine) & {
-    background: #ffffff; color: #1f2937; border-bottom-left-radius: 4px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  }
-  .msgGroupMine & {
-    background: #2563eb; color: #ffffff; border-bottom-right-radius: 4px; align-self: flex-end;
-  }
-}
-.msgName {
-  font-size: 12px; color: #6b7280; margin-bottom: 2px; padding-left: 2px;
-}
-.msgTime {
-  font-size: 10px; color: #9ca3af; margin-top: 3px; text-align: right;
-  .msgGroupMine & { color: rgba(255, 255, 255, 0.7); }
-}
-
-// ================================================================
-//  input
-// ================================================================
-.inputRow {
-  display: flex; align-items: flex-end; padding: 12px 18px; gap: 10px;
-  border-top: 1px solid #e5e7eb; background: #ffffff; flex-shrink: 0;
-}
-.chatInput {
-  flex: 1; background: #f9fafb; border: 1px solid #d1d5db; color: #1f2937;
-  padding: 10px 14px; font-size: 14px; border-radius: 20px; outline: none;
-  resize: none; font-family: inherit; line-height: 1.4; max-height: 120px;
-  &:focus { border-color: #2563eb; }
-}
-.sendBtn {
-  background: #2563eb; border: none; color: #fff; padding: 10px; cursor: pointer;
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  transition: background .15s; flex-shrink: 0;
-  &:hover { background: #1d4ed8; }
-  &:disabled { background: #d1d5db; color: #9ca3af; cursor: default; }
-}
-
-/* ---- Agent Mode Toggle ---- */
-.agentToggle {
   display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--chant-bg-base);
+}
+
+.placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.placeholderTitle {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.placeholderDesc {
+  font-size: 13px;
+  color: var(--chant-text-tertiary);
+}
+
+.header {
+  flex: none;
+  height: var(--chant-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--chant-border-l1);
+  background: var(--chant-bg-base);
+}
+
+.headerTitle {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manageBtn {
+  padding: 5px 12px;
+  border-radius: var(--chant-radius-sm);
+  border: 1px solid var(--chant-border-l1);
+  font-size: 12.5px;
+  color: var(--chant-text-secondary);
+  &:hover { border-color: var(--chant-border-l2); color: var(--chant-text-primary); }
+}
+
+.agentToggle {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  user-select: none;
-  margin-left: auto;
-
   input { display: none; }
 }
 
 .toggleSlider {
-  width: 40px;
-  height: 22px;
-  background: #ccc;
-  border-radius: 11px;
+  width: 34px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--chant-bg-layer-3);
   position: relative;
-  transition: background .25s;
-
+  transition: background var(--chant-duration) var(--chant-ease);
   &::after {
     content: '';
     position: absolute;
-    top: 2px; left: 2px;
-    width: 18px; height: 18px;
-    background: #fff;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    transition: transform .25s;
+    background: #fff;
+    transition: left var(--chant-duration) var(--chant-ease);
   }
 }
 
 .agentToggle input:checked + .toggleSlider {
-  background: #e65100;
-  &::after { transform: translateX(18px); }
+  background: var(--chant-accent);
+  &::after { left: 18px; }
 }
 
 .toggleLabel {
   font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  min-width: 56px;
-  text-align: center;
+  color: var(--chant-text-tertiary);
 }
 
-.agentToggle input:checked ~ .toggleLabel {
-  color: #e65100;
+// ── 成员管理面板 ──
+.memberPanel {
+  flex: none;
+  margin: 10px 20px 0;
+  padding: 12px;
+  border: 1px solid var(--chant-border-l1);
+  border-radius: var(--chant-radius);
+  background: var(--chant-bg-layer-1);
 }
 
-/* Agent send button */
-.sendBtnAgent {
-  background: #e65100 !important;
-  &:hover { background: #bf360c !important; }
+.memberPanelTitle {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
-/* Codex 风格进度点：挂靠在用户输入下方 */
-.progressTracker {
-  display: flex; align-items: center; gap: 8px;
-  padding: 2px 4px;
-}
-.progressDots { display: flex; align-items: center; gap: 6px; }
-.progressDot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: #2563eb; opacity: 0.45;
-}
-.progressDotDone { background: #2563eb; opacity: 1; }
-.progressDotActive {
-  width: 11px; height: 11px;
-  background: #2563eb;
-  animation: progressPulse 1.2s ease-in-out infinite;
-}
-.progressLabel { font-size: 12px; color: #6b7280; }
-
-@keyframes progressPulse {
-  0%, 100% {
-    transform: scale(1); opacity: 1;
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.35);
-  }
-  50% {
-    transform: scale(1.15); opacity: 0.8;
-    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0);
-  }
+.memberAddRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
-/* Critique note */
-.critiqueNote {
-  background: #fff3e0;
-  border-left: 3px solid #e65100;
-  padding: 8px 12px;
-  margin: 8px 0;
+.memberInput {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--chant-radius-sm);
+  border: 1px solid var(--chant-border-l1);
+  background: var(--chant-bg-layer-2);
+  font-size: 12.5px;
+  outline: none;
+  &:focus { border-color: var(--chant-accent); }
+}
+
+.memberBtn {
+  padding: 0 12px;
+  border-radius: var(--chant-radius-sm);
+  font-size: 12.5px;
+  color: var(--chant-text-primary);
+  background: var(--chant-bg-layer-2);
+  border: 1px solid var(--chant-border-l1);
+  &:hover { border-color: var(--chant-border-l2); }
+}
+
+.memberList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memberItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--chant-radius-sm);
+  background: var(--chant-bg-layer-2);
   font-size: 12px;
-  color: #666;
-  white-space: pre-wrap;
+}
+
+.memberRemove {
+  color: var(--chant-text-caption);
+  font-size: 12px;
+  &:hover { color: var(--chant-error); }
+}
+
+.memberEmpty {
+  font-size: 12px;
+  color: var(--chant-text-caption);
+}
+
+.memberStatus {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--chant-error);
 }

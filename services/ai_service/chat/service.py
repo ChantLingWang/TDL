@@ -20,27 +20,21 @@ from tenacity import (
     wait_exponential,
 )
 
-from chat.memory.sliding_window import SlidingWindowMemory
+from chat.memory.context import assemble_context
 from config.settings import settings
 from shared.cost.store import insert_cost
 from shared.cost.tracker import compute_cost
-from shared.kafka.producer import send_ai_reply, send_error_reply
+from shared.kafka.producer import (
+    send_ai_reply,
+    send_ai_reply_delta,
+    send_error_reply,
+)
 from shared.llm.factory import get_llm
-from shared.llm.base import LLMMessage
-from shared.llm.router import route_chat
 from shared.models import ChatHistoryMessage
 
 logger = logging.getLogger(__name__)
 
 from chat.prompts import SYSTEM_PROMPT
-
-_memories: dict[str, SlidingWindowMemory] = {}
-
-
-def _get_memory(user_id: str) -> SlidingWindowMemory:
-    if user_id not in _memories:
-        _memories[user_id] = SlidingWindowMemory()
-    return _memories[user_id]
 
 
 @retry(
@@ -49,16 +43,18 @@ def _get_memory(user_id: str) -> SlidingWindowMemory:
     wait=wait_exponential(multiplier=1, min=1, max=5),
 )
 async def _fetch_history(
-    conversation_id: str, limit: int = 30,
+    conversation_id: str, limit: int = 50,
 ) -> list[ChatHistoryMessage]:
-    """调用 chat_service 拉取会话历史。"""
+    """调用 chat_service 拉取会话历史（返回新 → 旧）。"""
     url = f"{settings.chat_service_url}/api/v1/messages/history"
     params = {
         "conversation_id": conversation_id,
         "limit": limit,
         "cursor": int(time.time()),  # Unix 秒级时间戳
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+    # trust_env=False：内部调用直连，不经过环境里的 HTTP 代理
+    # （代理只用于访问外部 LLM API，本地/内网服务走代理会被错误拦截）
+    async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), trust_env=False) as client:
         resp = await client.get(
             url, params=params,
             headers={"X-Internal-Key": settings.internal_api_key},
@@ -81,40 +77,88 @@ async def handle_private_message(producer, event_data: dict) -> None:
     if not group_id and target != settings.ai_user_id:
         return
     logger.info("收到 AI 消息  from=%s group=%s msg=%s", user_id, group_id, msg_id)
-    memory = _get_memory(user_id)
 
-    # ---- 加载历史 ----
+    # ---- 加载历史（接口返回新 → 旧，摆正为旧 → 新）----
+    history: list[ChatHistoryMessage] = []
     try:
         # 私聊会话 ID 是双方 ID 排序后的组合（与 chat_service 的 GenerateSessionID 一致）
         conversation_id = group_id or "_".join(sorted([target, user_id]))
-        history = await _fetch_history(conversation_id, limit=30)
-        for h in history:
-            role = "assistant" if h.sender_id == settings.ai_user_id else "user"
-            memory.add(role, h.content)
+        history = await _fetch_history(conversation_id, limit=50)
+        history.reverse()
     except Exception as e:
         logger.warning("拉取历史消息失败 user=%s err=%s", user_id, e)
 
-    # ---- 当前消息加入窗口 ----
-    memory.add("user", content)
+    # ---- 组装上下文（DSH 式：折叠摘要 + 检查点后尾巴 + 当前消息）----
+    llm_messages = await assemble_context(
+        conversation_id, SYSTEM_PROMPT, history, content,
+        current_msg_id=msg_id,
+    )
 
-    # ---- 调用 LLM ----
-    llm_messages: list[LLMMessage] = memory.build(SYSTEM_PROMPT)
+    # ---- 流式调用 LLM，增量分块经 Kafka 推送 ----
+    # 回复 ID 提前确定：所有 delta 与最终 AiReplyGenerated 共用，
+    # 前端按 (message_id, seq) 把分块累积到同一条回复上。
+    reply_id = f'ai-{msg_id}'
+    reasoning_parts: list[str] = []
+    content_parts: list[str] = []
+    usage: dict = {}
+    seq = 0
+
+    async def _flush(kind: str, buf: list[str]) -> None:
+        """把同 kind 的缓冲拼成一块发出去。"""
+        nonlocal seq
+        if not buf:
+            return
+        await send_ai_reply_delta(
+            producer, user_id, msg_id, reply_id, seq, kind, ''.join(buf),
+            group_id=group_id,
+        )
+        seq += 1
+        buf.clear()
+
     try:
-        response = await route_chat(llm_messages)
+        llm = get_llm()
+        # 起步进度：让前端思考块立刻出现（无思考内容时也有反馈）
+        await _flush('progress', ['正在思考…'])
+        buf_kind = ''
+        buf: list[str] = []
+        async for chunk in llm.chat_stream(llm_messages):
+            if chunk.usage:
+                usage = chunk.usage
+                continue
+            if not chunk.text:
+                continue
+            if chunk.kind != buf_kind:
+                await _flush(buf_kind, buf)
+                buf_kind = chunk.kind
+            buf.append(chunk.text)
+            (reasoning_parts if chunk.kind == 'reasoning' else content_parts).append(chunk.text)
+            # 约 16 字符合一块：既保证流式体验，又不打爆 Kafka
+            if len(buf) >= 16:
+                await _flush(buf_kind, buf)
+        await _flush(buf_kind, buf)
+        await send_ai_reply_delta(
+            producer, user_id, msg_id, reply_id, seq, 'done', '',
+            group_id=group_id,
+        )
     except Exception:
-        logger.exception("LLM 调用失败 user=%s", user_id)
+        logger.exception("LLM 流式调用失败 user=%s", user_id)
+        await send_error_reply(producer, user_id, msg_id, group_id=group_id)
+        return
+
+    content = ''.join(content_parts)
+    reasoning = ''.join(reasoning_parts)
+    if not content:
+        logger.error("流式回复为空 user=%s", user_id)
         await send_error_reply(producer, user_id, msg_id, group_id=group_id)
         return
 
     # ---- 记录成本 ----
     try:
-        usage = response.usage
         prompt_tok = usage.get("prompt_tokens", 0)
         completion_tok = usage.get("completion_tokens", 0)
         total_tok = usage.get("total_tokens", prompt_tok + completion_tok)
-        model = response.model or settings.llm_provider
+        model = getattr(llm, 'model_name', settings.llm_provider)
 
-        llm = get_llm()
         pricing = llm.get_pricing(model)
         input_price, output_price, cost_usd = compute_cost(
             pricing, prompt_tok, completion_tok,
@@ -128,11 +172,11 @@ async def handle_private_message(producer, event_data: dict) -> None:
     except Exception as e:
         logger.warning("成本记录失败 user=%s msg=%s err=%s", user_id, msg_id, e)
 
-    # ---- AI 回复存入记忆 ----
-    memory.add("assistant", response.content)
-
-    # ---- 通过 Kafka 发送回复 ----
+    # ---- 通过 Kafka 发送最终回复（整块落库；思考全文随 metadata 持久化）----
+    metadata = {}
+    if reasoning:
+        metadata['reasoning'] = reasoning
     await send_ai_reply(
-        producer, user_id, response.content, msg_id, group_id=group_id,
-        reply_to_msg_id=msg_id,
+        producer, user_id, content, msg_id, group_id=group_id,
+        reply_to_msg_id=msg_id, metadata=metadata,
     )

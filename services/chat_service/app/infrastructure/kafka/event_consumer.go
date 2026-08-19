@@ -18,10 +18,22 @@ func HandleProtoEnvelope(ctx context.Context, env *commonv1.EventEnvelope) error
 		return handleMessageSent(ctx, env)
 	case "chant.chat.v1.AiReplyGenerated":
 		return handleAiReply(ctx, env)
+	case "chant.chat.v1.AiReplyDelta":
+		return handleAiReplyDelta(ctx, env)
 	default:
 		log.Printf("忽略未知事件类型: %s", env.EventType)
 		return nil
 	}
+}
+
+// handleAiReplyDelta 处理 AI 流式分块 —— 仅实时 WS 转发，不落库。
+func handleAiReplyDelta(ctx context.Context, env *commonv1.EventEnvelope) error {
+	delta := new(chatv1.AiReplyDelta)
+	if err := sdk_kafka.UnmarshalData(env, delta); err != nil {
+		return err
+	}
+	services.BroadcastAiReplyDelta(delta, env.Timestamp)
+	return nil
 }
 
 func handleMessageSent(ctx context.Context, env *commonv1.EventEnvelope) error {

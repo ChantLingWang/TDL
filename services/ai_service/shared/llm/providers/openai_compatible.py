@@ -22,7 +22,7 @@ from tenacity import (
 )
 
 from config.settings import settings
-from shared.llm.base import AbstractLLM, LLMMessage, LLMResponse
+from shared.llm.base import AbstractLLM, LLMMessage, LLMResponse, LLMStreamChunk
 from shared.llm.factory import register
 
 
@@ -87,22 +87,24 @@ class OpenAICompatibleLLM(AbstractLLM):
         resp.raise_for_status()
         body = resp.json()
 
-        # 取第一个 choice 的 message.content
+        # 取第一个 choice 的 message.content；思考模型额外带 reasoning_content
         choice = body["choices"][0]
         return LLMResponse(
             content=choice["message"]["content"],
+            reasoning=choice["message"].get("reasoning_content", "") or "",
             model=body.get("model", self._model),
             usage=body.get("usage", {}),
         )
 
     async def chat_stream(
         self, messages: list[LLMMessage], **kwargs
-    ) -> AsyncIterator[str]:
-        """流式输出 — 通过 SSE 逐 token 产出。
+    ) -> AsyncIterator[LLMStreamChunk]:
+        """流式输出 — 通过 SSE 逐块产出，思考链与正文分流。
 
-        OpenAI 流式协议：每行 data: {"choices":[{"delta":{"content":"xxx"}}]}
+        OpenAI 流式协议：每行 data: {"choices":[{"delta":{...}}]}
+        思考模型（DeepSeek V3.2+ / reasoner）的 delta 中带
+        reasoning_content；流末尾带 usage 的结算块（choices 为空）。
         遇到 data: [DONE] 表示结束。
-        v1 暂未在生产中使用，预留给后续 SSE 升级。
         """
         max_tokens = kwargs.get("max_tokens", settings.llm_max_tokens)
         temperature = kwargs.get("temperature", settings.llm_temperature)
@@ -113,6 +115,7 @@ class OpenAICompatibleLLM(AbstractLLM):
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
 
         async with self._client.stream(
@@ -123,18 +126,27 @@ class OpenAICompatibleLLM(AbstractLLM):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if line.startswith("data: "):
-                    data = line[6:]          # 去掉 "data: " 前缀
-                    if data == "[DONE]":
-                        return
-                    try:
-                        chunk = json.loads(data)
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
-                    except (json.JSONDecodeError, KeyError, IndexError):
-                        # 个别 chunk 解析失败不影响后续
+                if not line.startswith("data: "):
+                    continue
+                data = line[6:]          # 去掉 "data: " 前缀
+                if data == "[DONE]":
+                    return
+                try:
+                    chunk = json.loads(data)
+                    # 结算块：只带 usage，choices 为空
+                    if chunk.get("usage"):
+                        yield LLMStreamChunk(kind="content", text="", usage=chunk["usage"])
                         continue
+                    delta = chunk["choices"][0].get("delta", {})
+                    reasoning = delta.get("reasoning_content") or ""
+                    content = delta.get("content") or ""
+                    if reasoning:
+                        yield LLMStreamChunk(kind="reasoning", text=reasoning)
+                    if content:
+                        yield LLMStreamChunk(kind="content", text=content)
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    # 个别 chunk 解析失败不影响后续
+                    continue
 
     def langchain_model(
         self, temperature: float = 0.3, max_tokens: int | None = None
@@ -161,6 +173,11 @@ class OpenAICompatibleLLM(AbstractLLM):
     def get_pricing(self, model: str | None = None) -> dict[str, float]:
         """Default pricing — override in subclass for accurate rates."""
         return {"input": 0.0, "output": 0.0}
+
+    @property
+    def model_name(self) -> str:
+        """当前生效的模型名（成本记录用）。"""
+        return self._model
 
 
     async def close(self) -> None:

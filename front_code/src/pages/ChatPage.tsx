@@ -1,154 +1,156 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// ============================================================================
+// ChatPage —— 装配层：持有状态与数据流，渲染全部委托给组件
+// 状态职责：群组/会话选择、消息流、未读、进度步骤、成员管理
+// ============================================================================
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../api/chat';
-import type { Group } from '../api/chat';
+import type { Group, WsMessage, SendPayload } from '../types/chat';
+import { isAIGroup } from '../types/chat';
+import { useChatSocket } from '../hooks/useChatSocket';
+import Sidebar from '../components/Sidebar';
+import MessageList from '../components/MessageList';
+import type { StreamEntry } from '../components/MessageList';
+import ChatInput from '../components/ChatInput';
+import NewChatModal from '../components/NewChatModal';
 import styles from './ChatPage.module.scss';
-
-const WS_BASE = import.meta.env.VITE_WS_URL
-  || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1/ws`;
-
-interface WsMessage {
-  type: string;
-  group_id?: string;
-  sender?: string;
-  content?: string;
-  time?: number;
-  message_id?: string;
-  reply_to_msg_id?: string;
-  metadata?: Record<string, string>;
-}
-
-const fmtTime = (ts?: number): string => {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-};
-
-const initials = (name: string): string => (name || '?').slice(0, 2).toUpperCase();
-
-const autoGrow = (el: HTMLTextAreaElement) => {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-};
 
 const ChatPage: React.FC = () => {
   const navigate = useNavigate();
-  const wsRef = useRef<WebSocket | null>(null);
-  const msgEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const token = localStorage.getItem('access_token') || '';
   const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
   const userId: string = String(userInfo.user_id || '');
   const username: string = userInfo.username || 'Unknown';
 
-  const [connected, setConnected] = useState(false);
+  // ── 会话与消息状态 ──
   const [groups, setGroups] = useState<Group[]>([]);
-  const [activeGroup, setActiveGroup] = useState<string>('');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [activeGroup, setActiveGroup] = useState<string>('');
   const [messages, setMessages] = useState<WsMessage[]>([]);
   const [input, setInput] = useState('');
-  const [newGroupName, setNewGroupName] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [progressSteps, setProgressSteps] = useState<Record<string, string[]>>({});
+  const [streams, setStreams] = useState<Record<string, StreamEntry>>({});
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [agentMode, setAgentMode] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+
+  // ── 成员管理状态 ──
   const [memberPanelOpen, setMemberPanelOpen] = useState(false);
   const [members, setMembers] = useState<string[]>([]);
   const [memberInput, setMemberInput] = useState('');
   const [memberStatus, setMemberStatus] = useState('');
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [progressSteps, setProgressSteps] = useState<Record<string, string[]>>({});
-  const [statusMsg, setStatusMsg] = useState('connecting...');
-  const [agentMode, setAgentMode] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+
   const currentGidRef = useRef<string>('');
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
 
-  // 派生：AI 群组和普通群组
-  const aiGroups = groups.filter(g => g.group_type === 'ai' || g.group_type === 'ai-research');
-  const normalGroups = groups.filter(g => g.group_type !== 'ai');
+  const currentGid = selectedGroupId || activeGroup;
+  const currentGroup = groups.find((g) => g.group_id === currentGid);
+  const aiGroups = groups.filter((g) => isAIGroup(g));
+  const normalGroups = groups.filter((g) => !isAIGroup(g));
 
-  // ---- WebSocket ----
-  const connectWS = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN ||
-        wsRef.current?.readyState === WebSocket.CONNECTING) return;
-    if (wsRef.current) wsRef.current.onclose = null;
+  // ── WS 消息统一入口 ──
+  const handleWsMessage = useCallback((msg: WsMessage) => {
+    if (msg.sender === userId) return; // 自己发的已在本地渲染
 
-    const ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
-    wsRef.current = ws;
-
-    ws.onopen = () => { setConnected(true); setStatusMsg('online'); };
-    ws.onmessage = (ev) => {
-      try {
-        const msg: WsMessage = JSON.parse(ev.data);
-        if (msg.sender === userId) return; // 跳过自己发的消息（本地已渲染）
-
-        // 进度消息：不进入消息流，转为挂靠原始输入的进度步骤
-        if (msg.metadata?.kind === 'progress' && msg.reply_to_msg_id) {
-          setProgressSteps((prev) => {
-            const key = msg.reply_to_msg_id!;
-            const texts = prev[key] || [];
-            if (msg.content && texts.includes(msg.content)) return prev;
-            return { ...prev, [key]: [...texts, msg.content || ''] };
-          });
-          return;
+    // delta 分块（kind 字段存在）：累积到流式条目，不进消息流、不计数未读
+    if (msg.kind && msg.message_id) {
+      const mid = msg.message_id;
+      setStreams((prev) => {
+        const cur = prev[mid] || {
+          group_id: msg.group_id || '',
+          sender: msg.sender || 'ai-assistant',
+          reasoning: '',
+          content: '',
+          steps: [],
+          done: false,
+          time: msg.time,
+          reply_to_msg_id: msg.reply_to_msg_id,
+        };
+        const next: StreamEntry = { ...cur, steps: [...cur.steps] };
+        if (msg.kind === 'thinking') next.reasoning += msg.content || '';
+        else if (msg.kind === 'progress') {
+          if (msg.content && !next.steps.includes(msg.content)) next.steps.push(msg.content);
         }
+        else if (msg.kind === 'content') next.content += msg.content || '';
+        else if (msg.kind === 'done') next.done = true;
+        return { ...prev, [mid]: next };
+      });
+      return;
+    }
 
-        // 最终回复 / 错误 / 审稿到达：清除对应输入的进度点
-        if (msg.reply_to_msg_id) {
-          setProgressSteps((prev) => {
-            if (!(msg.reply_to_msg_id! in prev)) return prev;
-            const next = { ...prev };
-            delete next[msg.reply_to_msg_id!];
-            return next;
-          });
-        }
+    // 进度消息（旧协议）：不进入消息流，挂靠到原始输入
+    if (msg.metadata?.kind === 'progress' && msg.reply_to_msg_id) {
+      const key = msg.reply_to_msg_id;
+      setProgressSteps((prev) => {
+        const texts = prev[key] || [];
+        if (msg.content && texts.includes(msg.content)) return prev;
+        return { ...prev, [key]: [...texts, msg.content || ''] };
+      });
+      return;
+    }
 
-        // 按 message_id 去重，防止 Kafka 重投导致重复显示
-        if (msg.message_id) {
-          if (seenMessageIdsRef.current.has(msg.message_id)) return;
-          seenMessageIdsRef.current.add(msg.message_id);
-        }
-        setMessages((prev) => [...prev, msg]);
-        // 非当前会话的消息计入未读角标
-        if (msg.group_id && msg.group_id !== currentGidRef.current) {
-          setUnreadCounts((prev) => ({
-            ...prev,
-            [msg.group_id!]: (prev[msg.group_id!] || 0) + 1,
-          }));
-        }
-      } catch { /* ignore */ }
-    };
-    ws.onclose = () => {
-      setConnected(false);
-      setStatusMsg('disconnected — reconnecting in 2s');
-      setTimeout(connectWS, 2000);
-    };
-    ws.onerror = () => {};
-  }, [token]);
+    // 最终回复 / 错误到达：清除对应输入的进度点
+    if (msg.reply_to_msg_id) {
+      setProgressSteps((prev) => {
+        if (!(msg.reply_to_msg_id! in prev)) return prev;
+        const next = { ...prev };
+        delete next[msg.reply_to_msg_id!];
+        return next;
+      });
+    }
 
+    // 按 message_id 去重，防 Kafka 重投
+    if (msg.message_id) {
+      if (seenMessageIdsRef.current.has(msg.message_id)) return;
+      seenMessageIdsRef.current.add(msg.message_id);
+    }
+    // 最终整块消息到达：以服务端全文为准，清掉对应流式条目。
+    // 按 message_id 清（正常最终回复），再按 reply_to_msg_id 兜底清（错误回复等异常收尾）
+    if (msg.message_id) {
+      setStreams((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const [id, s] of Object.entries(prev)) {
+          if (id === msg.message_id
+            || (msg.reply_to_msg_id && s.reply_to_msg_id === msg.reply_to_msg_id)) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+    setMessages((prev) => [...prev, msg]);
+
+    // 非当前会话计入未读角标
+    if (msg.group_id && msg.group_id !== currentGidRef.current) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [msg.group_id!]: (prev[msg.group_id!] || 0) + 1,
+      }));
+    }
+  }, [userId]);
+
+  const { connected, statusMsg, send } = useChatSocket({ token, onMessage: handleWsMessage });
+
+  // 保持 WS 回调里的当前会话 ID 最新
   useEffect(() => {
-    connectWS();
-    return () => { if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); } };
-  }, [connectWS]);
+    currentGidRef.current = currentGid;
+  }, [currentGid]);
 
-  useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-  // 保持 WS 回调里的当前会话 ID 为最新值，避免闭包过期
-  useEffect(() => {
-    currentGidRef.current = selectedGroupId || activeGroup;
-  }, [selectedGroupId, activeGroup]);
-
-  // ---- 初始化：加载所有群组（含 AI 群）----
+  // ── 初始化：加载群组与未读 ──
   useEffect(() => {
     if (!userId) return;
     chatApi.initUser(userId).catch(() => {});
     chatApi.getUserGroups(userId).then((res) => {
       const list = res.groups || [];
       setGroups(list);
-      // 默认选中第一个 AI 群
-      const firstAI = list.find(g => g.group_type === 'ai');
+      const firstAI = list.find((g) => g.group_type === 'ai');
       if (firstAI) setSelectedGroupId(firstAI.group_id);
 
-      // 拉取离线期间的未读计数；默认打开的会话视为已读
       chatApi.getMessages().then((unreadRes) => {
         const counts = unreadRes.unread_counts || {};
         if (firstAI) {
@@ -160,26 +162,25 @@ const ChatPage: React.FC = () => {
     }).catch(() => {});
   }, [userId]);
 
-  // 切换会话时加载历史消息
+  // ── 切换会话：加载历史（旧 → 新）──
   useEffect(() => {
-    const gid = selectedGroupId || activeGroup;
-    if (!gid) return;
+    if (!currentGid) return;
     setMessages([]);
-    chatApi.getHistory(gid, 0, 50).then((res) => {
+    chatApi.getHistory(currentGid, 0, 50).then((res) => {
       const history: WsMessage[] = (res.messages || []).map((m: any) => ({
         type: 'chat',
         sender: m.sender_id,
         content: m.content,
         time: typeof m.timestamp === 'number' ? m.timestamp : Date.parse(m.timestamp),
-        group_id: m.group_id || gid,
+        group_id: m.group_id || currentGid,
         message_id: m.message_id,
+        reasoning: m.metadata?.reasoning,
       }));
-      // 后端返回最新在前，前端需要旧 -> 新
       setMessages([...history].reverse());
     }).catch(() => {});
   }, [selectedGroupId, activeGroup]);
 
-  // 切换会话时收起成员管理面板
+  // 切换会话时收起成员面板
   useEffect(() => {
     setMemberPanelOpen(false);
     setMembers([]);
@@ -187,37 +188,34 @@ const ChatPage: React.FC = () => {
     setMemberStatus('');
   }, [selectedGroupId, activeGroup]);
 
-  // ---- 加载更多历史 ----
+  // ── 加载更早历史 ──
   const handleLoadMore = async () => {
-    const gid = selectedGroupId || activeGroup;
-    if (!gid || messages.length === 0) return;
+    if (!currentGid || messages.length === 0) return;
     const earliestTime = messages[0]?.time;
     if (!earliestTime) return;
-    const cursor = Math.floor(earliestTime / 1000);
     setLoadingHistory(true);
     try {
-      const res = await chatApi.getHistory(gid, cursor, 50);
+      const res = await chatApi.getHistory(currentGid, Math.floor(earliestTime / 1000), 50);
       const more: WsMessage[] = (res.messages || []).map((m: any) => ({
         type: 'chat',
         sender: m.sender_id,
         content: m.content,
         time: typeof m.timestamp === 'number' ? m.timestamp : Date.parse(m.timestamp),
-        group_id: m.group_id || gid,
+        group_id: m.group_id || currentGid,
         message_id: m.message_id,
+        reasoning: m.metadata?.reasoning,
       }));
-      // more 为最新在前，转为旧 -> 新后整体前置
       more.reverse();
       setMessages((prev) => [...more, ...prev]);
       setHasMoreHistory(res.messages?.length === 50);
-    } catch { } finally { setLoadingHistory(false); }
+    } catch { /* ignore */ } finally { setLoadingHistory(false); }
   };
 
-  // ---- 新 AI 会话
-  // ---- 新 AI 会话 = 创建 AI 群组 ----
-  const handleNewChat = async () => {
+  // ── 新建 AI 会话（弹窗确认模式后创建）──
+  const handleCreateChat = async (mode: 'ai' | 'ai-research') => {
+    setNewChatOpen(false);
     try {
-      const gtype = agentMode ? 'ai-research' : 'ai';
-      const group = await chatApi.createGroup('新聊天', userId, gtype);
+      const group = await chatApi.createGroup('新聊天', userId, mode);
       setGroups((prev) => [group, ...prev]);
       setSelectedGroupId(group.group_id);
       setActiveGroup('');
@@ -225,41 +223,29 @@ const ChatPage: React.FC = () => {
     } catch { /* ignore */ }
   };
 
-  // ---- 创建普通群组 ----
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim()) return;
+  // ── 创建普通群组 ──
+  const handleCreateGroup = async (name: string) => {
     try {
-      const group = await chatApi.createGroup(newGroupName.trim(), userId);
+      const group = await chatApi.createGroup(name, userId);
       setGroups((prev) => [...prev, group]);
-      setNewGroupName('');
     } catch { /* ignore */ }
   };
 
-  // ---- 发送消息 ----
+  // ── 发送消息 ──
   const handleSend = () => {
     const text = input.trim();
-    if (!text) return;
-    const gid = selectedGroupId || activeGroup;
-    if (!gid) return;
-
-    // 连接未就绪时不发送，避免“本地已显示但实际没发出”
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setStatusMsg('连接已断开，消息未发送，请稍后重试');
-      return;
-    }
+    if (!text || !currentGid) return;
+    if (!connected) return;
 
     const msgTime = Date.now();
-    const msgId = `${userId}-${msgTime}`;
-    const selGroup = groups.find(g => g.group_id === gid);
-    const groupType = selGroup?.group_type || 'group';
-    const isAI = groupType === 'ai' || groupType === 'ai-research';
-    // ai-research 群固定走研究模式；普通群始终是 group，不受 Research 开关影响
+    const msgId = userId + '-' + msgTime;
+    const groupType = currentGroup?.group_type || 'group';
+    const isAI = isAIGroup(currentGroup);
     const convType = groupType === 'ai-research'
       ? 'ai-research'
       : (isAI && agentMode) ? 'ai-research' : (isAI ? 'ai' : 'group');
 
-    const payload: any = {
+    const payload: SendPayload = {
       type: 'chat',
       content: {
         sender_id: userId,
@@ -267,54 +253,22 @@ const ChatPage: React.FC = () => {
         message_id: msgId,
         message_type: 'text',
         conversation_type: convType,
-        group_id: gid,
+        group_id: currentGid,
       },
     };
 
+    const ok = send(payload);
+    if (!ok) return; // 连接断开，不本地渲染
+
     setMessages((prev) => [...prev, {
       type: 'chat', sender: userId, content: text,
-      time: msgTime, group_id: gid, message_id: msgId,
+      time: msgTime, group_id: currentGid, message_id: msgId,
     }]);
-
-    ws.send(JSON.stringify(payload));
     setInput('');
-    if (inputRef.current) { inputRef.current.style.height = 'auto'; }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  // ---- 消息过滤 ----
-  const currentGid = selectedGroupId || activeGroup;
-  const filteredMessages = currentGid
-    ? messages.filter(m => m.group_id === currentGid)
-    : [];
-
-  const grouped = filteredMessages.reduce<WsMessage[][]>((acc, msg) => {
-    const prevGroup = acc[acc.length - 1];
-    if (prevGroup) {
-      const prevMsg = prevGroup[prevGroup.length - 1];
-      if (prevMsg.sender === msg.sender && msg.time && prevMsg.time && (msg.time - prevMsg.time) < 180_000) {
-        prevGroup.push(msg);
-        return acc;
-      }
-    }
-    acc.push([msg]);
-    return acc;
-  }, []);
-
-  const currentGroup = groups.find(g => g.group_id === currentGid);
-  const currentGroupName = currentGroup?.group_name || '';
-  const isOwner = !!currentGroup && currentGroup.create_by_user_id === userId;
-  const isAIConversation = currentGroup?.group_type === 'ai' || currentGroup?.group_type === 'ai-research';
-  const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
-
-  // ---- 打开会话即已读 ----
-  const openAIConversation = (gid: string) => {
+  // ── 会话切换 / 已读 ──
+  const openConversation = (gid: string) => {
     setSelectedGroupId(gid);
     setActiveGroup('');
     setUnreadCounts((prev) => (prev[gid] ? { ...prev, [gid]: 0 } : prev));
@@ -328,20 +282,15 @@ const ChatPage: React.FC = () => {
     chatApi.markMessagesAsRead(gid).catch(() => {});
   };
 
-  // ---- 群主成员管理 ----
+  // ── 成员管理 ──
   const handleToggleMemberPanel = async () => {
-    if (memberPanelOpen) {
-      setMemberPanelOpen(false);
-      return;
-    }
+    if (memberPanelOpen) { setMemberPanelOpen(false); return; }
     setMemberPanelOpen(true);
     setMemberStatus('');
     try {
       const res = await chatApi.getGroupMembers(currentGid);
       setMembers(res.members || []);
-    } catch {
-      setMembers([]);
-    }
+    } catch { setMembers([]); }
   };
 
   const handleAddMember = async () => {
@@ -368,99 +317,77 @@ const ChatPage: React.FC = () => {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
+
+  const currentGroupName = currentGroup?.group_name || '';
+  const isOwner = !!currentGroup && currentGroup.create_by_user_id === userId;
+  const totalUnread = Object.values(unreadCounts).reduce((sum, n) => sum + n, 0);
+  const filteredMessages = currentGid ? messages.filter((m) => m.group_id === currentGid) : [];
+
   return (
     <div className={styles.wrapper}>
-      <aside className={styles.sidebar}>
-        <div className={styles.sidebarHeaderRow}>
-          <span className={styles.statusDot} data-online={connected} />
-          <span className={styles.sidebarUser}>{username}</span>
-          <button className={styles.logoutBtn} onClick={() => { localStorage.clear(); wsRef.current?.close(); navigate('/login'); }}>X</button>
-        </div>
-        <div className={styles.statusLine}>{statusMsg}</div>
-        {totalUnread > 0 && (
-          <div className={styles.statusLine}>
-            未读消息 {totalUnread > 999 ? '999+' : totalUnread}
-          </div>
-        )}
+      <Sidebar
+        username={username}
+        connected={connected}
+        statusMsg={statusMsg}
+        totalUnread={totalUnread}
+        aiGroups={aiGroups}
+        normalGroups={normalGroups}
+        selectedGroupId={selectedGroupId}
+        activeGroup={activeGroup}
+        unreadCounts={unreadCounts}
+        onSelectAI={openConversation}
+        onSelectGroup={openNormalGroup}
+        onNewChat={() => setNewChatOpen(true)}
+        onCreateGroup={handleCreateGroup}
+        onLogout={handleLogout}
+      />
 
-        {/* AI 会话 = group_type === 'ai' */}
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>AI CHATS</div>
-          <button className={styles.actionBtn} onClick={handleNewChat}>+ 新聊天</button>
-          {aiGroups.map(g => (
-            <div key={g.group_id}
-                 className={`${styles.convItem} ${selectedGroupId === g.group_id ? styles.convActive : ''}`}
-                 onClick={() => openAIConversation(g.group_id)}>
-              <span className={styles.avatar}>AI</span>
-              <span>{g.group_name}</span>
-              {!!unreadCounts[g.group_id] && (
-                <span className={styles.unreadBadge}>
-                  {unreadCounts[g.group_id] > 99 ? '99+' : unreadCounts[g.group_id]}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* 普通群组 = group_type !== 'ai' */}
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>GROUPS</div>
-          {normalGroups.map(g => (
-            <div key={g.group_id}
-                 className={`${styles.convItem} ${activeGroup === g.group_id ? styles.convActive : ''}`}
-                 onClick={() => openNormalGroup(g.group_id)}>
-              <span className={styles.avatar}>{initials(g.group_name)}</span>
-              <span>{g.group_name}</span>
-              {!!unreadCounts[g.group_id] && (
-                <span className={styles.unreadBadge}>
-                  {unreadCounts[g.group_id] > 99 ? '99+' : unreadCounts[g.group_id]}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.section}>
-          <div className={styles.sectionTitle}>NEW GROUP</div>
-          <input className={styles.smallInput} value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="group name" />
-          <button className={styles.actionBtn} onClick={handleCreateGroup}>create</button>
-        </div>
-      </aside>
-
-      <main className={styles.chatArea}>
+      <main className={styles.main}>
         {!currentGid ? (
-          <div className={styles.placeholder}>select a conversation to start chatting</div>
+          <div className={styles.placeholder}>
+            <div className={styles.placeholderTitle}>Chant</div>
+            <div className={styles.placeholderDesc}>选择或新建一个 AI 会话，开始聊天</div>
+          </div>
         ) : (
           <>
-            <div className={styles.chatHeader}>
-              <span>{selectedGroupId ? `🤖 ${currentGroupName}` : currentGroupName || activeGroup}</span>
-              {isOwner && (
-                <button className={styles.manageBtn} onClick={handleToggleMemberPanel}>
-                  {memberPanelOpen ? '收起' : '拉人'}
-                </button>
-              )}
-              {isAIConversation && (
-                <label className={styles.agentToggle} title={agentMode ? '研究模式开启' : '聊天模式'}>
-                  <input type="checkbox" checked={agentMode} onChange={e => setAgentMode(e.target.checked)} />
-                  <span className={styles.toggleSlider} />
-                  <span className={styles.toggleLabel}>{agentMode ? 'Research' : 'Chat'}</span>
-                </label>
-              )}
-            </div>
+            <header className={styles.header}>
+              <span className={styles.headerTitle}>
+                {selectedGroupId ? '🤖 ' + currentGroupName : currentGroupName || activeGroup}
+              </span>
+              <div className={styles.headerActions}>
+                {isOwner && (
+                  <button className={styles.manageBtn} onClick={handleToggleMemberPanel}>
+                    {memberPanelOpen ? '收起' : '成员'}
+                  </button>
+                )}
+                {isAIGroup(currentGroup) && (
+                  <label className={styles.agentToggle} title={agentMode ? '研究模式开启' : '聊天模式'}>
+                    <input type='checkbox' checked={agentMode} onChange={(e) => setAgentMode(e.target.checked)} />
+                    <span className={styles.toggleSlider} />
+                    <span className={styles.toggleLabel}>{agentMode ? 'Research' : 'Chat'}</span>
+                  </label>
+                )}
+              </div>
+            </header>
+
             {memberPanelOpen && (
               <div className={styles.memberPanel}>
                 <div className={styles.memberPanelTitle}>群成员管理</div>
                 <div className={styles.memberAddRow}>
                   <input
-                    className={styles.smallInput}
+                    className={styles.memberInput}
                     value={memberInput}
-                    onChange={e => setMemberInput(e.target.value)}
-                    placeholder="输入用户 ID"
+                    onChange={(e) => setMemberInput(e.target.value)}
+                    placeholder='输入用户 ID'
                   />
-                  <button className={styles.actionBtn} onClick={handleAddMember}>拉入</button>
+                  <button className={styles.memberBtn} onClick={handleAddMember}>拉入</button>
                 </div>
                 <div className={styles.memberList}>
-                  {members.map(m => (
+                  {members.map((m) => (
                     <div key={m} className={styles.memberItem}>
                       <span>{m}</span>
                       {m !== userId && (
@@ -473,85 +400,32 @@ const ChatPage: React.FC = () => {
                 {memberStatus && <div className={styles.memberStatus}>{memberStatus}</div>}
               </div>
             )}
-                        <div className={styles.messageList}>
-              {hasMoreHistory && (
-                <button
-                  className={styles.actionBtn}
-                  onClick={handleLoadMore}
-                  disabled={loadingHistory}
-                  style={{ display: 'block', margin: '0 auto 8px' }}
-                >
-                  {loadingHistory ? '加载中...' : '加载更多'}
-                </button>
-              )}
-              {grouped.map((group, gi) => {
-                const lastMsg = group[group.length - 1];
-                const steps = lastMsg?.sender === userId
-                  ? progressSteps[lastMsg.message_id || '']
-                  : undefined;
-                return (
-                  <div key={gi}>
-                    <div className={`${styles.msgGroup} ${group[0]?.sender === userId ? styles.msgGroupMine : ''}`}>
-                      {group[0]?.sender !== userId && (
-                        <div className={styles.msgAvatar}>{initials(group[0]?.sender || '?')}</div>
-                      )}
-                      <div className={styles.msgBubbles}>
-                        {group.map((m, mi) => (
-                          <div key={mi} className={styles.msgBubble}>
-                            {mi === 0 && group[0]?.sender !== userId && (
-                              <div className={styles.msgName}>{m.sender}</div>
-                            )}
-                            <div className={styles.msgText}>{m.content}</div>
-                            {mi === group.length - 1 && (
-                              <div className={styles.msgTime}>{fmtTime(m.time)}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {steps && steps.length > 0 && (
-                      <div className={styles.progressTracker}>
-                        <div className={styles.progressDots}>
-                          {steps.map((text, si) => (
-                            <span
-                              key={si}
-                              title={text}
-                              className={`${styles.progressDot} ${
-                                si === steps.length - 1
-                                  ? styles.progressDotActive
-                                  : styles.progressDotDone
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className={styles.progressLabel}>{steps[steps.length - 1]}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              <div ref={msgEndRef} />
-            </div>
 
-            <div className={styles.inputRow}>
-              <textarea
-                ref={inputRef}
-                className={styles.chatInput}
-                value={input}
-                onChange={e => { setInput(e.target.value); autoGrow(e.target); }}
-                onKeyDown={handleKeyDown}
-                placeholder="输入消息..."
-                rows={1}
-              />
-              <button className={`${styles.sendBtn} ${agentMode ? styles.sendBtnAgent : ''}`} onClick={handleSend} disabled={!input.trim()}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
-              </button>
-            </div>
+            <MessageList
+              messages={filteredMessages}
+              userId={userId}
+              progressSteps={progressSteps}
+              streams={streams}
+              hasMoreHistory={hasMoreHistory}
+              loadingHistory={loadingHistory}
+              onLoadMore={handleLoadMore}
+            />
+
+            <ChatInput
+              value={input}
+              onChange={setInput}
+              onSend={handleSend}
+              accent={agentMode}
+            />
           </>
         )}
       </main>
+
+      <NewChatModal
+        open={newChatOpen}
+        onClose={() => setNewChatOpen(false)}
+        onCreate={handleCreateChat}
+      />
     </div>
   );
 };

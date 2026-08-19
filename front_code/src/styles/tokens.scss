@@ -1,0 +1,63 @@
+// ============================================================================
+// Chant 设计 Token —— 1:1 取自 DSH 的 design-platform.css（深色主题）
+// 出处：@deepseek-ai/dsh-client-ui-theme/lib/styles/design-platform.css
+// 品牌强调色集中在 --chant-accent 一个变量，日后想换品牌色只改这一处。
+// ============================================================================
+
+:root {
+  // ── 品牌强调色（DSH deepseek-500/400 同款蓝）────────────────────────
+  --chant-accent: rgb(65, 118, 230);          // #4176E6 主强调
+  --chant-accent-hover: rgb(103, 158, 254);   // #679EFE 悬停
+  --chant-accent-soft: rgba(65, 118, 230, 0.12); // 弱强调底
+
+  // ── 深色底（DSH neutral-bluish 中性偏蓝灰，逐层提亮）─────────────────
+  --chant-bg-base: rgb(21, 21, 23);      // bluish-950 全局底色
+  --chant-bg-layer-1: rgb(27, 27, 28);   // bluish-900 侧栏/面板
+  --chant-bg-layer-2: rgb(35, 35, 36);   // bluish-875 卡片/输入框
+  --chant-bg-layer-3: rgb(44, 44, 46);   // bluish-850 悬浮层
+
+  // ── 文字（DSH label 梯度）─────────────────────────────────────────
+  --chant-text-primary: rgb(255, 255, 255);   // 主文字
+  --chant-text-secondary: rgb(207, 211, 214); // bluish-300 次要
+  --chant-text-tertiary: rgb(151, 157, 166);  // bluish-500 弱化
+  --chant-text-caption: rgb(173, 178, 184);   // bluish-400 说明
+
+  // ── 边框（深色下用白色透明，DSH 同思路）───────────────────────────
+  --chant-border-l1: rgba(255, 255, 255, 0.06);
+  --chant-border-l2: rgba(255, 255, 255, 0.10);
+  --chant-border-l3: rgba(255, 255, 255, 0.14);
+
+  // ── 交互态 ────────────────────────────────────────────────────────
+  --chant-hover: rgba(255, 255, 255, 0.05);
+  --chant-active: rgba(255, 255, 255, 0.08);
+
+  // ── 状态色（DSH 1:1）──────────────────────────────────────────────
+  --chant-success: rgb(34, 197, 94);     // green-500
+  --chant-warn: rgb(245, 158, 11);       // amber-500
+  --chant-error: rgb(239, 68, 68);       // red-500
+
+  // ── 代码 ──────────────────────────────────────────────────────────
+  --chant-code-bg: rgb(27, 27, 28);      // 代码块底 = layer-1
+  --chant-inline-code-bg: rgba(255, 255, 255, 0.08);
+
+  // ── 字体（DSH base.css 1:1，注意代码字体刻意不带 monospace 尾巴）──
+  --chant-font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --chant-font-code: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas,
+    'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+
+  // ── 动效（DSH base.css 1:1）───────────────────────────────────────
+  --chant-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --chant-duration-fast: 0.1s;
+  --chant-duration: 0.2s;
+  --chant-duration-slow: 0.3s;
+
+  // ── 圆角 ──────────────────────────────────────────────────────────
+  --chant-radius-sm: 6px;
+  --chant-radius: 10px;
+  --chant-radius-lg: 14px;
+
+  // ── 布局 ──────────────────────────────────────────────────────────
+  --chant-sidebar-width: 260px;
+  --chant-header-height: 52px;
+}

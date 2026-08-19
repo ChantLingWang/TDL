@@ -26,6 +26,11 @@ def parse_ai_reply(env: _envelope.EventEnvelope) -> _event.AiReplyGenerated:
     return Parse(env.data, _event.AiReplyGenerated())
 
 
+def parse_ai_reply_delta(env: _envelope.EventEnvelope) -> _event.AiReplyDelta:
+    """从信封中解析 AiReplyDelta。"""
+    return Parse(env.data, _event.AiReplyDelta())
+
+
 # ---- 序列化（生产端）----
 
 def envelope_to_json(env: _envelope.EventEnvelope) -> bytes:
@@ -77,5 +82,28 @@ def new_ai_reply(target_user_id: str, content: str,
         reply_to_msg_id=reply_to_msg_id,
         message_id=message_id,
         group_id=group_id,
+        **kwargs,
+    )
+
+
+def new_ai_reply_delta(target_user_id: str, reply_to_msg_id: str,
+                       message_id: str, seq: int, kind: str, content: str,
+                       group_id: str = '', timestamp_ms: int = 0,
+                       metadata: dict | None = None) -> _event.AiReplyDelta:
+    """构造一条 AI 回复流式分块。"""
+    kwargs: dict = {}
+    if timestamp_ms:
+        kwargs['timestamp_ms'] = timestamp_ms
+    if metadata:
+        kwargs['metadata'] = metadata
+    return _event.AiReplyDelta(
+        sender_id='ai-assistant',
+        target_user_id=target_user_id,
+        group_id=group_id,
+        reply_to_msg_id=reply_to_msg_id,
+        message_id=message_id,
+        seq=seq,
+        kind=kind,
+        content=content,
         **kwargs,
     )

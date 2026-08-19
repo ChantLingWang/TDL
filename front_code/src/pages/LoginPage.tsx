@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import styles from './LoginPage.module.scss';
-import ArknightsButton from '../components/ArknightsButton';
-import ArknightsInput from '../components/ArknightsInput';
 import { authApi } from '../api/auth';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -18,164 +16,107 @@ const LoginPage: React.FC = () => {
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     if (countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
+      timer = setInterval(() => setCountdown((prev) => prev - 1), 1000);
     }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
+    return () => { if (timer) clearInterval(timer); };
   }, [countdown]);
 
   const handleSendCode = async () => {
-    if (!email) {
-      setMessage('请输入邮箱地址');
-      return;
-    }
+    if (!email) { setMessage('请输入邮箱地址'); return; }
     try {
       setLoading(true);
       await authApi.sendCode({ email });
       setCountdown(60);
       setMessage('验证码发送成功');
-    } catch (error) {
+    } catch {
       setMessage('验证码发送失败');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleLogin = async () => {
-    if (loginMethod === 'code' && (!email || !code)) {
-      setMessage('请输入邮箱和验证码');
-      return;
-    }
-    if (loginMethod === 'password' && (!email || !password)) {
-      setMessage('请输入邮箱和密码');
-      return;
-    }
-    
+    if (loginMethod === 'code' && (!email || !code)) { setMessage('请输入邮箱和验证码'); return; }
+    if (loginMethod === 'password' && (!email || !password)) { setMessage('请输入邮箱和密码'); return; }
+
     try {
       setLoading(true);
-      let response;
-      if (loginMethod === 'code') {
-        response = await authApi.verifyCodeLogin({ email, code });
-      } else {
-        response = await authApi.login({ email, password });
-      }
-      
+      const response = loginMethod === 'code'
+        ? await authApi.verifyCodeLogin({ email, code })
+        : await authApi.login({ email, password });
+
       setMessage('登录成功。');
-      
       localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('user_info', JSON.stringify(response.data.user));
-      localStorage.setItem('refresh_token', response.data.refresh_token);      
-      // Delay redirect slightly to show success message
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1000);
+      localStorage.setItem('refresh_token', response.data.refresh_token);
+      setTimeout(() => navigate('/dashboard'), 800);
     } catch (error) {
-      const msg = (error as any)?.response?.data?.detail || '登录失败'; setMessage(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleLoginMethod = () => {
-    setLoginMethod(prev => prev === 'code' ? 'password' : 'code');
-    setMessage('');
+      const msg = (error as any)?.response?.data?.detail || '登录失败';
+      setMessage(msg);
+    } finally { setLoading(false); }
   };
 
   return (
     <div className={styles.container}>
-      <div className={styles.loginBox}>
-        <div className={styles.header}>
-          <h1 className={styles.title}>
-            Chant AI
-          </h1>
-        </div>
-        <div 
-          className={styles.backButton}
-          style={{ 
-            visibility: loginMethod === 'password' ? 'visible' : 'hidden',
-            pointerEvents: loginMethod === 'password' ? 'auto' : 'none'
-          }}
-          onClick={() => {
-            setLoginMethod('code');
-            setMessage('');
-          }}
-        >
-          {`< 返回`}
-        </div>
-        
-        <div className={styles.formGroup}>
-          <ArknightsInput 
-            label="邮箱地址" 
-            type="email" 
-            placeholder="example@chant.com"
+      <div className={styles.card}>
+        <h1 className={styles.title}>Chant</h1>
+        <p className={styles.subtitle}>登录你的账号</p>
+
+        <div className={styles.field}>
+          <label className={styles.label}>邮箱地址</label>
+          <input
+            className={styles.input}
+            type='email'
+            placeholder='example@chant.com'
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          
-          {loginMethod === 'code' ? (
+        </div>
+
+        {loginMethod === 'code' ? (
+          <div className={styles.field}>
+            <label className={styles.label}>验证码</label>
             <div className={styles.codeRow}>
-              <ArknightsInput 
-                label="验证码" 
-                className={styles.codeInput}
-                placeholder="******"
+              <input
+                className={styles.input}
+                placeholder='******'
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
               />
-              <ArknightsButton 
-                label={countdown > 0 ? `${countdown}s` : "SEND CODE"} 
+              <button
+                className={styles.secondaryBtn}
                 onClick={handleSendCode}
                 disabled={loading || countdown > 0}
-              />
+              >
+                {countdown > 0 ? countdown + 's' : '发送验证码'}
+              </button>
             </div>
-          ) : (
-            <ArknightsInput 
-              label="密码" 
-              type="password" 
-              placeholder="********"
+          </div>
+        ) : (
+          <div className={styles.field}>
+            <label className={styles.label}>密码</label>
+            <input
+              className={styles.input}
+              type='password'
+              placeholder='********'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-          )}
-          
-          <ArknightsButton 
-            label={loading ? "CONNECTING..." : "CONNECT"} 
-            onClick={handleLogin}
-            disabled={loading}
-            style={{ width: '100%', marginTop: '5px' }}
-          />
-
-          <div className={styles.bottomLinks}>
-            <div 
-              className={styles.linkItem}
-              onClick={toggleLoginMethod}
-            >
-              {`> ${loginMethod === 'code' ? '密码登录' : '验证码登录'}`}
-            </div>
-            <Link to="/register" className={styles.linkItem}>
-              {`> 注册账号`}
-            </Link>
           </div>
-          
-          {message && (
-            <div style={{ 
-              color: message.includes('成功') ? 'var(--ak-accent)' : 'var(--ak-error)',
-              fontFamily: 'var(--ak-font-mono)',
-              fontSize: '12px',
-              marginTop: '10px',
-              textAlign: 'center'
-            }}>
-              {`> ${message}`}
-            </div>
-          )}
+        )}
+
+        <button className={styles.primaryBtn} onClick={handleLogin} disabled={loading}>
+          {loading ? '登录中…' : '登录'}
+        </button>
+
+        <div className={styles.links}>
+          <button className={styles.link} onClick={() => { setLoginMethod(loginMethod === 'code' ? 'password' : 'code'); setMessage(''); }}>
+            {loginMethod === 'code' ? '密码登录' : '验证码登录'}
+          </button>
+          <Link className={styles.link} to='/register'>注册账号</Link>
         </div>
-        
-        <div className={styles.footer}>
-          <p style={{ margin: '2px 0' }}>SYSTEM VERSION 3.0.1</p>
-          <p style={{ margin: '2px 0' }}>COPYRIGHT © RHODES ISLAND</p>
-        </div>
+
+        {message && (
+          <div className={[styles.msg, message.includes('成功') ? styles.msgOk : ''].join(' ')}>{message}</div>
+        )}
       </div>
     </div>
   );

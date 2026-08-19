@@ -1,0 +1,79 @@
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  width: 360px;
+  padding: 18px;
+  border-radius: var(--chant-radius-lg);
+  background: var(--chant-bg-layer-2);
+  border: 1px solid var(--chant-border-l2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.modeList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--chant-radius);
+  border: 1px solid var(--chant-border-l1);
+  background: var(--chant-bg-layer-1);
+  text-align: left;
+  transition: all var(--chant-duration-fast) var(--chant-ease);
+  &:hover { border-color: var(--chant-border-l2); }
+}
+
+.modeActive {
+  border-color: var(--chant-accent);
+  background: var(--chant-accent-soft);
+}
+
+.modeTitle { font-size: 13.5px; font-weight: 500; }
+.modeDesc { font-size: 12px; color: var(--chant-text-tertiary); }
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cancel, .create {
+  padding: 6px 16px;
+  border-radius: var(--chant-radius-sm);
+  font-size: 13px;
+  transition: all var(--chant-duration-fast) var(--chant-ease);
+}
+
+.cancel {
+  color: var(--chant-text-secondary);
+  background: var(--chant-bg-layer-1);
+  border: 1px solid var(--chant-border-l1);
+  &:hover { color: var(--chant-text-primary); }
+}
+
+.create {
+  color: #fff;
+  background: var(--chant-accent);
+  &:hover { background: var(--chant-accent-hover); }
+}

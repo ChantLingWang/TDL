@@ -1,28 +1,67 @@
-:root {
-  --ak-bg-primary: #f5f5f5;
-  --ak-bg-secondary: #ffffff;
-  --ak-text-primary: #1a1a1a;
-  --ak-text-secondary: #6b7280;
-  --ak-accent: #2563eb;
-  --ak-accent-hover: #1d4ed8;
-  --ak-warning: #d97706;
-  --ak-error: #dc2626;
-  
-  --ak-font-main: 'Roboto', 'Helvetica Neue', sans-serif;
-  --ak-font-mono: 'Roboto Mono', 'Courier New', monospace;
-  
-  --ak-border-width: 1px;
-  --ak-corner-size: 10px;
-}
-
-body {
-  background-color: var(--ak-bg-primary);
-  color: var(--ak-text-primary);
-  font-family: var(--ak-font-main);
-  margin: 0;
-  padding: 0;
-}
+// ============================================================================
+// Chant 全局样式 —— 深色主题，参照 DSH 视觉
+// ============================================================================
+@use './tokens.scss';
 
 * {
   box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--chant-bg-base);
+  color: var(--chant-text-primary);
+  font-family: var(--chant-font-main);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+// 链接
+a {
+  color: var(--chant-accent);
+  text-decoration: none;
+  &:hover { color: var(--chant-accent-hover); }
+}
+
+// 按钮基础重置（各组件用自己的样式）
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+// 输入框基础
+input, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+// ── 细滚动条（DSH scrollbar.css 风格）──────────────────────────────
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  &:hover { background: rgba(255, 255, 255, 0.2); }
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+// ── 选区 ────────────────────────────────────────────────────────────
+::selection {
+  background: rgba(65, 118, 230, 0.35);
 }

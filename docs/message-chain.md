@@ -21,13 +21,21 @@ sequenceDiagram
     K->>AI: MessageSent
     AI->>CS: GET /api/v1/messages/history?conversation_id=...
     CS-->>AI: {messages:[...]}
-    AI->>LLM: chat 调用
-    LLM-->>AI: 回复
-    AI->>K: EventEnvelope{AiReplyGenerated}
+    AI->>LLM: 流式 chat 调用
+    LLM-->>AI: SSE 增量（reasoning_content / content）
+    AI->>K: EventEnvelope{AiReplyDelta} × N（流式分块）
+    K->>CS: AiReplyDelta × N
+    CS-->>FE: WebSocket 实时转发（不落库）
+    AI->>K: EventEnvelope{AiReplyGenerated}（整块，含 metadata.reasoning）
     K->>CS: AiReplyGenerated
     CS->>M: 保存 AI 回复（幂等去重）
     CS-->>FE: WebSocket 推送
 ```
+
+> 流式说明：AI 回复以 `AiReplyDelta` 分块实时转发（thinking / progress / content / done
+> 四种 kind，前端按 `(message_id, seq)` 累积渲染）；最终 `AiReplyGenerated` 与全部分块
+> 共用同一 `message_id`，前端收到后以服务端整块为准。思考全文随最终消息的
+> `metadata.reasoning` 落库，历史接口原样返回，刷新后可回看。
 
 ---
 
@@ -282,6 +290,88 @@ Kafka key：`target_user_id`（即原用户 ID）。
 1. ~~**群聊 AI 回复推送**~~ **已修复**：群聊回复现在会查询群成员并逐个推送，推送 JSON 带 `type: "group_chat"` 和 `group_id`，已用 WebSocket 实测通过。
 2. **历史接口未鉴权**：`GET /api/v1/messages/history` 是内部接口但没有鉴权，可遍历任意会话。
 3. ~~**成本表分区缺失**~~ **已修复**：ai_service 启动时会自动补建当月与下月分区（`{table}_{YYYYMM}`），成本写入已实测通过。
-4. **chat 模式记忆在进程内**：`_memories` 是进程内字典，重启丢失、多实例不共享。
+4. ~~**chat 模式记忆在进程内**~~ **已修复（2026 短期记忆重构）**：改为 DSH 式——真相在 chat_service 历史，折叠摘要幂等写入 Mongo 检查点（`conversation_memory` 集合），重启可重放恢复。详见第 14 节。
 5. **Kafka 直接注入 MessageSent 不会落用户消息**：用户消息落库发生在 WS 处理阶段；绕过 WS 直接发 Kafka 只有 AI 回复会被 chat_service 落库。
 6. **kafka-ui 端口**：当前 compose 中 kafka-ui 使用 `8083`，避免与 chat_service 的 `8080` 冲突。
+
+---
+
+## 13. AiReplyDelta —— AI 回复流式分块（2026 流式升级新增）
+
+### 事件类型
+
+`chant.chat.v1.AiReplyDelta`（定义见 `proto/chant/chat/v1/event.proto`）
+
+- **生产者**: ai_service（chat 模式：LLM 流式增量；agent 模式：图节点输出）
+- **消费者**: chat_service —— 仅实时 WS 转发，**不落库**
+- **分区 key**: `user_id`（与 `send_ai_reply` 一致，同分区保序）
+- **顺序保证**: 同一回复的分块 `seq` 从 0 递增；前端按 `(message_id, seq)` 累积排序
+
+### 字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `sender_id` | string | 固定 `ai-assistant` |
+| `target_user_id` | string | 目标用户 |
+| `group_id` | string | 群 ID（私聊为空） |
+| `reply_to_msg_id` | string | 回复的用户消息 ID |
+| `message_id` | string | 最终回复 ID（`ai-{用户消息ID}`，全部分块一致） |
+| `seq` | int64 | 分块序号，从 0 递增 |
+| `kind` | string | `thinking` 思考链 / `progress` 进度 / `content` 正文 / `done` 结束 |
+| `content` | string | 增量文本（done 时为空） |
+| `timestamp_ms` | int64 | 毫秒时间戳 |
+| `metadata` | map | 可扩展元数据 |
+
+### WS 推送形态（chat_service 广播）
+
+与 `AiReplyGenerated` 同构，额外带 `kind` / `seq` 字段；前端按 kind 分流渲染：
+`thinking` / `progress` 进思考块，`content` 进正文气泡（打字机），`done` 标记流结束。
+
+### 思考内容持久化
+
+最终 `AiReplyGenerated` 的 `metadata.reasoning` 携带思考全文（chat 模式为模型
+`reasoning_content`，agent 模式为节点输出小结），随消息落库；历史接口原样返回
+`metadata`，前端据此在历史消息中恢复思考块。
+
+### 前端兜底
+
+- 断线重连 / 丢块：收到最终整块消息后以服务端全文为准，流式条目被替换清除
+- 错误回复（`err-*` 消息）到达时，按其 `reply_to_msg_id` 清除未收尾的流式条目
+
+---
+
+## 14. 短期记忆（DSH 式折叠，2026 重构）
+
+### 原则（对齐 DSH）
+
+1. **单一真相源**：对话内容只存在于 chat_service 的 Mongo 历史，ai_service 不持有对话消息
+2. **投影组装**：模型上下文 = 系统提示 + 折叠摘要 + 检查点之后的尾巴（`chat/memory/context.py: assemble_context`）
+3. **折叠压缩**：`摘要 + 尾巴` 超过触发线时，旧段送 LLM 摘要，
+   幂等写入 Mongo `conversation_memory` 集合，保留原文尾巴
+4. **可重放**：检查点 = `{conversation_id, watermark_ms, summary, updated_at_ms}`，重启 / 多实例从检查点恢复
+
+### 配置（ai_service .env / settings.py，数值 1:1 对齐 DSH）
+
+| 字段 | 默认 | DSH 出处 |
+|---|---|---|
+| `memory_context_window` | 1000000 | DSH `DEFAULT_CONTEXT_WINDOW = 1e6`（DeepSeek V4 上下文窗口） |
+| `memory_summary_trigger_ratio` | 0.8 | DSH `thresholdRatio = 0.8`（触发线 = 窗口 × 0.8 = 80 万 token） |
+| `memory_retain_ratio` | 0.16 | DSH `retainRatio = 0.16`（保留尾巴 = 窗口 × 0.16 = 16 万 token） |
+| `memory_summary_max_tokens` | 8192 | DSH compaction `maxTokens = 8192`（摘要输出上限） |
+| `memory_mongo_url` | mongodb://localhost:27017 | 检查点存储（与历史同库） |
+| `memory_checkpoint_collection` | conversation_memory | 检查点集合 |
+
+> token 估算（无 tokenizer 依赖）：CJK 1 字 1 token，其余 4 字符 1 token。
+
+### 历史回填链路
+
+ai_service 每次处理消息时：
+1. 用 `X-Internal-Key`（两侧配置一致的 `internal_api_key`）直连 chat_service
+   `GET /api/v1/messages/history?conversation_id=...`（**trust_env=False，不走 HTTP 代理**）
+2. 接口返回新 → 旧，**先 reverse 摆正**再组装
+3. 剔除当前消息自身（它已被 chat_service 落库，避免重复）
+
+### 与旧实现的差异
+
+- 旧：进程内 deque（按 user_id 键控、满了静默丢、重启失忆、历史倒序喂入）
+- 新：无进程内状态；按会话键控（conversation_id）；token 预算切片；摘要化折叠 + 持久检查点

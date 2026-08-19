@@ -51,3 +51,39 @@ message AiReplyGenerated {
   // 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
   map<string, string> metadata = 9;
 }
+
+// AiReplyDelta AI 回复的流式增量分块。
+// 生产者: ai_service
+// 消费者: chat_service（仅实时 WS 转发，不落库）
+//
+// 一条回复对应一个固定的 message_id（流开始即确定，与最终
+// AiReplyGenerated 的 message_id 一致），分块按 seq 从 0 递增；
+// 前端按 (message_id, seq) 累积排序，收到最终整块消息时以服务端为准。
+//
+// kind 取值：
+//   "thinking"  思考链文本增量（模型 reasoning_content / 图节点输出）
+//   "progress"  阶段进度文字（与旧 progress 消息语义一致）
+//   "content"   正文文本增量
+//   "done"      流结束标记（content 为空，之后必有最终 AiReplyGenerated）
+message AiReplyDelta {
+  // AI 用户 ID，如 "ai-assistant"
+  string sender_id = 1;
+  // 回复的目标用户
+  string target_user_id = 2;
+  // 群组 ID；私聊时可为空
+  string group_id = 3;
+  // 回复的是哪条用户消息
+  string reply_to_msg_id = 4;
+  // 最终回复的消息 ID（该回复的所有分块一致）
+  string message_id = 5;
+  // 分块序号，从 0 递增，前端据此排序
+  int64 seq = 6;
+  // thinking / progress / content / done
+  string kind = 7;
+  // 增量文本；kind=done 时为空
+  string content = 8;
+  // 分块产生时间戳（毫秒，Unix epoch）
+  int64 timestamp_ms = 9;
+  // 可扩展元数据
+  map<string, string> metadata = 10;
+}

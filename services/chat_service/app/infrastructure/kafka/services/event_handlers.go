@@ -115,6 +115,33 @@ func BroadcastAiReply(reply *chatv1.AiReplyGenerated, ts int64) {
 	aiReplyBroadcast(reply.TargetUserId, reply.GroupId, responseMsg)
 }
 
+// BroadcastAiReplyDelta 将 AI 流式分块实时推送给目标用户（不落库）。
+func BroadcastAiReplyDelta(delta *chatv1.AiReplyDelta, ts int64) {
+	if aiReplyBroadcast == nil {
+		return
+	}
+	payload := map[string]interface{}{
+		"sender":          delta.SenderId,
+		"content":         delta.Content,
+		"message_id":      delta.MessageId,
+		"reply_to_msg_id": delta.ReplyToMsgId,
+		"metadata":        delta.Metadata,
+		"kind":            delta.Kind,
+		"seq":             delta.Seq,
+		"time":            ts,
+	}
+	if delta.GroupId != "" {
+		payload["type"] = "group_chat"
+		payload["group_id"] = delta.GroupId
+		payload["conversation_id"] = delta.GroupId
+	} else {
+		payload["type"] = "private_chat"
+		payload["conversation_id"] = mongodb.GenerateSessionID(delta.SenderId, delta.TargetUserId)
+	}
+	responseMsg, _ := json.Marshal(payload)
+	aiReplyBroadcast(delta.TargetUserId, delta.GroupId, responseMsg)
+}
+
 // RegisterAiReplyBroadcast 注册 AI 回复推送回调。
 var aiReplyBroadcast func(targetUserID, groupID string, message []byte)
 

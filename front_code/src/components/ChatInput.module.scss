@@ -1,0 +1,51 @@
+.dock {
+  padding: 10px 16px 14px;
+}
+
+.box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--chant-border-l2);
+  border-radius: var(--chant-radius-lg);
+  background: var(--chant-bg-layer-1);
+  transition: border-color var(--chant-duration-fast) var(--chant-ease);
+  &:focus-within { border-color: var(--chant-accent); }
+}
+
+.input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--chant-text-primary);
+  max-height: 140px;
+  &::placeholder { color: var(--chant-text-caption); }
+}
+
+.send {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--chant-accent);
+  transition: all var(--chant-duration-fast) var(--chant-ease);
+  &:hover:not(:disabled) { background: var(--chant-accent-hover); }
+  &:disabled {
+    background: var(--chant-bg-layer-2);
+    color: var(--chant-text-tertiary);
+    cursor: default;
+  }
+}
+
+.sendAccent {
+  box-shadow: 0 0 10px rgba(65, 118, 230, 0.35);
+}

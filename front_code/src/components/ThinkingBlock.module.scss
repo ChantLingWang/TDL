@@ -1,0 +1,93 @@
+.thinking {
+  margin: 2px 0;
+  border: 1px solid var(--chant-border-l1);
+  border-radius: var(--chant-radius-sm);
+  background: var(--chant-bg-layer-1);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  color: var(--chant-text-tertiary);
+  font-size: 12.5px;
+  transition: color var(--chant-duration-fast) var(--chant-ease);
+  &:hover { color: var(--chant-text-secondary); }
+}
+
+.headerText {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chevron {
+  transition: transform var(--chant-duration) var(--chant-ease);
+}
+
+.chevronOpen { transform: rotate(90deg); }
+
+.pulseDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chant-accent);
+  animation: chantPulse 1.2s var(--chant-ease) infinite;
+}
+
+@keyframes chantPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.body {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--chant-border-l1);
+  color: var(--chant-text-tertiary);
+  font-size: 13px;
+  line-height: 1.7;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.stepList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.stepMarker {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--chant-accent);
+  opacity: 0.8;
+}
+
+.reasoning {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--chant-accent);
+  animation: chantPulse 1s var(--chant-ease) infinite;
+}
