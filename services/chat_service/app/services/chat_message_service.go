@@ -27,16 +27,15 @@ func getGroupPartitionKey(groupID string) string {
 }
 
 // HandleChat 处理统一聊天逻辑，使用 proto MessageSent。
-// userID 为认证中间件从 JWT 中解析出的登录用户 ID，
-// 消息的 sender 一律以登录态为准，忽略客户端传来的 sender_id。
-func HandleChat(userID string, content models.ChatMessageRequest) {
+// userInfo 为认证中间件从 JWT 中解析出的完整用户信息，
+func HandleChat(userInfo *UserInfo, content models.ChatMessageRequest) {
 	if content.Text == "" {
 		return
 	}
 
 	msgID := content.MessageID
 	contentType := content.MessageType
-	senderID := userID
+	senderID := userInfo.UserID
 
 	switch content.ConversationType {
 	case chatconst.ConversationTypeGroup, chatconst.ConversationTypeAI, chatconst.ConversationTypeAIResearch:

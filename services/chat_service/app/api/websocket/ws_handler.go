@@ -62,7 +62,7 @@ func HandleWebSocket(c *gin.Context) {
 		// 根据消息类型分发给不同的处理函数
 		switch msg.Type {
 		case kafka.WSMsgTypeChat:
-			services.HandleChat(userInfo.UserID, msg.Content)
+			services.HandleChat(userInfo, msg.Content)
 		case kafka.WSMsgTypePing:
 			// 心跳包处理
 			log.Printf("Received ping from %s", userInfo.UserID)
