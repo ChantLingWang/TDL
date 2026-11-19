@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     kafka_topic: str = "chat_group_message"
     kafka_group_id: str = "ai_service_group"
 
+    # ---- 并发消费 ----
+    ai_worker_count: int = 8
+    """同时处理的用户回合数上限（协程 worker 数量）"""
+    ai_queue_maxsize: int = 100
+    """待处理消息队列长度；满时暂停 Kafka 拉取（背压）"""
+
     # ---- 成本审计 ----
     cost_tracking_enabled: bool = True
     cost_table_name: str = "llm_api_costs"

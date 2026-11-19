@@ -128,7 +128,10 @@ Topic：`chat_group_message`。
 [main.py](../services/ai_service/main.py)：
 
 - consumer group：`ai_service_group`；
-- `auto_offset_reset=latest`、自动提交（这两点目前是已知限制，见第 11 节）；
+- **拉取与处理解耦**：`consume_loop` 只做 `parse + 入有界队列`，
+  `ai_worker_count`（默认 8）个 worker 并发处理；
+- 同一 `conversation_id` 串行（Kafka key 就是 conversation_id），不同会话并行；
+- `auto_offset_reset=latest`、自动提交（自动提交是阶段一，见第 11 节）；
 - 只处理 `MessageSent`，且 `target_user_id == settings.ai_user_id`；
 - `AiReplyGenerated` 直接忽略，避免自己回复自己。
 
@@ -248,8 +251,9 @@ WS 推送 JSON（[event_handlers.go](../services/chat_service/app/infrastructure
 
 1. **没有持久化**：用户消息、AI 回复、会话列表都不落库；刷新即丢。
 2. **短期记忆空转**：history 恒为空，折叠逻辑不会触发。
-3. **Kafka 串行消费**：`consume_loop` 中 `await handler`，一个慢请求会阻塞所有人；
-   `enable_auto_commit=True` 在长任务下有丢消息风险；`auto_offset_reset=latest` 会丢停机期间消息。
+3. **自动提交**：已改为 8 个 worker 并发（同一会话串行），但仍是
+   `enable_auto_commit=True`；进程崩溃/取消时，队列里未处理的消息可能已被提交而丢失；
+   `auto_offset_reset=latest` 也会丢停机期间的消息。下一阶段改手动提交 + 幂等。
 4. **无幂等**：Kafka 重投会重复回复同一 `message_id`。
 5. **无 token 预算**：只有步数/工具数/时间预算；工具结果按单条 8000 字符截断，
    多轮后仍可能超出上下文窗口。
