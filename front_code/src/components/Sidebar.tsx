@@ -1,7 +1,6 @@
 // ============================================================================
-// 侧栏 —— AI 会话列表 + 普通群组列表 + 用户区（DSH 侧栏风格）
+// 侧栏 —— AI 会话列表 + 用户区（AI-only）
 // ============================================================================
-import { useState } from 'react';
 import type { Group } from '../types/chat';
 import styles from './Sidebar.module.scss';
 
@@ -11,36 +10,19 @@ interface SidebarProps {
   statusMsg: string;
   totalUnread: number;
   aiGroups: Group[];
-  normalGroups: Group[];
   selectedGroupId: string;
-  activeGroup: string;
   unreadCounts: Record<string, number>;
   onSelectAI: (gid: string) => void;
-  onSelectGroup: (gid: string) => void;
   onNewChat: () => void;
-  onCreateGroup: (name: string) => void;
   onLogout: () => void;
 }
 
-const initials = (name: string): string => (name || '?').slice(0, 2).toUpperCase();
-
 const Sidebar: React.FC<SidebarProps> = ({
-  username, connected, statusMsg, totalUnread, aiGroups, normalGroups,
-  selectedGroupId, activeGroup, unreadCounts, onSelectAI, onSelectGroup,
-  onNewChat, onCreateGroup, onLogout,
+  username, connected, statusMsg, totalUnread, aiGroups,
+  selectedGroupId, unreadCounts, onSelectAI, onNewChat, onLogout,
 }) => {
-  const [newGroupName, setNewGroupName] = useState('');
-
-  const submitGroup = () => {
-    const name = newGroupName.trim();
-    if (!name) return;
-    onCreateGroup(name);
-    setNewGroupName('');
-  };
-
   return (
     <aside className={styles.sidebar}>
-      {/* 用户区 */}
       <div className={styles.userRow}>
         <span className={styles.statusDot} data-online={connected} />
         <span className={styles.userName} title={username}>{username}</span>
@@ -58,7 +40,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className={styles.statusLine}>未读消息 {totalUnread > 999 ? '999+' : totalUnread}</div>
       )}
 
-      {/* AI 会话 */}
       <div className={styles.section}>
         <div className={styles.sectionHead}>
           <span className={styles.sectionTitle}>AI 会话</span>
@@ -88,40 +69,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         ))}
-      </div>
-
-      {/* 普通群组 */}
-      <div className={styles.section}>
-        <div className={styles.sectionHead}>
-          <span className={styles.sectionTitle}>群组</span>
-        </div>
-        {normalGroups.map((g) => (
-          <div
-            key={g.group_id}
-            className={[styles.convItem, activeGroup === g.group_id ? styles.convActive : ''].join(' ')}
-            onClick={() => onSelectGroup(g.group_id)}
-          >
-            <span className={styles.avatar}>{initials(g.group_name)}</span>
-            <span className={styles.convName}>{g.group_name}</span>
-            {!!unreadCounts[g.group_id] && (
-              <span className={styles.badge}>
-                {unreadCounts[g.group_id] > 99 ? '99+' : unreadCounts[g.group_id]}
-              </span>
-            )}
-          </div>
-        ))}
-
-        {/* 创建普通群组 */}
-        <div className={styles.createRow}>
-          <input
-            className={styles.createInput}
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') submitGroup(); }}
-            placeholder='新群组名称'
-          />
-          <button type='button' className={styles.createBtn} onClick={submitGroup}>创建</button>
-        </div>
       </div>
     </aside>
   );

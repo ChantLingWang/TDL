@@ -1,0 +1,23 @@
+# 本地虚拟环境与缓存（不进镜像）
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# 测试与开发依赖不进生产镜像
+tests/
+requirements-dev.txt
+
+# 密钥绝不进镜像；只保留模板
+.env
+.env.*
+!.env.example
+
+# 版本控制与 IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store

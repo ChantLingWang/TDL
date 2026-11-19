@@ -1,377 +1,270 @@
 # 消息链路与字段传递文档
 
-> 本文档描述“前端 → chat_service → Kafka → ai_service → Kafka → chat_service → 前端/存储”的完整链路。
-> 所有字段以当前代码为准，后续改代码请同步更新本文档。
+> 本文档描述**当前代码实际运行**的链路：前端 → gateway → Kafka → ai_service → Kafka → gateway → 前端。
+>
+> **当前没有消息落库**：storage 尚未实现，刷新页面后历史会丢失。存储现状见
+> [storage-architecture.md](./storage-architecture.md)。
+>
+> 2026-11 重构后：私聊/群聊/深度模式已删除；`chat_service` 是 AI-only gateway；
+> `ai_service` 是 AgentLoop harness；LLM 只有 `complete()` 调用，没有 token 级流式。
 
-## 1. 总链路图
+## 1. 总链路
 
 ```mermaid
 sequenceDiagram
     participant FE as 前端 ChatPage
-    participant WS as chat_service WS
-    participant CS as chat_service (Kafka 消费者)
-    participant K as Kafka (chat_group_message)
+    participant GW as gateway /ws
+    participant K as Kafka
     participant AI as ai_service
-    participant LLM as DeepSeek/LLM
-    participant M as MongoDB
+    participant LLM as DeepSeek
 
-    FE->>WS: {type:"chat", content:{conversation_type, sender_id, target_id/group_id, text, message_id, message_type}}
-    WS->>M: 保存用户消息（群/私聊）
-    WS->>K: EventEnvelope{MessageSent}
+    FE->>GW: {type:"chat", content:{conversation_id,text,message_id,message_type}}
+    GW->>K: MessageSent（key=conversation_id）
     K->>AI: MessageSent
-    AI->>CS: GET /api/v1/messages/history?conversation_id=...
-    CS-->>AI: {messages:[...]}
-    AI->>LLM: 流式 chat 调用
-    LLM-->>AI: SSE 增量（reasoning_content / content）
-    AI->>K: EventEnvelope{AiReplyDelta} × N（流式分块）
-    K->>CS: AiReplyDelta × N
-    CS-->>FE: WebSocket 实时转发（不落库）
-    AI->>K: EventEnvelope{AiReplyGenerated}（整块，含 metadata.reasoning）
-    K->>CS: AiReplyGenerated
-    CS->>M: 保存 AI 回复（幂等去重）
-    CS-->>FE: WebSocket 推送
+    AI->>AI: assemble_context + AgentLoop
+    loop 工具轮（最多 8 步）
+        AI->>LLM: complete(tools)
+        LLM-->>AI: content / reasoning / tool_calls
+        AI->>AI: execute_tool_batch
+    end
+    AI->>K: AiReplyDelta × N（progress / thinking / content / done）
+    AI->>K: AiReplyGenerated（整块）
+    K->>GW: AiReplyDelta / AiReplyGenerated
+    GW-->>FE: WebSocket 推送（不落库）
 ```
 
-> 流式说明：AI 回复以 `AiReplyDelta` 分块实时转发（thinking / progress / content / done
-> 四种 kind，前端按 `(message_id, seq)` 累积渲染）；最终 `AiReplyGenerated` 与全部分块
-> 共用同一 `message_id`，前端收到后以服务端整块为准。思考全文随最终消息的
-> `metadata.reasoning` 落库，历史接口原样返回，刷新后可回看。
+> `AiReplyDelta` 是**答案生成完之后**再切块发送的，不是边生成边推送；
+> 作用只是让前端能按块渲染，首字延迟等于整段回答的生成时间。
 
----
+## 2. 前端 → gateway（WebSocket）
 
-## 2. 前端 WebSocket 发送（FE → chat_service）
-
-外层结构（[ws_message.go](../services/chat_service/app/api/models/ws_message.go)）：
+外层结构见 [ws_message.go](../services/chat_service/app/api/models/ws_message.go)：
 
 ```json
 {
   "type": "chat",
   "content": {
-    "conversation_type": "private | group | ai | ai-research",
-    "sender_id": "用户ID",
-    "target_id": "私聊接收者ID（私聊必填）",
-    "group_id": "群ID（群聊/AI 会话必填）",
+    "conversation_id": "AI 会话 ID，可空",
     "text": "消息文本",
-    "message_id": "客户端生成的唯一ID，如 123-1690000000000",
-    "message_type": "text",
-    "conversation_id": "AI 会话ID（可选）"
+    "message_id": "客户端生成的 UUID，可空",
+    "message_type": "text"
   }
 }
 ```
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `type` | string | 固定 `"chat"`；心跳为 `"ping"` |
-| `content.conversation_type` | string | `private` / `group` / `ai` / `ai-research` |
-| `content.sender_id` | string | 发送者用户 ID |
-| `content.target_id` | string | 私聊接收者 ID |
-| `content.group_id` | string | 群 ID / AI 会话 ID |
-| `content.text` | string | 消息文本 |
-| `content.message_id` | string | 消息 ID（去重/溯源用） |
-| `content.message_type` | string | 消息类型（`text` 等） |
+| `type` | string | `chat` / `ping` |
+| `content.conversation_id` | string | 为空时 gateway 生成 UUID |
+| `content.text` | string | 消息正文；为空直接丢弃 |
+| `content.message_id` | string | 为空时 gateway 生成 UUID |
+| `content.message_type` | string | 默认 `text` |
 
-> 注意：前端发的是 `text`，不是 `content`；`content` 是外层载荷的键名。
+前端 [ChatPage.tsx](../front_code/src/pages/ChatPage.tsx) 在发送后**本地乐观追加**用户消息；
+gateway 不会把用户消息回推给发送者。
 
----
+WebSocket 地址：`/api/v1/ws?token=<access_token>`（浏览器 WS 不能带 Header，
+鉴权中间件支持 query token 回退）。
 
-## 3. chat_service 处理与 Mongo 落库
+## 3. gateway（chat_service）
 
-### 3.1 用户消息处理（[chat_message_service.go](../services/chat_service/app/services/chat_message_service.go)）
+路由见 [router.go](../services/chat_service/app/api/routes/router.go)：
 
-1. 校验 `content.Text` 非空。
-2. **群聊 / AI 会话**：`SaveMessage(conversationType, senderID, groupID, msg)`，`targetID` 位置传群 ID。
-3. **私聊**：`SaveMessage("private", senderID, targetID, msg)`。
-4. 构造 `MessageSent` 发送 Kafka，分区 key：
-   - 群聊：`getGroupPartitionKey(groupID)`（群 ID 数字部分奇偶分区）
-   - 私聊：`targetID`
-
-### 3.2 Mongo Message 结构（[models.go](../services/chat_service/app/database/mongodb/models.go)）
-
-消息落库统一使用 `Message`，同时是历史接口返回的 JSON 结构：
-
-| Mongo/JSON 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `sender_id` | string | 发送者 ID |
-| `timestamp` | string(RFC3339) | 时间戳 |
-| `timestamp_ms` | int64 | AI 生成时间戳（毫秒，可选） |
-| `content` | string | 文本内容 |
-| `metadata` | map | 可扩展元数据（AI 报告摘要等，可选） |
-| `private_id` | string | 私聊接收者 ID（仅私聊） |
-| `group_id` | string | 群 ID（仅群聊/AI） |
-| `message_id` | string | 消息 ID |
-| `conversation_id` | string | AI 会话 ID（可选） |
-| `message_type` | string | 消息类型 |
-| `is_active` | bool | 是否可见 |
-| `read` | bool | 是否已读 |
-
-### 3.3 Mongo 分桶规则
-
-- 群聊集合：`group_message_history_YYYYMM`
-- 私聊集合：`private_message_history_YYYYMM`
-- 文档内 `date_identifier`：`YYYYMMDD`
-- 私聊会话 ID：`GenerateSessionID(userA, userB)`，即两个用户 ID **排序后**用 `_` 拼接，例如 `ai-assistant_smoke-user`
-- 写入幂等：更新条件带 `messages.message_id: {$ne: message_id}`，重放/重试不会重复插入
-
----
-
-## 4. Kafka 事件信封（EventEnvelope）
-
-定义见 [envelope.proto](../proto/chant/common/v1/envelope.proto)：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `event_id` | string | 事件唯一 ID |
-| `event_type` | string | `chant.chat.v1.MessageSent` / `chant.chat.v1.AiReplyGenerated` |
-| `source` | string | 来源服务：`chat-service` / `ai-service` |
-| `timestamp` | int64 | 事件产生时间（Unix 毫秒） |
-| `trace_id` | string | 分布式追踪 ID（可选） |
-| `data` | bytes | 载荷 protojson 序列化后的字节 |
-
-Kafka topic：`chat_group_message`。
-
----
-
-## 5. MessageSent（用户消息事件）
-
-定义见 [event.proto](../proto/chant/chat/v1/event.proto)：
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `sender_id` | string | 发送者 ID |
-| `target_user_id` | string | 私聊目标 ID |
-| `group_id` | string | 群/AI 会话 ID |
-| `content` | string | 文本内容 |
-| `message_id` | string | 消息 ID |
-| `message_type` | string | `text` 等 |
-| `conversation_type` | string | `private` / `group` / `ai` / `ai-research` |
-| `timestamp_ms` | int64 | 毫秒时间戳 |
-| `metadata` | map<string,string> | 扩展字段 |
-
----
-
-## 6. ai_service 消费与分发（[main.py](../services/ai_service/main.py)）
-
-按 `event_type` 分发：
-
-| 条件 | 处理函数 | 模式 |
-| --- | --- | --- |
-| `conversation_type == "ai-research"` 或 `target_user_id == ai-research` | `handle_agent_message` | agent 研究模式 |
-| `target_user_id == ai-assistant` 或 `group_id` 以 `ai_` 开头 | `handle_private_message` | chat 对话模式 |
-| `event_type == AiReplyGenerated` | 忽略 | 防循环 |
-
----
-
-## 7. chat 模式处理（[chat/service.py](../services/ai_service/chat/service.py)）
-
-输入字段：`sender_id`、`target_user_id`、`content`、`message_id`、`group_id`。
-
-### 7.1 历史拉取（关键字段）
-
-```
-GET {chat_service_url}/api/v1/messages/history
-  ?conversation_id=<conversation_id>
-  &limit=30
-  &cursor=<当前 Unix 秒>
-```
-
-`conversation_id` 取值规则：
-
-| 场景 | conversation_id |
+| 接口 | 说明 |
 | --- | --- |
-| 群聊 / AI 群 | `group_id`（AI 群以 `ai_` 开头） |
-| 私聊 | 双方 ID 排序后拼接：`"_".join(sorted([target_user_id, sender_id]))`，例如 `ai-assistant_smoke-user` |
+| `GET /api/v1/health` | 健康检查 |
+| `GET /api/v1/users/:user_id` | 代理到 auth_service（gRPC），gateway 不查库 |
+| `POST /api/v1/conversations` | 只返回一个新 UUID，不落库 |
+| `GET /api/v1/ws` | WebSocket 入口 |
 
-> 私聊不能只传单个用户 ID（如 `ai-assistant`），否则接口返回 200 但查不到记录。
+收到 `chat` 后（[chat_message_service.go](../services/chat_service/app/services/chat_message_service.go)）：
 
-### 7.2 处理流程
+1. `text` 为空则丢弃；
+2. 补全 `conversation_id` / `message_id` / `message_type`；
+3. 构造 `MessageSent`，`target_user_id = config.AIUserID`（默认 `ai-assistant`）；
+4. 发 Kafka，key 为 `conversation_id`，event type `chant.chat.v1.MessageSent`。
 
-1. 拉取历史（失败只告警，不阻断）。
-2. 将历史与当前消息写入进程内滑动窗口（`SlidingWindowMemory`，键为 `user_id`）。
-3. 调用 LLM（`route_chat`，带重试）。
-4. 成本记录（失败只告警）。
-5. `send_ai_reply` 发送回复。
+gateway **不写任何数据库**。
 
----
+## 4. Kafka
 
-## 8. agent 模式处理（[agent/service.py](../services/ai_service/agent/service.py)）
+Topic：`chat_group_message`。
 
-输入字段：`sender_id`、`content`、`message_id`、`group_id`。
+信封定义见 [envelope.proto](../proto/chant/common/v1/envelope.proto)：
 
-Agent 会流式发送多类消息，`message_id` 规则：
+| 字段 | 说明 |
+| --- | --- |
+| `event_id` | 事件 ID |
+| `event_type` | `chant.chat.v1.MessageSent` / `AiReplyDelta` / `AiReplyGenerated` |
+| `source` | `chat-service` / `ai-service` |
+| `timestamp` | 事件时间（Unix 毫秒） |
+| `data` | protojson 序列化后的载荷 |
 
-| 消息 | message_id | 说明 |
+分区 key：
+
+- `MessageSent`：`conversation_id`
+- `AiReplyDelta` / `AiReplyGenerated`：`target_user_id`（保证同一条回复的分块与最终消息同分区有序）
+
+> 用户消息与 AI 回复可能落在不同分区；如果以后有 storage 消费者，落库后必须按
+> `timestamp_ms` 排序，不能依赖到达顺序。
+
+## 5. MessageSent
+
+定义见 [event.proto](../proto/chant/chat/v1/event.proto)。
+
+| 字段 | 说明 |
+| --- | --- |
+| `sender_id` | 发送者用户 ID |
+| `target_user_id` | AI 用户 ID，固定 `ai-assistant` |
+| `conversation_id` | AI 会话 ID |
+| `content` | 文本正文 |
+| `message_id` | 消息 ID |
+| `message_type` | `text` 等 |
+| `timestamp_ms` | 毫秒时间戳 |
+| `metadata` | 扩展字段（当前为空） |
+
+## 6. ai_service 消费
+
+[main.py](../services/ai_service/main.py)：
+
+- consumer group：`ai_service_group`；
+- `auto_offset_reset=latest`、自动提交（这两点目前是已知限制，见第 11 节）；
+- 只处理 `MessageSent`，且 `target_user_id == settings.ai_user_id`；
+- `AiReplyGenerated` 直接忽略，避免自己回复自己。
+
+[apps/chat/service.py](../services/ai_service/apps/chat/service.py) 的处理：
+
+1. 每个任务建一个 `Toolbox`（`user_id` / `conversation_id` / `message_id`）；
+2. `system_prompt = SYSTEM_PROMPT + toolbox.catalog()`；
+3. `assemble_context(...)` 组装上下文（**当前 history 传空数组**，见第 7 节）；
+4. 先发一条 `progress="正在思考…"`；
+5. 跑 `AgentLoop.run()`；
+6. 把完整结果切块发 `AiReplyDelta`（thinking 64 字/块，content 16 字/块），最后发 `done`；
+7. 发 `AiReplyGenerated`（整块，`metadata.reasoning` 带思考全文）；
+8. 成本写 PostgreSQL（失败只告警）。
+
+## 7. 上下文组装
+
+[memory/context.py](../services/ai_service/memory/context.py)：
+
+- 模型看到的上下文 = 系统提示 + 折叠摘要 + 检查点之后的尾巴 + 当前消息；
+- 超过“上下文窗口 × 0.8”时把旧段摘要化，保留约 16% 原文尾巴；
+- 检查点 `{conversation_id, watermark_ms, summary, updated_at_ms}`。
+
+**当前实际行为**：调用方传的 history 是空数组，所以只有“系统提示 + 当前消息”，
+折叠逻辑不会触发。检查点目前直连 Mongo，是 storage 接入前的临时实现。
+
+## 8. AgentLoop
+
+[runtime/agent_loop](../services/ai_service/runtime/agent_loop/loop.py)：
+
+```
+model.complete(messages, tools)
+  ├─ 无 tool_calls → 最终回答，结束
+  └─ 有 tool_calls → 追加 assistant + tool 结果 → 再请求
+        └─ 超过预算 → 追加“直接回答”提示，做一次无工具调用收口
+```
+
+预算（[config.py](../services/ai_service/runtime/agent_loop/config.py)）：
+
+| 配置 | 默认 | 说明 |
 | --- | --- | --- |
-| 进度消息 | `ai-progress-<原 message_id>` | 如“正在分析您的问题...” |
-| 最终报告 | `ai-<原 message_id>` | 带 `metadata`（report_type/domain/methodology/summary） |
-| 审稿意见 | `ai-<原 message_id>-critique` | 审核未通过时追加 |
-| 错误回复 | `ai-err-<原 message_id>` | 异常兜底 |
+| `max_steps` | 8 | 最多模型调用次数 |
+| `max_tool_calls` | 16 | 任务内工具调用上限（批次执行后检查） |
+| `max_seconds` | 120 | 步骤之间检查的软时间预算 |
+| `tool_timeout_seconds` | 30 | 单个工具超时 |
+| `max_parallel_tools` | 5 | 同批工具并发上限 |
+| `max_tool_result_chars` | 8000 | 单条工具结果截断，保留头尾 |
 
----
+工具执行（[executor.py](../services/ai_service/runtime/agent_loop/executor.py)）：
 
-## 9. AiReplyGenerated（AI 回复事件）
+- `load_tools` 先串行执行（屏障），其余工具并行；
+- 结果按模型返回顺序回填；
+- 未知工具、未加载、参数错误、异常、超时都会变成一条 tool 消息，保证 call/result 配对。
 
-定义见 [event.proto](../proto/chant/chat/v1/event.proto)，构造见 [producer.py](../services/ai_service/shared/kafka/producer.py)：
+可用工具（[llm_tools](../services/ai_service/llm_relay/llm_tools/__init__.py)）：
+`load_tools`（常驻）、`get_current_time`、`web_search`、`web_fetch`。
+后两个走 DeepSeek `/tools/search`、`/tools/fetch`。
 
-| 字段 | 来源 | 说明 |
-| --- | --- | --- |
-| `sender_id` | 固定 | `ai-assistant` |
-| `target_user_id` | 原消息 sender | 回复给谁 |
-| `content` | LLM 输出 | 回复正文 |
-| `reply_to_msg_id` | 原消息 message_id | 回复哪条 |
-| `message_id` | `ai-<原 message_id>` | 回复消息 ID |
-| `group_id` | 原消息 group_id | 群聊时非空 |
-| `conversation_type` | 未设置 | 当前留空 |
-| `timestamp_ms` | 当前时间 | 毫秒 |
-| `metadata` | 报告元数据 | agent 模式使用 |
+## 9. AI 回复事件
 
-Kafka key：`target_user_id`（即原用户 ID）。
+### AiReplyDelta
 
----
+定义见 [event.proto](../proto/chant/chat/v1/event.proto)。
 
-## 10. chat_service 消费 AI 回复（[event_consumer.go](../services/chat_service/app/infrastructure/kafka/event_consumer.go)）
+| 字段 | 说明 |
+| --- | --- |
+| `sender_id` | `ai-assistant` |
+| `target_user_id` | 回复给谁 |
+| `conversation_id` | 会话 ID |
+| `reply_to_msg_id` | 回复的用户消息 ID |
+| `message_id` | `ai-<用户消息 ID>`，该回复所有分块一致 |
+| `seq` | 从 0 递增 |
+| `kind` | `progress` / `thinking` / `content` / `done` |
+| `content` | 增量文本；`done` 为空 |
 
-1. 解析 `AiReplyGenerated`。
-2. **群聊**：`GroupID = reply.group_id`、`ConversationID = reply.group_id`，按 `"ai"` 类型落 Mongo 群聊集合。
-3. **私聊**：`PrivateID = reply.target_user_id`，按 `"private"` 类型落 Mongo 私聊集合。
-4. WebSocket 推送 JSON：
+### AiReplyGenerated
+
+| 字段 | 说明 |
+| --- | --- |
+| `sender_id` | `ai-assistant` |
+| `target_user_id` | 回复给谁 |
+| `conversation_id` | 会话 ID |
+| `content` | 完整回答 |
+| `reply_to_msg_id` | 回复的用户消息 ID |
+| `message_id` | `ai-<用户消息 ID>` |
+| `metadata` | `reasoning`：思考全文 |
+| `timestamp_ms` | 毫秒时间戳 |
+
+错误路径：`send_error_reply` 发送固定兜底文案，`message_id = ai-err-<用户消息 ID>`，
+`reply_to_msg_id` 仍是原消息，前端据此清掉未收尾的流式条目。
+
+## 10. gateway 消费并推送
+
+[event_consumer.go](../services/chat_service/app/infrastructure/kafka/event_consumer.go)：
+
+- `AiReplyDelta` → `BroadcastAiReplyDelta`；
+- `AiReplyGenerated` → `BroadcastAiReply`；
+- 只推给 `target_user_id` 的本地 WS 连接，**不落库**。
+
+WS 推送 JSON（[event_handlers.go](../services/chat_service/app/infrastructure/kafka/services/event_handlers.go)）：
 
 ```json
 {
-  "type": "private_chat",
+  "type": "ai_chat",
+  "conversation_id": "...",
   "sender": "ai-assistant",
-  "content": "回复内容",
-  "time": 1690000000000
+  "content": "...",
+  "message_id": "ai-...",
+  "reply_to_msg_id": "...",
+  "metadata": { "reasoning": "..." },
+  "kind": "content",
+  "seq": 3,
+  "time": 1786000000000
 }
 ```
 
----
+## 11. 当前限制（已知）
 
-## 11. 历史接口（GET /api/v1/messages/history）
+1. **没有持久化**：用户消息、AI 回复、会话列表都不落库；刷新即丢。
+2. **短期记忆空转**：history 恒为空，折叠逻辑不会触发。
+3. **Kafka 串行消费**：`consume_loop` 中 `await handler`，一个慢请求会阻塞所有人；
+   `enable_auto_commit=True` 在长任务下有丢消息风险；`auto_offset_reset=latest` 会丢停机期间消息。
+4. **无幂等**：Kafka 重投会重复回复同一 `message_id`。
+5. **无 token 预算**：只有步数/工具数/时间预算；工具结果按单条 8000 字符截断，
+   多轮后仍可能超出上下文窗口。
+6. **工具目录是快照**：`load_tools` 之后 system prompt 里的目录不会刷新。
+7. **没有 token 级流式**：`AiReplyDelta` 是完整答案生成后的切块。
 
-入口：[message_handler.go](../services/chat_service/app/api/handlers/message_handler.go)
+## 12. 配置位置
 
-### 请求参数
-
-| 参数 | 类型 | 说明 |
-| --- | --- | --- |
-| `conversation_id` | string | 必填；群=group_id，AI 群=`ai_` 开头，私聊=排序会话 ID |
-| `cursor` | int64 | Unix 秒，往前翻页 |
-| `start_time` / `end_time` | int64 | 时间范围（Unix 秒） |
-| `keyword` | string | 内容关键字 |
-| `limit` | int | 默认 100 |
-
-### 响应
-
-```json
-{
-  "messages": [
-    {
-      "sender_id": "ai-assistant",
-      "timestamp": "2026-08-07T06:44:08.073Z",
-      "timestamp_ms": 1786085035774,
-      "content": "10+10等于20。",
-      "private_id": "smoke-clean",
-      "group_id": "",
-      "message_id": "ai-clean2-1786085212650",
-      "message_type": "text",
-      "is_active": true,
-      "read": false
-    }
-  ]
-}
-```
-
-> 读取按“月集合名去重”，避免同一个月被重复查询导致历史消息重复。
-
----
-
-## 12. 已知问题 / 注意事项
-
-1. ~~**群聊 AI 回复推送**~~ **已修复**：群聊回复现在会查询群成员并逐个推送，推送 JSON 带 `type: "group_chat"` 和 `group_id`，已用 WebSocket 实测通过。
-2. **历史接口未鉴权**：`GET /api/v1/messages/history` 是内部接口但没有鉴权，可遍历任意会话。
-3. ~~**成本表分区缺失**~~ **已修复**：ai_service 启动时会自动补建当月与下月分区（`{table}_{YYYYMM}`），成本写入已实测通过。
-4. ~~**chat 模式记忆在进程内**~~ **已修复（2026 短期记忆重构）**：改为 DSH 式——真相在 chat_service 历史，折叠摘要幂等写入 Mongo 检查点（`conversation_memory` 集合），重启可重放恢复。详见第 14 节。
-5. **Kafka 直接注入 MessageSent 不会落用户消息**：用户消息落库发生在 WS 处理阶段；绕过 WS 直接发 Kafka 只有 AI 回复会被 chat_service 落库。
-6. **kafka-ui 端口**：当前 compose 中 kafka-ui 使用 `8083`，避免与 chat_service 的 `8080` 冲突。
-
----
-
-## 13. AiReplyDelta —— AI 回复流式分块（2026 流式升级新增）
-
-### 事件类型
-
-`chant.chat.v1.AiReplyDelta`（定义见 `proto/chant/chat/v1/event.proto`）
-
-- **生产者**: ai_service（chat 模式：LLM 流式增量；agent 模式：图节点输出）
-- **消费者**: chat_service —— 仅实时 WS 转发，**不落库**
-- **分区 key**: `user_id`（与 `send_ai_reply` 一致，同分区保序）
-- **顺序保证**: 同一回复的分块 `seq` 从 0 递增；前端按 `(message_id, seq)` 累积排序
-
-### 字段
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `sender_id` | string | 固定 `ai-assistant` |
-| `target_user_id` | string | 目标用户 |
-| `group_id` | string | 群 ID（私聊为空） |
-| `reply_to_msg_id` | string | 回复的用户消息 ID |
-| `message_id` | string | 最终回复 ID（`ai-{用户消息ID}`，全部分块一致） |
-| `seq` | int64 | 分块序号，从 0 递增 |
-| `kind` | string | `thinking` 思考链 / `progress` 进度 / `content` 正文 / `done` 结束 |
-| `content` | string | 增量文本（done 时为空） |
-| `timestamp_ms` | int64 | 毫秒时间戳 |
-| `metadata` | map | 可扩展元数据 |
-
-### WS 推送形态（chat_service 广播）
-
-与 `AiReplyGenerated` 同构，额外带 `kind` / `seq` 字段；前端按 kind 分流渲染：
-`thinking` / `progress` 进思考块，`content` 进正文气泡（打字机），`done` 标记流结束。
-
-### 思考内容持久化
-
-最终 `AiReplyGenerated` 的 `metadata.reasoning` 携带思考全文（chat 模式为模型
-`reasoning_content`，agent 模式为节点输出小结），随消息落库；历史接口原样返回
-`metadata`，前端据此在历史消息中恢复思考块。
-
-### 前端兜底
-
-- 断线重连 / 丢块：收到最终整块消息后以服务端全文为准，流式条目被替换清除
-- 错误回复（`err-*` 消息）到达时，按其 `reply_to_msg_id` 清除未收尾的流式条目
-
----
-
-## 14. 短期记忆（DSH 式折叠，2026 重构）
-
-### 原则（对齐 DSH）
-
-1. **单一真相源**：对话内容只存在于 chat_service 的 Mongo 历史，ai_service 不持有对话消息
-2. **投影组装**：模型上下文 = 系统提示 + 折叠摘要 + 检查点之后的尾巴（`chat/memory/context.py: assemble_context`）
-3. **折叠压缩**：`摘要 + 尾巴` 超过触发线时，旧段送 LLM 摘要，
-   幂等写入 Mongo `conversation_memory` 集合，保留原文尾巴
-4. **可重放**：检查点 = `{conversation_id, watermark_ms, summary, updated_at_ms}`，重启 / 多实例从检查点恢复
-
-### 配置（ai_service .env / settings.py，数值 1:1 对齐 DSH）
-
-| 字段 | 默认 | DSH 出处 |
-|---|---|---|
-| `memory_context_window` | 1000000 | DSH `DEFAULT_CONTEXT_WINDOW = 1e6`（DeepSeek V4 上下文窗口） |
-| `memory_summary_trigger_ratio` | 0.8 | DSH `thresholdRatio = 0.8`（触发线 = 窗口 × 0.8 = 80 万 token） |
-| `memory_retain_ratio` | 0.16 | DSH `retainRatio = 0.16`（保留尾巴 = 窗口 × 0.16 = 16 万 token） |
-| `memory_summary_max_tokens` | 8192 | DSH compaction `maxTokens = 8192`（摘要输出上限） |
-| `memory_mongo_url` | mongodb://localhost:27017 | 检查点存储（与历史同库） |
-| `memory_checkpoint_collection` | conversation_memory | 检查点集合 |
-
-> token 估算（无 tokenizer 依赖）：CJK 1 字 1 token，其余 4 字符 1 token。
-
-### 历史回填链路
-
-ai_service 每次处理消息时：
-1. 用 `X-Internal-Key`（两侧配置一致的 `internal_api_key`）直连 chat_service
-   `GET /api/v1/messages/history?conversation_id=...`（**trust_env=False，不走 HTTP 代理**）
-2. 接口返回新 → 旧，**先 reverse 摆正**再组装
-3. 剔除当前消息自身（它已被 chat_service 落库，避免重复）
-
-### 与旧实现的差异
-
-- 旧：进程内 deque（按 user_id 键控、满了静默丢、重启失忆、历史倒序喂入）
-- 新：无进程内状态；按会话键控（conversation_id）；token 预算切片；摘要化折叠 + 持久检查点
+| 位置 | 内容 |
+| --- | --- |
+| `services/chat_service/config.yaml` | gateway 端口、Kafka、AI 用户 ID、CORS/WS Origin |
+| `services/ai_service/llm_relay/config/config.json` | provider / model / routing / 价格 / 超时 / web 工具 |
+| `services/ai_service/.env.example` | Kafka、成本库、记忆检查点、密钥 |
+| `docker-compose.yml` | 开发：基础设施 + auth + gateway + orchestrator |
+| `docker-compose.prod.yml` | 生产：含 ai-service |
+| `docker-compose.ai.yml` | 独立 AI 节点 |
+| `docker-compose.chat.yml` | 独立 gateway 节点 |
+| `docker-compose.edge.yml` | 独立 auth/nginx 节点 |

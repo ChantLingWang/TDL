@@ -46,12 +46,10 @@ type WSHub struct {
 	mu sync.RWMutex
 }
 
-
 var (
 	hubInstance *WSHub
 	once        sync.Once
 )
-
 
 // NewWSClient 创建一个新的客户端实例
 func NewWSClient(hub *WSHub, conn *WSConnection, userInfo *UserInfo) *WSClient {
@@ -75,7 +73,6 @@ func GetWSHub() *WSHub {
 	})
 	return hubInstance
 }
-
 
 // WritePump 监听 Send 通道并将消息写入 WebSocket 连接
 func (c *WSClient) WritePump() {
@@ -107,7 +104,6 @@ func (c *WSClient) WritePump() {
 		}
 	}
 }
-
 
 // Run 启动 Hub 的主循环，处理注册和注销请求
 func (h *WSHub) Run() {
@@ -156,18 +152,6 @@ func (h *WSHub) GetOnlineCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
-}
-
-// GetAllUserIDs 获取所有在线用户ID（用于群消息广播）
-func (h *WSHub) GetAllUserIDs() []string {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	userIDs := make([]string, 0, len(h.clients))
-	for userID := range h.clients {
-		userIDs = append(userIDs, userID)
-	}
-	return userIDs
 }
 
 // IsUserOnline 检查用户是否在线

@@ -20,67 +20,35 @@ func NewRouter() *Router {
 }
 
 func (r *Router) SetupRoutes() *gin.RouterGroup {
-	// CORS：生产环境通过 CORS_ALLOWED_ORIGIN 配置白名单；为空则不输出 CORS 头
-	r.Engine.Use(func(c *gin.Context) {
-		if origin := config.CORSAllowedOrigin; origin != "" {
-			c.Header("Access-Control-Allow-Origin", origin)
-			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Internal-Key")
+	if config.CORSAllowedOrigin != "" {
+		r.Engine.Use(func(c *gin.Context) {
+			c.Header("Access-Control-Allow-Origin", config.CORSAllowedOrigin)
+			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		}
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+			if c.Request.Method == "OPTIONS" {
+				c.AbortWithStatus(http.StatusNoContent)
+				return
+			}
+			c.Next()
+		})
+	}
 
-	// 健康检查
 	r.Engine.GET("/api/v1/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "chat_service"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "chat_gateway"})
 	})
-
-	// 历史接口：支持前端 JWT 或 ai_service 内部密钥
-	r.Engine.GET("/api/v1/messages/history", authOrInternal(), handlers.GetMessageHistory)
 
 	v1 := r.Engine.Group("/api/v1")
 	v1.Use(auth_token.Auth())
 
-	users := v1.Group("/users")
-	{
-		users.GET("/:user_id", handlers.GetUser)
-		users.GET("/:user_id/groups", handlers.GetUserGroups)
-	}
+	// 用户资料代理到 auth_service，gateway 不直接查库。
+	v1.GET("/users/:user_id", handlers.GetUser)
 
-	groups := v1.Group("/groups")
-	{
-		groups.POST("", handlers.CreateGroup)
-		groups.GET("/:group_id/members", handlers.GetGroupMembers)
-		groups.POST("/:group_id/members", handlers.AddGroupMember)
-		groups.DELETE("/:group_id/members/:user_id", handlers.RemoveGroupMember)
-	}
+	// 只生成 conversation_id；会话内容在第一条消息时才由下游创建。
+	v1.POST("/conversations", handlers.CreateConversation)
 
 	v1.GET("/ws", websocket.HandleWebSocket)
 
-	messages := v1.Group("/messages")
-	{
-		messages.GET("", handlers.GetMessages)
-		messages.POST("/read", handlers.MarkMessagesAsRead)
-	}
-
 	return v1
-}
-
-// authOrInternal 允许两种调用方：
-//  1. 前端：携带 JWT（走 auth_token.Auth）
-//  2. ai_service：携带 X-Internal-Key（内部服务密钥）
-func authOrInternal() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if key := c.GetHeader("X-Internal-Key"); key != "" && key == config.InternalAPIKey {
-			c.Next()
-			return
-		}
-		auth_token.Auth()(c)
-	}
 }
 
 func GetRouter() *Router {

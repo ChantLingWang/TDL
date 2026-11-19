@@ -72,7 +72,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-orchestrator}
-      POSTGRES_MULTIPLE_DATABASES: "orchestrator,user_service"
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       TZ: Asia/Shanghai
     volumes:
@@ -139,34 +138,6 @@ services:
           cpus: ${CPU_LIMIT_REDIS:-0.2}
     restart: always
 
-  qdrant:
-    image: docker.m.daocloud.io/qdrant/qdrant:latest
-    container_name: qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    environment:
-      TZ: Asia/Shanghai
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - chant-shared-network
-    restart: always
-
-  searxng:
-    image: docker.m.daocloud.io/searxng/searxng:latest
-    container_name: searxng
-    ports:
-      - "8888:8080"
-    environment:
-      - TZ=Asia/Shanghai
-    volumes:
-      - searxng_data:/etc/searxng
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
-    networks:
-      - chant-shared-network
-    restart: always
-
   # ==================== 应用服务 ====================
   auth-service:
     build:
@@ -223,28 +194,12 @@ services:
       - "8080:8080"
     environment:
       CHAT_GROUP_ID: chat-prod
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB_NAME: orchestrator
-      MONGODB_HOST: mongodb
-      MONGODB_PORT: "27017"
-      MONGODB_DB_NAME: chat
       KAFKA_BROKERS: kafka:29092
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
       AUTH_GRPC_ADDR: auth-service:50051
-      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      AI_USER_ID: ai-assistant
       SERVER_PORT: "8080"
       TZ: Asia/Shanghai
     depends_on:
-      postgres:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       kafka:
         condition: service_started
       auth-service:
@@ -267,30 +222,17 @@ services:
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: chat_group_message
       KAFKA_GROUP_ID: ai_service_group
-      CHAT_SERVICE_URL: http://chat-service:8080
-      QDRANT_URL: http://qdrant:6333
-      SEARXNG_BASE_URL: http://searxng:8080
       COST_DB_HOST: postgres
       COST_DB_PORT: "5432"
       COST_DB_USER: ${POSTGRES_USER:-postgres}
       COST_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       COST_DB_NAME: ai_audit
-      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       AI_USER_ID: ai-assistant
-      AI_RESEARCH_USER_ID: ai-research
-      SILICONFLOW_EMBEDDING_API_KEY: ${SILICONFLOW_EMBEDDING_API_KEY:-}
-      SILICONFLOW_RERANKER_API_KEY: ${SILICONFLOW_RERANKER_API_KEY:-}
       HTTP_PROXY: ${HTTP_PROXY:-}
       TZ: Asia/Shanghai
     depends_on:
       kafka:
-        condition: service_started
-      qdrant:
-        condition: service_started
-      searxng:
         condition: service_started
       postgres:
         condition: service_healthy
@@ -344,8 +286,6 @@ services:
     restart: always
 
 volumes:
-  searxng_data:
   postgres_data:
-  qdrant_data:
   mongodb_data:
   redis_data:

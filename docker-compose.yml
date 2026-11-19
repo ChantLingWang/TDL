@@ -54,7 +54,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: orchestrator
-      POSTGRES_MULTIPLE_DATABASES: "orchestrator,user_service"
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
       TZ: Asia/Shanghai
     volumes:
@@ -67,20 +66,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  qdrant:
-    image: docker.m.daocloud.io/qdrant/qdrant:latest
-    container_name: qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    environment:
-      TZ: Asia/Shanghai
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - chant-shared-network
-    restart: on-failure
 
   mongodb:
     image: docker.m.daocloud.io/library/mongo:6
@@ -116,20 +101,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  searxng:
-    image: docker.m.daocloud.io/searxng/searxng:latest
-    container_name: searxng
-    ports:
-      - "8888:8080"
-    environment:
-      - TZ=Asia/Shanghai
-    volumes:
-      - searxng_data:/etc/searxng
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
-    networks:
-      - chant-shared-network
-    restart: on-failure
 
   # ==================== 应用服务 ====================
   auth-service:
@@ -176,28 +147,12 @@ services:
       - "8080:8080"
     environment:
       CHAT_GROUP_ID: chat-local
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB_NAME: orchestrator
-      MONGODB_HOST: mongodb
-      MONGODB_PORT: "27017"
-      MONGODB_DB_NAME: chat
       KAFKA_BROKERS: kafka:29092
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
       AUTH_GRPC_ADDR: auth-service:50051
-      LAST_OFFLINE_GRPC_ADDR: auth-service:50052
+      AI_USER_ID: ai-assistant
       SERVER_PORT: "8080"
       TZ: Asia/Shanghai
     depends_on:
-      postgres:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       kafka:
         condition: service_started
       auth-service:
@@ -242,8 +197,6 @@ services:
     restart: on-failure
 
 volumes:
-  searxng_data:
   postgres_data:
-  qdrant_data:
   mongodb_data:
   redis_data:

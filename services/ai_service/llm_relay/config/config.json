@@ -1,0 +1,43 @@
+{
+  "llm_relay": {
+    "defaults": {
+      "model": "deepseek-chat",
+      "temperature": 0.7,
+      "max_tokens": 2048
+    },
+    "providers": {
+      "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY"
+      }
+    },
+    "models": {
+      "deepseek-chat": {
+        "provider": "deepseek",
+        "context_window": 128000,
+        "input_price": 0.27,
+        "output_price": 1.10
+      }
+    },
+    "routing": {
+      "chat": "deepseek-chat",
+      "summarize": "deepseek-chat"
+    },
+    "http": {
+      "timeout_seconds": 60,
+      "retry_attempts": 3,
+      "retry_backoff_seconds": 1.0,
+      "retry_max_backoff_seconds": 10.0,
+      "proxy_env": "HTTP_PROXY"
+    },
+    "web": {
+      "enabled": true,
+      "provider": "deepseek",
+      "search_path": "/tools/search",
+      "fetch_path": "/tools/fetch",
+      "timeout_seconds": 30,
+      "default_count": 5,
+      "max_count": 50
+    }
+  }
+}

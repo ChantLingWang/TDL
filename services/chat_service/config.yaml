@@ -1,39 +1,14 @@
 server:
   port: "8080"
 
-postgres:
-  host: localhost
-  port: "5432"
-  user: postgres
-  password: postgres
-  db_name: orchestrator
-  ssl_mode: disable
-  timezone: Asia/Shanghai
-
-mongodb:
-  host: localhost
-  port: "27017"
-  db_name: chat
-  ssl_mode: disable
-  timezone: Asia/Shanghai
-  max_pool_size: 50
-  min_pool_size: 5
-  max_idle_time_ms: 60000
-  server_selection_timeout_ms: 5000
-  connect_timeout_ms: 5000
-  socket_timeout_ms: 30000
-  retry_writes: true
-  retry_reads: true
-
 kafka:
   brokers:
     - localhost:9094
   topic: chat_group_message
   group_id: chat_service_group
 
-internal_api_key: chant-internal-2026
+# gateway 把用户消息投递给哪个 AI 用户
+ai_user_id: ai-assistant
 
-redis:
-  host: localhost
-  port: "6379"
-  db: 0
+cors_allowed_origin: ""
+ws_allowed_origins: ""

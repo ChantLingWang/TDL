@@ -15,16 +15,14 @@ message WsIncoming {
   }
 }
 
-// ChatContent WebSocket 聊天消息载荷。
+// ChatContent WebSocket 聊天消息载荷（AI-only）。
 message ChatContent {
-  string sender_id = 1;
-  string text = 2;
-  string message_id = 3;
+  string text = 1;
+  string message_id = 2;
   // text / image 等
-  string message_type = 4;
-  // "group" 或 "ai"
-  string conversation_type = 5;
-  string group_id = 6;
+  string message_type = 3;
+  // AI 会话 ID；为空时 gateway 生成
+  string conversation_id = 4;
 }
 
 // PingContent WebSocket 心跳。

@@ -115,19 +115,17 @@ func (*WsIncoming_Chat) isWsIncoming_Payload() {}
 
 func (*WsIncoming_Ping) isWsIncoming_Payload() {}
 
-// ChatContent WebSocket 聊天消息载荷。
+// ChatContent WebSocket 聊天消息载荷（AI-only）。
 type ChatContent struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
-	SenderId  string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	Text      string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
-	MessageId string                 `protobuf:"bytes,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Text      string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	MessageId string                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image 等
-	MessageType string `protobuf:"bytes,4,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
-	// "group" 或 "ai"
-	ConversationType string `protobuf:"bytes,5,opt,name=conversation_type,json=conversationType,proto3" json:"conversation_type,omitempty"`
-	GroupId          string `protobuf:"bytes,6,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	MessageType string `protobuf:"bytes,3,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	// AI 会话 ID；为空时 gateway 生成
+	ConversationId string `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ChatContent) Reset() {
@@ -160,13 +158,6 @@ func (*ChatContent) Descriptor() ([]byte, []int) {
 	return file_chant_chat_v1_ws_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ChatContent) GetSenderId() string {
-	if x != nil {
-		return x.SenderId
-	}
-	return ""
-}
-
 func (x *ChatContent) GetText() string {
 	if x != nil {
 		return x.Text
@@ -188,16 +179,9 @@ func (x *ChatContent) GetMessageType() string {
 	return ""
 }
 
-func (x *ChatContent) GetConversationType() string {
+func (x *ChatContent) GetConversationId() string {
 	if x != nil {
-		return x.ConversationType
-	}
-	return ""
-}
-
-func (x *ChatContent) GetGroupId() string {
-	if x != nil {
-		return x.GroupId
+		return x.ConversationId
 	}
 	return ""
 }
@@ -249,15 +233,13 @@ const file_chant_chat_v1_ws_proto_rawDesc = "" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x120\n" +
 	"\x04chat\x18\x02 \x01(\v2\x1a.chant.chat.v1.ChatContentH\x00R\x04chat\x120\n" +
 	"\x04ping\x18\x03 \x01(\v2\x1a.chant.chat.v1.PingContentH\x00R\x04pingB\t\n" +
-	"\apayload\"\xc8\x01\n" +
-	"\vChatContent\x12\x1b\n" +
-	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\x12\x1d\n" +
+	"\apayload\"\x8c\x01\n" +
+	"\vChatContent\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x03 \x01(\tR\tmessageId\x12!\n" +
-	"\fmessage_type\x18\x04 \x01(\tR\vmessageType\x12+\n" +
-	"\x11conversation_type\x18\x05 \x01(\tR\x10conversationType\x12\x19\n" +
-	"\bgroup_id\x18\x06 \x01(\tR\agroupId\"\r\n" +
+	"message_id\x18\x02 \x01(\tR\tmessageId\x12!\n" +
+	"\fmessage_type\x18\x03 \x01(\tR\vmessageType\x12'\n" +
+	"\x0fconversation_id\x18\x04 \x01(\tR\x0econversationId\"\r\n" +
 	"\vPingContentB\xa6\x01\n" +
 	"\x11com.chant.chat.v1B\aWsProtoP\x01Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1\xa2\x02\x03CCX\xaa\x02\rChant.Chat.V1\xca\x02\rChant\\Chat\\V1\xe2\x02\x19Chant\\Chat\\V1\\GPBMetadata\xea\x02\x0fChant::Chat::V1b\x06proto3"
 

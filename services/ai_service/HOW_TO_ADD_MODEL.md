@@ -1,95 +1,110 @@
 # 如何新增 LLM 模型
 
-三步完成，不需要改动 chat/agent/kafka 任何代码。
+> 重构后模型接入统一走 `llm_relay`（`services/ai_service/llm_relay/`）。
+> 连接、模型、价格、任务路由全部在 `llm_relay/config/config.json`，
+> 业务代码（`apps/`、`runtime/`、`memory/`）不需要改。
+
+## 配置文件结构
+
+`config.json` 顶层只有一个 `llm_relay` 块，内部固定六段：
+
+| 段 | 作用 |
+| --- | --- |
+| `defaults` | 默认模型、temperature、max_tokens |
+| `providers` | 供应商连接：`base_url` + `api_key_env`（只存变量名，不存密钥） |
+| `models` | 模型能力与价格：provider、context_window、input/output price |
+| `routing` | 任务名 → 模型名（`chat` / `summarize` 等） |
+| `http` | 超时、重试、退避、代理环境变量名 |
+| `web` | 联网工具的搜索/抓取端点（`web_search` / `web_fetch`） |
 
 ---
 
-## 1. 创建 provider 文件
+## 1. 接入一个 OpenAI 兼容供应商（最快路径）
 
-在 `shared/llm/providers/` 下新建 `foo.py`：
+只要对方提供 `/v1/chat/completions` 且响应结构一致，全程不需要写 Python。
+
+### 1.1 在 `providers` 里加连接
+
+```json
+"foo": {
+  "base_url": "https://api.foo.com/v1",
+  "api_key_env": "FOO_API_KEY"
+}
+```
+
+`api_key_env` 填**环境变量名**，真实的 key 不写进 JSON。
+
+### 1.2 放密钥（二选一）
+
+- **部署环境变量**：`FOO_API_KEY=sk-xxx`（`os.getenv` 直接命中）；
+- **本地 `.env`**：`FOO_API_KEY=sk-xxx`，同时在
+  [config/settings.py](config/settings.py) 增加字段 `foo_api_key: str = ""`。
+
+原因是 `loader.api_key()` 先读真实环境变量，读不到再回退到
+pydantic Settings 的同名小写字段；`.env` 里的值不会自动进 `os.environ`。
+
+### 1.3 在 `models` 里声明模型
+
+```json
+"foo-chat": {
+  "provider": "foo",
+  "api_model": "foo-chat-2026",
+  "context_window": 200000,
+  "input_price": 0.27,
+  "output_price": 1.10
+}
+```
+
+- `api_model`：供应商真实模型名；省略时直接用 key（`foo-chat`）；
+- `context_window`：短期记忆折叠预算要用，**必填**；
+- `input_price` / `output_price`：美元 / 百万 token；
+- 可选 `temperature`、`max_tokens`，覆盖 `defaults`。
+
+### 1.4 配置路由
+
+```json
+"routing": {
+  "chat": "foo-chat",
+  "summarize": "deepseek-chat"
+}
+```
+
+`routing.<task>` 决定 `llm.complete(..., task="chat")` 用哪个模型；
+`defaults.model` 是没配路由时的兜底。两者都必须指向已存在的 model。
+
+---
+
+## 2. 非 OpenAI 兼容协议
+
+在 `llm_relay/providers/` 新建一个类，实现：
 
 ```python
-from config.settings import settings
-from shared.llm.factory import register
-from shared.llm.base import AbstractLLM, LLMMessage, LLMResponse
-
-
-@register("foo")          # 名称要和 .env 中 LLM_PROVIDER 一致
-class FooLLM(AbstractLLM):
-
-    PRICING = {
-        "foo-model": {"input": 0.50, "output": 1.50},
-    }
-
-    def __init__(self) -> None:
-        self._base = settings.foo_base_url.rstrip("/")
-        self._model = settings.foo_model
-        self._key = settings.foo_api_key
-        # ... 初始化 HTTP 客户端等
-
-    async def chat(self, messages, **kwargs) -> LLMResponse:
-        # 实现非流式对话
-        ...
-
-    async def chat_stream(self, messages, **kwargs):
-        # 实现流式对话（可选）
-        ...
+async def complete(self, request: LLMRequest) -> LLMResult: ...
+async def aclose(self) -> None: ...
 ```
 
-> 如果新模型兼容 OpenAI 的 `/v1/chat/completions` 接口，直接继承 `OpenAICompatibleLLM` 即可，
-> 只需覆盖 `PRICING` 和 `__init__`，参考 `deepseek.py`。
+然后在 `LLMClient.get_provider()` 的构造分支里按 `provider` 名接入。
+目前 `models.<name>.provider` 只支持 `ChatCompletionsProvider`。
 
 ---
 
-## 2. 注册 provider
+## 3. 联网工具端点
 
-在 `shared/llm/factory.py` 末尾加一行 import，触发 `@register` 装饰器：
-
-```python
-import shared.llm.providers.foo  # noqa: E402, F401
-```
+`web.enabled` 控制 `web_search` / `web_fetch` 是否可用；
+`web.provider` 必须是 `providers` 里已有的名字，`search_path` / `fetch_path`
+必须以 `/` 开头，`default_count` 不能大于 `max_count`。改完同样重启生效。
 
 ---
 
-## 3. 配置 .env 和 settings.py
+## 4. 校验与生效
 
-**`.env`** —— 新增一个配置段：
+- `llm_relay/config/loader.py` 在 import 时加载并校验一次，**改完要重启进程**；
+- 启动即报 `ConfigError` 的常见原因：provider 不存在、routing 指向不存在的 model、
+  `web.search_path` 不以 `/` 开头；
+- 可用 `LLM_RELAY_CONFIG=/path/to/config.json` 指向另一份配置（测试/多环境）。
 
-```bash
-# ============================================================
-#  Foo
-# ============================================================
-FOO_API_KEY=sk-xxx
-FOO_BASE_URL=https://api.foo.com/v1
-FOO_MODEL=foo-model
-```
+## 5. 注意
 
-**`config/settings.py`** —— 新增三个字段：
-
-```python
-# ---- Foo ----
-foo_api_key: str = ""
-foo_base_url: str = "https://api.foo.com/v1"
-foo_model: str = "foo-model"
-```
-
----
-
-## 切换模型
-
-改 `.env` 一行：
-
-```bash
-LLM_PROVIDER=foo
-```
-
-定价（`PRICING`）在 provider 类中维护，修改后重新部署即可，历史数据不受影响。
-
----
-
-## 现有模型参考
-
-| Provider | 文件 | 接口类型 |
-|----------|------|---------|
-| `deepseek` | `providers/deepseek.py` | OpenAI 兼容 |
-| `openai_compatible` | `providers/openai_compatible.py` | OpenAI 兼容 |
+- 价格只影响成本表里的估价，不参与计费；
+- 生产调用链只有 `complete`；provider 不需要实现流式接口；
+- 密钥永远只放 `.env` / 环境变量，`config.json` 里只写变量名。

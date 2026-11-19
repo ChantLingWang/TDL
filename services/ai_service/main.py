@@ -1,4 +1,10 @@
-"""ai_service —— 后台 Kafka 消费者（proto 版）。"""
+"""ai_service —— 后台 Kafka 消费者。
+
+只做三件事：
+    1. 消费 MessageSent，判断是不是发给 AI 的
+    2. 交给 apps/chat 处理
+    3. 管理 consumer / producer / 连接池的生命周期
+"""
 
 import asyncio
 import logging
@@ -7,65 +13,48 @@ import sys
 from pathlib import Path
 
 # 将 proto 生成的 Python 代码加入搜索路径
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'proto' / 'gen' / 'python'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "proto" / "gen" / "python"))
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 
-import shared.llm.providers.openai_compatible  # noqa: F401 触发 @register
-import shared.llm.providers.deepseek  # noqa: F401
-from qdrant.client import init as init_qdrant
-
-from chat.service import handle_private_message
-from agent.service import handle_agent_message
-from shared.cost import store as cost_store
-from shared.kafka.consumer import consume_loop, create_consumer
-from shared.kafka.producer import create_producer
-from shared.proto_adapter import parse_message_sent, parse_ai_reply
+from apps.chat.service import handle_message
 from config.settings import settings
+from infra.cost import store as cost_store
+from infra.kafka.consumer import consume_loop, create_consumer
+from infra.kafka.producer import create_producer
+from infra.proto_adapter import parse_message_sent
+import llm_relay.llm_tools  # noqa: F401  启动时装配工具注册表
+from llm_relay.client import aclose_providers
 
 logger = logging.getLogger(__name__)
+
 AI_USER_ID = settings.ai_user_id
-AI_RESEARCH_USER_ID = settings.ai_research_user_id
 
 
 async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
-    """事件分发入口 —— 接收 proto EventEnvelope，按 event_type 路由。"""
-    etype = envelope.event_type
+    """事件分发入口：只处理 MessageSent。"""
+    event_type = envelope.event_type
 
-    if etype == 'chant.chat.v1.MessageSent':
+    if event_type == "chant.chat.v1.MessageSent":
         msg = parse_message_sent(envelope)
-        # 只处理发给 AI 的私聊或 ai_ 前缀群组
-        # agent 模式：conversation_type 为 ai-research 或发给 ai-research 的消息
-        is_agent = (
-            msg.conversation_type == 'ai-research'
-            or msg.target_user_id == AI_RESEARCH_USER_ID
-        )
-        if is_agent:
-            data = {
-                'sender_id': msg.sender_id,
-                'content': msg.content,
-                'message_id': msg.message_id,
-                'group_id': msg.group_id,
-            }
-            await handle_agent_message(producer, data)
+        if msg.target_user_id != AI_USER_ID:
+            return
 
-        # chat 模式：发给 ai-assistant 的消息走 chat
-        elif msg.target_user_id == AI_USER_ID or msg.group_id.startswith('ai_'):
-            data = {
-                'sender_id': msg.sender_id,
-                'target_user_id': msg.target_user_id or AI_USER_ID,
-                'content': msg.content,
-                'message_id': msg.message_id,
-                'group_id': msg.group_id,
-            }
-            await handle_private_message(producer, data)
+        data = {
+            "sender_id": msg.sender_id,
+            "target_user_id": msg.target_user_id or AI_USER_ID,
+            "conversation_id": msg.conversation_id,
+            "content": msg.content,
+            "message_id": msg.message_id,
+        }
+        await handle_message(producer, data)
 
-    elif etype == 'chant.chat.v1.AiReplyGenerated':
+    elif event_type == "chant.chat.v1.AiReplyGenerated":
         # AI 自己的回复，忽略避免循环
         pass
 
     else:
-        logger.debug('忽略事件类型: %s', etype)
+        logger.debug("忽略事件类型: %s", event_type)
 
 
 async def main() -> None:
@@ -97,11 +86,6 @@ async def main() -> None:
         except Exception:
             logger.warning("成本审计数据库连接失败，成本记录功能停用")
 
-        try:
-            await init_qdrant()
-        except Exception:
-            logger.warning("Qdrant 连接失败，长期记忆功能停用")
-
         async def handler(envelope) -> None:
             await dispatch(producer, envelope)
 
@@ -121,8 +105,12 @@ async def main() -> None:
             await cost_store.close_pool()
         except Exception:
             pass
+        try:
+            await aclose_providers()
+        except Exception:
+            pass
         logger.info("ai_service 已停止")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

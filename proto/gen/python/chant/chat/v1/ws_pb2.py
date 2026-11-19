@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63hant/chat/v1/ws.proto\x12\rchant.chat.v1\"}\n\nWsIncoming\x12\x0c\n\x04type\x18\x01 \x01(\t\x12*\n\x04\x63hat\x18\x02 \x01(\x0b\x32\x1a.chant.chat.v1.ChatContentH\x00\x12*\n\x04ping\x18\x03 \x01(\x0b\x32\x1a.chant.chat.v1.PingContentH\x00\x42\t\n\x07payload\"\x85\x01\n\x0b\x43hatContent\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12\x12\n\nmessage_id\x18\x03 \x01(\t\x12\x14\n\x0cmessage_type\x18\x04 \x01(\t\x12\x19\n\x11\x63onversation_type\x18\x05 \x01(\t\x12\x10\n\x08group_id\x18\x06 \x01(\t\"\r\n\x0bPingContentB4Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x63hant/chat/v1/ws.proto\x12\rchant.chat.v1\"}\n\nWsIncoming\x12\x0c\n\x04type\x18\x01 \x01(\t\x12*\n\x04\x63hat\x18\x02 \x01(\x0b\x32\x1a.chant.chat.v1.ChatContentH\x00\x12*\n\x04ping\x18\x03 \x01(\x0b\x32\x1a.chant.chat.v1.PingContentH\x00\x42\t\n\x07payload\"^\n\x0b\x43hatContent\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x12\n\nmessage_id\x18\x02 \x01(\t\x12\x14\n\x0cmessage_type\x18\x03 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x04 \x01(\t\"\r\n\x0bPingContentB4Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,8 +34,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1'
   _globals['_WSINCOMING']._serialized_start=41
   _globals['_WSINCOMING']._serialized_end=166
-  _globals['_CHATCONTENT']._serialized_start=169
-  _globals['_CHATCONTENT']._serialized_end=302
-  _globals['_PINGCONTENT']._serialized_start=304
-  _globals['_PINGCONTENT']._serialized_end=317
+  _globals['_CHATCONTENT']._serialized_start=168
+  _globals['_CHATCONTENT']._serialized_end=262
+  _globals['_PINGCONTENT']._serialized_start=264
+  _globals['_PINGCONTENT']._serialized_end=277
 # @@protoc_insertion_point(module_scope)

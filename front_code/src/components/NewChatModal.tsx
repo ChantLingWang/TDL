@@ -1,23 +1,15 @@
 // ============================================================================
-// 新会话弹窗 —— 选择 聊天 / 研究 模式后创建（DSH 弹窗风格）
+// 新会话弹窗 —— 只有一个 AI 会话入口（是否检索/调工具交给 agent loop 判断）
 // ============================================================================
-import { useState } from 'react';
 import styles from './NewChatModal.module.scss';
 
 interface NewChatModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (mode: 'ai' | 'ai-research') => void;
+  onCreate: () => void;
 }
 
-const MODES = [
-  { value: 'ai', title: '聊天模式', desc: '日常对话，快速回答' },
-  { value: 'ai-research', title: '研究模式', desc: '联网检索、多轮审核、生成带引用的报告' },
-] as const;
-
 const NewChatModal: React.FC<NewChatModalProps> = ({ open, onClose, onCreate }) => {
-  const [mode, setMode] = useState<'ai' | 'ai-research'>('ai');
-
   if (!open) return null;
 
   return (
@@ -25,21 +17,16 @@ const NewChatModal: React.FC<NewChatModalProps> = ({ open, onClose, onCreate }) 
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.title}>新建会话</div>
         <div className={styles.modeList}>
-          {MODES.map((m) => (
-            <button
-              key={m.value}
-              type='button'
-              className={[styles.mode, mode === m.value ? styles.modeActive : ''].join(' ')}
-              onClick={() => setMode(m.value)}
-            >
-              <span className={styles.modeTitle}>{m.title}</span>
-              <span className={styles.modeDesc}>{m.desc}</span>
-            </button>
-          ))}
+          <div className={styles.mode}>
+            <span className={styles.modeTitle}>AI 聊天</span>
+            <span className={styles.modeDesc}>
+              由 agent loop 自行判断是否需要联网检索或调用工具
+            </span>
+          </div>
         </div>
         <div className={styles.actions}>
           <button type='button' className={styles.cancel} onClick={onClose}>取消</button>
-          <button type='button' className={styles.create} onClick={() => onCreate(mode)}>创建</button>
+          <button type='button' className={styles.create} onClick={onCreate}>创建</button>
         </div>
       </div>
     </div>

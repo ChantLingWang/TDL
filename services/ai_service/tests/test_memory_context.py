@@ -1,18 +1,17 @@
 """短期记忆（DSH 式）纯逻辑单元测试：token 估算、时间归一化、折叠切分。"""
 
-import asyncio
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from chat.memory.context import (
+from memory.context import (  # noqa: E402
     estimate_tokens,
     format_history,
     _to_epoch_ms,
 )
-from shared.models import ChatHistoryMessage
+from infra.models import ChatHistoryMessage  # noqa: E402
 
 
 def test_estimate_tokens():

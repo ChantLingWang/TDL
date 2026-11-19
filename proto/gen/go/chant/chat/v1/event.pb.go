@@ -21,27 +21,24 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// MessageSent 用户发送了一条聊天消息。
-// 生产者: chat_service
-// 消费者: ai_service 及其他消息消费者
+// MessageSent 用户向 AI 发送了一条消息。
+// 生产者: gateway(chat_service)
+// 消费者: ai_service
 type MessageSent struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	SenderId string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	// 私聊目标用户 ID；群聊时可为空
+	// AI 用户 ID，如 "ai-assistant"
 	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	// 群组 ID；私聊时可为空
-	GroupId   string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	Content   string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
-	MessageId string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	// AI 会话 ID，由 gateway 生成的 UUID
+	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	MessageId      string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image / file 等
 	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
-	// 会话类型: "private" 或 "group"
-	ConversationType string `protobuf:"bytes,7,opt,name=conversation_type,json=conversationType,proto3" json:"conversation_type,omitempty"`
-	// AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
-	TimestampMs int64 `protobuf:"varint,8,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// 消息产生时间戳（毫秒，Unix epoch）
+	TimestampMs int64 `protobuf:"varint,7,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
 	// 可扩展元数据（域名、报告摘要、方法论等）
-	// 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
-	Metadata      map[string]string `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata      map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,9 +87,9 @@ func (x *MessageSent) GetTargetUserId() string {
 	return ""
 }
 
-func (x *MessageSent) GetGroupId() string {
+func (x *MessageSent) GetConversationId() string {
 	if x != nil {
-		return x.GroupId
+		return x.ConversationId
 	}
 	return ""
 }
@@ -118,13 +115,6 @@ func (x *MessageSent) GetMessageType() string {
 	return ""
 }
 
-func (x *MessageSent) GetConversationType() string {
-	if x != nil {
-		return x.ConversationType
-	}
-	return ""
-}
-
 func (x *MessageSent) GetTimestampMs() int64 {
 	if x != nil {
 		return x.TimestampMs
@@ -139,27 +129,25 @@ func (x *MessageSent) GetMetadata() map[string]string {
 	return nil
 }
 
-// AiReplyGenerated AI 生成了一条回复。
+// AiReplyGenerated AI 生成了一条完整回复。
 // 生产者: ai_service
-// 消费者: chat_service（用于持久化和 WS 推送）
+// 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
 type AiReplyGenerated struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// AI 用户 ID，如 "ai-assistant"
 	SenderId string `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	// 回复的目标用户
 	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	Content      string `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
-	// 回复的是哪条消息
-	ReplyToMsgId string `protobuf:"bytes,4,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
-	MessageId    string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// 私聊目标；群聊时填写 group_id
-	GroupId          string `protobuf:"bytes,6,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
-	ConversationType string `protobuf:"bytes,7,opt,name=conversation_type,json=conversationType,proto3" json:"conversation_type,omitempty"`
-	// AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
-	TimestampMs int64 `protobuf:"varint,8,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// AI 会话 ID，与 MessageSent.conversation_id 一致
+	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	// 回复的是哪条用户消息
+	ReplyToMsgId string `protobuf:"bytes,5,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
+	MessageId    string `protobuf:"bytes,6,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	// AI 生成回复时的时间戳（毫秒，Unix epoch）
+	TimestampMs int64 `protobuf:"varint,7,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
 	// 可扩展元数据（域名、报告摘要、方法论等）
-	// 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
-	Metadata      map[string]string `protobuf:"bytes,9,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata      map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -208,6 +196,13 @@ func (x *AiReplyGenerated) GetTargetUserId() string {
 	return ""
 }
 
+func (x *AiReplyGenerated) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
 func (x *AiReplyGenerated) GetContent() string {
 	if x != nil {
 		return x.Content
@@ -229,20 +224,6 @@ func (x *AiReplyGenerated) GetMessageId() string {
 	return ""
 }
 
-func (x *AiReplyGenerated) GetGroupId() string {
-	if x != nil {
-		return x.GroupId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetConversationType() string {
-	if x != nil {
-		return x.ConversationType
-	}
-	return ""
-}
-
 func (x *AiReplyGenerated) GetTimestampMs() int64 {
 	if x != nil {
 		return x.TimestampMs
@@ -259,7 +240,7 @@ func (x *AiReplyGenerated) GetMetadata() map[string]string {
 
 // AiReplyDelta AI 回复的流式增量分块。
 // 生产者: ai_service
-// 消费者: chat_service（仅实时 WS 转发，不落库）
+// 消费者: gateway（WS 推送）、storage（直接按该结构落库）
 //
 // 一条回复对应一个固定的 message_id（流开始即确定，与最终
 // AiReplyGenerated 的 message_id 一致），分块按 seq 从 0 递增；
@@ -267,8 +248,8 @@ func (x *AiReplyGenerated) GetMetadata() map[string]string {
 //
 // kind 取值：
 //
-//	"thinking"  思考链文本增量（模型 reasoning_content / 图节点输出）
-//	"progress"  阶段进度文字（与旧 progress 消息语义一致）
+//	"thinking"  思考链文本增量
+//	"progress"  阶段进度文字
 //	"content"   正文文本增量
 //	"done"      流结束标记（content 为空，之后必有最终 AiReplyGenerated）
 type AiReplyDelta struct {
@@ -277,8 +258,8 @@ type AiReplyDelta struct {
 	SenderId string `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	// 回复的目标用户
 	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	// 群组 ID；私聊时可为空
-	GroupId string `protobuf:"bytes,3,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	// AI 会话 ID，与 MessageSent.conversation_id 一致
+	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	// 回复的是哪条用户消息
 	ReplyToMsgId string `protobuf:"bytes,4,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
 	// 最终回复的消息 ID（该回复的所有分块一致）
@@ -341,9 +322,9 @@ func (x *AiReplyDelta) GetTargetUserId() string {
 	return ""
 }
 
-func (x *AiReplyDelta) GetGroupId() string {
+func (x *AiReplyDelta) GetConversationId() string {
 	if x != nil {
-		return x.GroupId
+		return x.ConversationId
 	}
 	return ""
 }
@@ -401,39 +382,37 @@ var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\x9a\x03\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xfb\x02\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
-	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x19\n" +
-	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12\x18\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x18\n" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
-	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12+\n" +
-	"\x11conversation_type\x18\a \x01(\tR\x10conversationType\x12!\n" +
-	"\ftimestamp_ms\x18\b \x01(\x03R\vtimestampMs\x12D\n" +
-	"\bmetadata\x18\t \x03(\v2(.chant.chat.v1.MessageSent.MetadataEntryR\bmetadata\x1a;\n" +
+	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12!\n" +
+	"\ftimestamp_ms\x18\a \x01(\x03R\vtimestampMs\x12D\n" +
+	"\bmetadata\x18\b \x03(\v2(.chant.chat.v1.MessageSent.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa8\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x89\x03\n" +
 	"\x10AiReplyGenerated\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
-	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x18\n" +
-	"\acontent\x18\x03 \x01(\tR\acontent\x12%\n" +
-	"\x0freply_to_msg_id\x18\x04 \x01(\tR\freplyToMsgId\x12\x1d\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12%\n" +
+	"\x0freply_to_msg_id\x18\x05 \x01(\tR\freplyToMsgId\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x19\n" +
-	"\bgroup_id\x18\x06 \x01(\tR\agroupId\x12+\n" +
-	"\x11conversation_type\x18\a \x01(\tR\x10conversationType\x12!\n" +
-	"\ftimestamp_ms\x18\b \x01(\x03R\vtimestampMs\x12I\n" +
-	"\bmetadata\x18\t \x03(\v2-.chant.chat.v1.AiReplyGenerated.MetadataEntryR\bmetadata\x1a;\n" +
+	"message_id\x18\x06 \x01(\tR\tmessageId\x12!\n" +
+	"\ftimestamp_ms\x18\a \x01(\x03R\vtimestampMs\x12I\n" +
+	"\bmetadata\x18\b \x03(\v2-.chant.chat.v1.AiReplyGenerated.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x99\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa7\x03\n" +
 	"\fAiReplyDelta\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
-	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12\x19\n" +
-	"\bgroup_id\x18\x03 \x01(\tR\agroupId\x12%\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12%\n" +
 	"\x0freply_to_msg_id\x18\x04 \x01(\tR\freplyToMsgId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x10\n" +

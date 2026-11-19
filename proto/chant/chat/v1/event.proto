@@ -4,65 +4,60 @@ package chant.chat.v1;
 
 option go_package = "github.com/chant/chant/gen/go/chant/chat/v1;chatv1";
 
-// MessageSent 用户发送了一条聊天消息。
-// 生产者: chat_service
-// 消费者: ai_service 及其他消息消费者
+// MessageSent 用户向 AI 发送了一条消息。
+// 生产者: gateway(chat_service)
+// 消费者: ai_service
 message MessageSent {
   string sender_id = 1;
-  // 私聊目标用户 ID；群聊时可为空
+  // AI 用户 ID，如 "ai-assistant"
   string target_user_id = 2;
-  // 群组 ID；私聊时可为空
-  string group_id = 3;
+  // AI 会话 ID，由 gateway 生成的 UUID
+  string conversation_id = 3;
   string content = 4;
   string message_id = 5;
   // text / image / file 等
   string message_type = 6;
-  // 会话类型: "private" 或 "group"
-  string conversation_type = 7;
 
-  // AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
-  int64 timestamp_ms = 8;
+  // 消息产生时间戳（毫秒，Unix epoch）
+  int64 timestamp_ms = 7;
 
   // 可扩展元数据（域名、报告摘要、方法论等）
-  // 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
-  map<string, string> metadata = 9;
+  map<string, string> metadata = 8;
 }
 
-// AiReplyGenerated AI 生成了一条回复。
+// AiReplyGenerated AI 生成了一条完整回复。
 // 生产者: ai_service
-// 消费者: chat_service（用于持久化和 WS 推送）
+// 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
 message AiReplyGenerated {
   // AI 用户 ID，如 "ai-assistant"
   string sender_id = 1;
   // 回复的目标用户
   string target_user_id = 2;
-  string content = 3;
-  // 回复的是哪条消息
-  string reply_to_msg_id = 4;
-  string message_id = 5;
-  // 私聊目标；群聊时填写 group_id
-  string group_id = 6;
-  string conversation_type = 7;
+  // AI 会话 ID，与 MessageSent.conversation_id 一致
+  string conversation_id = 3;
+  string content = 4;
+  // 回复的是哪条用户消息
+  string reply_to_msg_id = 5;
+  string message_id = 6;
 
-  // AI 生成回复时的时间戳（毫秒，Unix epoch），由 ai_service 填写
-  int64 timestamp_ms = 8;
+  // AI 生成回复时的时间戳（毫秒，Unix epoch）
+  int64 timestamp_ms = 7;
 
   // 可扩展元数据（域名、报告摘要、方法论等）
-  // 键为字段名，值为 JSON 或纯文本，未来新增字段无需改 proto
-  map<string, string> metadata = 9;
+  map<string, string> metadata = 8;
 }
 
 // AiReplyDelta AI 回复的流式增量分块。
 // 生产者: ai_service
-// 消费者: chat_service（仅实时 WS 转发，不落库）
+// 消费者: gateway（WS 推送）、storage（直接按该结构落库）
 //
 // 一条回复对应一个固定的 message_id（流开始即确定，与最终
 // AiReplyGenerated 的 message_id 一致），分块按 seq 从 0 递增；
 // 前端按 (message_id, seq) 累积排序，收到最终整块消息时以服务端为准。
 //
 // kind 取值：
-//   "thinking"  思考链文本增量（模型 reasoning_content / 图节点输出）
-//   "progress"  阶段进度文字（与旧 progress 消息语义一致）
+//   "thinking"  思考链文本增量
+//   "progress"  阶段进度文字
 //   "content"   正文文本增量
 //   "done"      流结束标记（content 为空，之后必有最终 AiReplyGenerated）
 message AiReplyDelta {
@@ -70,8 +65,8 @@ message AiReplyDelta {
   string sender_id = 1;
   // 回复的目标用户
   string target_user_id = 2;
-  // 群组 ID；私聊时可为空
-  string group_id = 3;
+  // AI 会话 ID，与 MessageSent.conversation_id 一致
+  string conversation_id = 3;
   // 回复的是哪条用户消息
   string reply_to_msg_id = 4;
   // 最终回复的消息 ID（该回复的所有分块一致）

@@ -1,213 +1,109 @@
-# Chant 存储架构文档
+# 存储架构文档
 
-> 本文档描述 Chant 各存储组件的职责、命名规则、数据结构与读写路径。
-> 所有名称以当前代码为准，改动存储结构时请同步更新本文档。
+> 2026-11 重构后：`chat_service` 改为 AI-only gateway，**不再落库**；
+> 私聊/群聊的 Mongo/Postgres/Redis 代码已删除；AI 长期记忆（Qdrant）已下线。
+>
+> **聊天消息、会话列表、历史记录目前都没有存储**。本文只描述当前代码真实使用的存储，
+> 未实现的部分集中在第 6 节。
 
-## 1. 存储总览
+## 1. 总览
 
-| 存储 | 职责 | 谁在写 | 谁在读 |
+| 存储 | 当前用途 | 谁在写 | 谁在读 |
 | --- | --- | --- | --- |
-| Kafka | 事件总线（不落业务状态） | chat_service / ai_service / orchestrator | chat_service / ai_service / orchestrator |
-| MongoDB | 消息本体、用户、Token、离线时间真源 | chat_service / auth_service | chat_service / auth_service / ai_service（经 HTTP） |
-| PostgreSQL | 群组/会话等关系数据、Saga 状态、LLM 成本 | chat_service / orchestrator / ai_service | chat_service / orchestrator / ai_service |
-| Redis | 验证码、last_offline_time 缓存 | auth_service / chat_service | auth_service / chat_service |
-| Qdrant | AI 长期记忆（向量） | ai_service | ai_service |
+| Kafka | 事件总线（不落业务状态） | gateway / ai_service / orchestrator | gateway / ai_service / orchestrator |
+| MongoDB | 用户、Token、离线时间 | auth_service | auth_service / gateway（经 gRPC） |
+| PostgreSQL | Saga 状态、LLM 成本 | orchestrator / ai_service | orchestrator / ai_service |
+| Redis | 邮箱验证码等短生命周期数据 | auth_service | auth_service |
 
----
+已下线：
 
-## 2. Kafka 事件总线
+- Qdrant 向量库与 embedding/rerank 调用；
+- chat_service 的 Mongo / PostgreSQL / Redis 依赖与对应表。
+
+## 2. Kafka
 
 | Topic | 事件格式 | 用途 |
 | --- | --- | --- |
-| `chat_group_message` | Proto `EventEnvelope`（JSON 序列化） | 聊天消息与 AI 回复 |
-| `saga-events` | 旧版 JSON `BusinessEvent` | Saga 编排 |
+| `chat_group_message` | Proto `EventEnvelope`（protojson） | 聊天消息与 AI 回复 |
+| `saga-events` | JSON `BusinessEvent` | Saga 编排 |
 | `saga-dlq` | JSON DLQ 载荷 | Saga 死信队列 |
-| `user-registrations` / `user-updates` / `sync_user_fields` | 未实现 | compose 中已配置，auth_service 代码未接入 |
 
-`chat_group_message` 的 key 规则：
+`chat_group_message` 的 key：
 
-- 群聊消息：`getGroupPartitionKey(groupID)`，群 ID 数字部分奇偶分区
-- 私聊消息：目标用户 ID
-- AI 回复：目标用户 ID（保证与私聊消息同分区有序）
-
----
+- `MessageSent`：`conversation_id`
+- `AiReplyDelta` / `AiReplyGenerated`：`target_user_id`
 
 ## 3. MongoDB
 
-### 3.1 数据库与集合
+数据库 `auth`：
 
-| 数据库 | 集合 | 内容 | 写入方 |
-| --- | --- | --- | --- |
-| `chat` | `group_message_history_YYYYMM` | 群聊 / AI 会话消息 | chat_service |
-| `chat` | `private_message_history_YYYYMM` | 私聊消息 | chat_service |
-| `auth` | `Users` | 用户资料、`last_offline_time` | auth_service |
-| `auth` | `UserTokens` | refresh token 及有效期 | auth_service |
+| 集合 | 内容 | 写入方 |
+| --- | --- | --- |
+| `Users` | 用户资料、`last_offline_time` | auth_service |
+| `UserTokens` | refresh token 及有效期 | auth_service |
 
-### 3.2 消息分桶规则
-
-- 集合按**月份**命名：`group_message_history_202608`
-- 文档按**天**分桶：`date_identifier = YYYYMMDD`
-- 群聊每个桶最多 `MaxMessagesPerBucket = 500` 条，超出自动开新桶；桶内维护 `count` / `start_time` / `end_time`
-- 私聊桶按 `session_id + date_identifier` 区分
-
-### 3.3 私聊会话 ID
-
-`GenerateSessionID(userA, userB)`：两个用户 ID **排序后**用 `_` 拼接：
-
-```
-ai-assistant + smoke-user → ai-assistant_smoke-user
-```
-
-历史接口的 `conversation_id` 私聊时也必须传这个排序后的会话 ID，不能只传单个用户 ID。
-
-### 3.4 消息文档字段
-
-见 [message-chain.md](./message-chain.md#32-mongo-message-结构modelsgo)。
-
-### 3.5 写入幂等
-
-- 先 `$setOnInsert` 确保会话/桶文档存在（幂等，不重复建文档）
-- 再以 `messages.message_id: {$ne: <message_id>}` 条件 `$push`，且**不使用 upsert**
-- 效果：Kafka 重放 / 服务重启重复消费时，同一 `message_id` 只落一条
-
-### 3.6 历史读取
-
-- 按“最近 30 天”查询，但集合按月份命名，因此查询前会对**月份集合名去重**，避免同月重复读取
-- 群聊按 `group_id` 过滤，私聊按 `session_id` 过滤
-
-### 3.7 生产环境数据边界（双 MongoDB）
-
-开发环境使用一个 MongoDB 实例、两个数据库（`auth` / `chat`）即可；生产三机部署采用**双 MongoDB 实例**，把两类数据从物理上隔开：
-
-| 数据 | 实例 | 数据库 | 谁可写 | 其他服务如何读 |
-| --- | --- | --- | --- | --- |
-| 用户、refresh token、last_offline_time | 节点 1 | `auth` | 仅 auth-service | 通过 auth 的 gRPC / HTTP |
-| 群聊/私聊消息历史 | 节点 2 | `chat` | 仅 chat-service | 通过 chat_service 历史接口（HTTP） |
-
-**为什么要有数据边界：**
-
-- **领域归属**：auth 域（身份、凭据）与 chat 域（消息内容）是不同业务领域，各自的数据生命周期和访问者不同。
-- **安全边界**：用户表里是密码哈希、refresh token、邮箱；消息表里是聊天内容。两者混在一起时，任何能读 chat 库的漏洞/事故都可能波及凭据；物理隔离后，即使 chat 被攻破，也碰不到 auth 数据。
-- **访问边界**：chat-service、ai-service **不直接读 auth 库**，只能通过 auth 的 gRPC/HTTP 接口取用户信息；ai-service 也不直接读 chat 库，只能通过 chat_service 历史接口。跨库直连被架构性禁止。
-- **故障边界**：一个 Mongo 实例故障不影响另一个；chat 的写入压力不会拖垮 auth。
-- **运维边界**：两套实例可以分别备份、保留、加密和审计（auth 数据小而敏感，chat 数据大而高频）。
-
-> 可选：Redis 同样可以按库隔离（auth 用 db0 存验证码，chat 用 db1 存 last_offline_time 缓存），进一步缩小共享面。
-
----
+`chat` 库当前没有代码写入。旧的 `group_message_history_YYYYMM`、
+`private_message_history_YYYYMM` 集合与分桶逻辑已随社交功能删除。
 
 ## 4. PostgreSQL
 
-### 4.1 数据库
-
 | 数据库 | 用途 |
 | --- | --- |
-| `orchestrator` | chat_service 关系表 + orchestrator 的 `saga_map`（两个服务共用） |
-| `user_service` | 历史遗留，init 脚本创建，当前无代码使用 |
-| `ai_audit` | LLM 成本表 `llm_api_costs`（独立库，需手动/脚本预创建） |
+| `orchestrator` | orchestrator 的 `saga_map`（Saga 状态、乐观锁、租约锁） |
+| `ai_audit` | LLM 成本表 `llm_api_costs` |
 
-### 4.2 chat_service 表（位于 `orchestrator` 库）
+### 4.1 LLM 成本表
 
-| 表 | 用途 | 主键 |
-| --- | --- | --- |
-| `groups` | 群组元数据（group_id、group_name、group_type、create_by_user_id） | `group_id` |
-| `user_groups` | 用户-群组关联 | `(user_id, group_id)` |
-| `conversations` | 会话已读状态 / 最后读取时间 | `(user_id, conversation_id)` |
-| `private_chats` | 私聊列表（历史遗留语义） | `(user_id, add_time)` |
-| `temp_chats` | 临时会话（历史遗留语义） | `(user_id, source)` |
+- 表：`ai_audit.llm_api_costs`；
+- 按 `created_at` **RANGE 分区**，分区名 `llm_api_costs_YYYYMM`；
+- 分区边界：每月 1 日 00:00 +08 到次月 1 日 00:00 +08；
+- ai_service 启动时自动补建**当月与下月**分区（[store.py](../services/ai_service/infra/cost/store.py)）；
+- 字段：`user_id`、`provider`、`model`、prompt/completion/total tokens、
+  `input_price`、`output_price`、`cost_usd`、`message_id`、`created_at`。
 
-### 4.3 orchestrator 表
-
-| 表 | 用途 | 关键字段 |
-| --- | --- | --- |
-| `saga_map` | Saga 状态持久化 | `status`、`version`（乐观锁）、`locked_by` / `lock_expiry`（分布式锁）、`context` / `steps`（JSON） |
-
-### 4.4 LLM 成本表（`ai_audit.llm_api_costs`）
-
-- 按 `created_at` **RANGE 分区**，分区命名 `llm_api_costs_YYYYMM`
-- 分区边界：每月 1 日 00:00 **+08** 至次月 1 日 00:00 +08
-- ai_service 启动时自动补建**当月与下月**分区（[store.py](../services/ai_service/shared/cost/store.py)）
-- 字段：user_id、provider、model、prompt_tokens、completion_tokens、total_tokens、input_price、output_price、cost_usd、message_id、created_at
-
----
+> 部署时 `ai_audit` 库需要存在；`scripts/init-multiple-databases.sh` 会在初始化时创建。
 
 ## 5. Redis
 
-### 5.1 auth_service：邮箱验证码
+仅 auth_service 使用，存放邮箱验证码等短生命周期数据，按 key 设置 TTL。
 
-- key：用户邮箱
-- value：验证码
-- TTL：600 秒
+## 6. 未实现：聊天消息存储
 
-### 5.2 chat_service：last_offline_time 缓存
+当前事实：
 
-- key：`{userID}:{username}`（Hash）
-- field：`last_offline_time`
-- value：Unix 秒
-- 未命中时通过 gRPC 从 auth_service 读取，**真源在 MongoDB `Users` 集合**
+- gateway 只把用户消息发到 Kafka，不落库；
+- ai_service 只把 AI 回复发到 Kafka，不落库；
+- gateway 消费 AI 回复只做 WS 推送，不落库；
+- 前端只把**会话列表**写进 localStorage，消息本身不保存。
 
----
+因此：
 
-## 6. Qdrant（AI 长期记忆）
+- 刷新页面后消息全部丢失；
+- ai_service 的 `assemble_context` 只能拿到当前一条消息，短期记忆的折叠逻辑不会触发；
+- 没有任何地方能提供历史消息或会话列表接口。
 
-- 集合：`long_term_memory`
-- 向量维度：4096（`Qwen/Qwen3-Embedding-8B`）
-- 距离：Cosine
-- payload：`user_id`、`group_id`、`question`、`report_summary`、`report_full`、`domain`、`methodology`、`created_at`
-- 检索：向量召回 → 时间衰减 × 语义分混合排序 → 可选 `Qwen/Qwen3-Reranker-8B` 精排
-- 用户隔离：查询时按 `user_id` 过滤
+后续如果要做，需要单独确定“谁消费 Kafka、写哪个库、暴露什么查询接口”，
+本文不预设实现。
 
----
+> 临时说明：ai_service 的 `memory/context.py` 目前直连 Mongo 写折叠检查点
+> （`conversation_memory`），这是存储链路接入前的临时实现，不属于正式存储架构。
 
-## 7. 读写路径摘要
+## 7. 开发注意
 
-### 写路径
+1. Docker 与宿主机可能同时监听同名端口（MongoDB/Redis/PostgreSQL）；
+   排查时先确认 `localhost` 实际由谁监听。
+2. `ai_audit` 与 `orchestrator` 是不同数据库；ai_service 只连 `ai_audit`。
+3. gateway 不再需要 Mongo/Postgres/Redis 连接；如果本地还配了这些环境变量，可以删掉。
+4. 成本表分区由 ai_service 启动时自动创建；如果数据库账号没有建表权限，成本记录会静默停用。
 
-```
-前端 WS
-  → chat_service：用户消息落 MongoDB（群/私聊）
-  → Kafka（MessageSent）
-      ├→ ai_service：读历史(HTTP) → LLM → 成本写 PG → 回复发 Kafka
-      └→ chat_service 自身消费者：广播给在线用户
-Kafka（AiReplyGenerated）
-  → chat_service：AI 回复落 MongoDB + WS 推送
-```
-
-Agent 模式额外：研究报告 → Qdrant 长期记忆（fire-and-forget）。
-
-### 读路径
-
-| 场景 | 数据源 |
-| --- | --- |
-| 会话历史 | MongoDB（按月份集合 + 天数桶） |
-| 未读消息 | Redis last_offline_time + MongoDB 时间过滤 |
-| 群成员 / 会话关系 | PostgreSQL |
-| Saga 状态 | PostgreSQL `saga_map` |
-| LLM 成本 | PostgreSQL `ai_audit.llm_api_costs` |
-| AI 长期记忆 | Qdrant |
-
----
-
-## 8. 开发环境注意
-
-本地开发时，Docker 与宿主机可能同时存在同名服务（例如宿主机的 MongoDB/Redis 占用 `localhost` 端口，优先于 Docker 容器被访问）。表现：
-
-- `docker exec mongodb` 里看不到聊天数据，但 chat_service 历史接口有数据 → 说明 chat_service 连的是宿主机 MongoDB
-- 8080 端口被旧 Python 进程占用时，chat_service 需换端口运行
-
-排查时先确认 `localhost` 端口实际由谁监听，再判断数据落在 Docker 还是宿主机。
-
----
-
-## 9. 关键代码索引
+## 8. 代码索引
 
 | 存储 | 代码 |
 | --- | --- |
-| Mongo 消息分桶 | [mongodb_group_message_history_service.go](../services/chat_service/app/database/mongodb/mongodb_group_message_history_service.go) |
-| Mongo 私聊会话 | [mongodb_private_message_history_service.go](../services/chat_service/app/database/mongodb/mongodb_private_message_history_service.go) |
-| Mongo 模型 | [models.go](../services/chat_service/app/database/mongodb/models.go) |
-| PG 表模型 | [model.go](../services/chat_service/app/database/pgsql/model/model.go) |
+| Kafka 事件信封 | [proto/chant/common/v1/envelope.proto](../proto/chant/common/v1/envelope.proto) |
+| Kafka 生产/消费（ai） | [infra/kafka](../services/ai_service/infra/kafka/consumer.py) |
+| 成本表与分区 | [infra/cost/store.py](../services/ai_service/infra/cost/store.py) |
+| auth 的 Mongo 访问 | [services/auth_service/app/database](../services/auth_service/app/database/mongodb_service.py) |
+| auth 的 Redis 访问 | [services/auth_service/app/database/redis_service.py](../services/auth_service/app/database/redis_service.py) |
 | Saga 表模型 | [saga_map.go](../services/orchestrator_service/database/pgsql/model/saga_map.go) |
-| 成本分区 | [store.py](../services/ai_service/shared/cost/store.py) |
-| 长期记忆 | [long_term_memory.py](../services/ai_service/agent/tools/long_term_memory.py) |
-| Redis 缓存 | [redis_handler.go](../services/chat_service/app/infrastructure/redis/redis_handler.go) |
+| gateway 的 Kafka 消费 | [event_consumer.go](../services/chat_service/app/infrastructure/kafka/event_consumer.go) |

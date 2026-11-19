@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	sdk_kafka "infrastructure_sdk/kafka"
 	"google.golang.org/protobuf/proto"
+	sdk_kafka "infrastructure_sdk/kafka"
 )
 
 // KafkaProducer 包装 SDK 生产者，适配本地接口
@@ -31,15 +31,6 @@ func NewKafkaProducer(connection *sdk_kafka.KafkaConnection, defaultTopic string
 // GetProducer 获取全局生产者实例
 func GetProducer() *KafkaProducer {
 	return globalProducer
-}
-
-// SendEvent 通用发送方法（兼容旧版 BusinessEvent）
-func (kp *KafkaProducer) SendEvent(ctx context.Context, eventType string, messageID string, key string, data interface{}) error {
-	event, err := sdk_kafka.NewBusinessEvent(eventType, eventType, messageID, data)
-	if err != nil {
-		return err
-	}
-	return kp.sdkProducer.SendBusinessEvent(ctx, kp.defaultTopic, event, key)
 }
 
 // SendProtoEvent 用 proto 消息类型发送事件信封。
