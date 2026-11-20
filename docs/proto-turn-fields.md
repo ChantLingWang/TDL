@@ -81,19 +81,21 @@ step 5  RESULT        content: "今天天气晴，25 度……"
 | 1 | `sender_id` | string | AI 用户 ID |
 | 2 | `target_user_id` | string | 推给谁 |
 | 3 | `conversation_id` | string | 会话 ID |
-| 4 | `turn_id` | string | 本轮 ID |
-| 5 | `round` | int64 | 轮号 |
-| 6 | `step` | int64 | 步号，轮内从 1 递增 |
-| 7 | `seq` | int64 | 轮内事件序号 |
-| 8 | `attempt` | int32 | 重试次数 |
-| 9 | `kind` | StepKind | THINK / RESULT / OBSERVATION |
-| 10 | `result_type` | ResultType | kind=RESULT 时：CONTENT / TOOL_CALL |
-| 11 | `name` | string | 工具名（OBSERVATION / TOOL_CALL） |
-| 12 | `status` | string | requested / completed / failed / timeout |
-| 13 | `detail` | string | 给用户看的摘要 |
-| 14 | `payload` | string | 结构化数据（工具参数 / 工具返回 JSON） |
-| 15 | `duration_ms` | int64 | 工具执行耗时 |
-| 16 | `metadata` | map | 扩展字段 |
+| 4 | `reply_to_msg_id` | string | 回复哪条用户消息 |
+| 5 | `message_id` | string | 最终回复 ID（`ai-<用户消息ID>`），前端按它归组 |
+| 6 | `turn_id` | string | 本轮 ID |
+| 7 | `round` | int64 | 轮号 |
+| 8 | `step` | int64 | 步号，轮内从 1 递增 |
+| 9 | `seq` | int64 | 轮内事件序号 |
+| 10 | `attempt` | int32 | 重试次数 |
+| 11 | `kind` | StepKind | THINK / RESULT / OBSERVATION |
+| 12 | `result_type` | ResultType | kind=RESULT 时：CONTENT / TOOL_CALL |
+| 13 | `name` | string | 工具名（OBSERVATION / TOOL_CALL） |
+| 14 | `status` | StepStatus | requested / running / completed / failed / timeout |
+| 15 | `detail` | string | 给用户看的摘要 |
+| 16 | `payload` | string | 结构化数据（工具参数 / 工具返回 JSON） |
+| 17 | `duration_ms` | int64 | 工具执行耗时 |
+| 18 | `metadata` | map | 扩展字段 |
 
 ### AiReplyGenerated
 
@@ -123,6 +125,15 @@ enum ResultType {
   RESULT_TYPE_UNSPECIFIED = 0;
   RESULT_TYPE_CONTENT = 1;
   RESULT_TYPE_TOOL_CALL = 2;
+}
+
+enum StepStatus {
+  STEP_STATUS_UNSPECIFIED = 0;
+  STEP_STATUS_REQUESTED = 1;
+  STEP_STATUS_RUNNING = 2;
+  STEP_STATUS_COMPLETED = 3;
+  STEP_STATUS_FAILED = 4;
+  STEP_STATUS_TIMEOUT = 5;
 }
 
 enum TurnStatus {
