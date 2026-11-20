@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1e\x63hant/common/v1/envelope.proto\x12\x0f\x63hant.common.v1\"x\n\rEventEnvelope\x12\x10\n\x08\x65vent_id\x18\x01 \x01(\t\x12\x12\n\nevent_type\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x11\n\ttimestamp\x18\x04 \x01(\x03\x12\x10\n\x08trace_id\x18\x05 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x06 \x01(\x0c\x42\x38Z6github.com/chant/chant/gen/go/chant/common/v1;commonv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1e\x63hant/common/v1/envelope.proto\x12\x0f\x63hant.common.v1\"v\n\rEventEnvelope\x12\x10\n\x08\x65vent_id\x18\x01 \x01(\t\x12\x12\n\nevent_type\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x11\n\ttimestamp\x18\x04 \x01(\x03\x12\x0c\n\x04\x64\x61ta\x18\x06 \x01(\x0cJ\x04\x08\x05\x10\x06R\x08trace_idB8Z6github.com/chant/chant/gen/go/chant/common/v1;commonv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,5 +33,5 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z6github.com/chant/chant/gen/go/chant/common/v1;commonv1'
   _globals['_EVENTENVELOPE']._serialized_start=51
-  _globals['_EVENTENVELOPE']._serialized_end=171
+  _globals['_EVENTENVELOPE']._serialized_end=169
 # @@protoc_insertion_point(module_scope)

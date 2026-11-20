@@ -45,7 +45,6 @@ func BroadcastAiReplyDelta(delta *chatv1.AiReplyDelta, ts int64) {
 		"content":         delta.Content,
 		"message_id":      delta.MessageId,
 		"reply_to_msg_id": delta.ReplyToMsgId,
-		"metadata":        delta.Metadata,
 		"kind":            delta.Kind,
 		"seq":             delta.Seq,
 		"time":            ts,

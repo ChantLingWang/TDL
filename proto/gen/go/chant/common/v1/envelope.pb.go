@@ -33,8 +33,6 @@ type EventEnvelope struct {
 	Source string `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
 	// 事件产生时间，Unix 毫秒
 	Timestamp int64 `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	// 分布式追踪 ID
-	TraceId string `protobuf:"bytes,5,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	// 具体事件载荷的 protojson 序列化
 	Data          []byte `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -99,13 +97,6 @@ func (x *EventEnvelope) GetTimestamp() int64 {
 	return 0
 }
 
-func (x *EventEnvelope) GetTraceId() string {
-	if x != nil {
-		return x.TraceId
-	}
-	return ""
-}
-
 func (x *EventEnvelope) GetData() []byte {
 	if x != nil {
 		return x.Data
@@ -117,15 +108,14 @@ var File_chant_common_v1_envelope_proto protoreflect.FileDescriptor
 
 const file_chant_common_v1_envelope_proto_rawDesc = "" +
 	"\n" +
-	"\x1echant/common/v1/envelope.proto\x12\x0fchant.common.v1\"\xae\x01\n" +
+	"\x1echant/common/v1/envelope.proto\x12\x0fchant.common.v1\"\xa3\x01\n" +
 	"\rEventEnvelope\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
 	"event_type\x18\x02 \x01(\tR\teventType\x12\x16\n" +
 	"\x06source\x18\x03 \x01(\tR\x06source\x12\x1c\n" +
-	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\x19\n" +
-	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x12\n" +
-	"\x04data\x18\x06 \x01(\fR\x04dataB\xba\x01\n" +
+	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\x12\n" +
+	"\x04data\x18\x06 \x01(\fR\x04dataJ\x04\b\x05\x10\x06R\btrace_idB\xba\x01\n" +
 	"\x13com.chant.common.v1B\rEnvelopeProtoP\x01Z6github.com/chant/chant/gen/go/chant/common/v1;commonv1\xa2\x02\x03CCX\xaa\x02\x0fChant.Common.V1\xca\x02\x0fChant\\Common\\V1\xe2\x02\x1bChant\\Common\\V1\\GPBMetadata\xea\x02\x11Chant::Common::V1b\x06proto3"
 
 var (

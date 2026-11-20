@@ -106,7 +106,7 @@ Topic：`chat_group_message`。
 - `AiReplyDelta` / `AiReplyGenerated`：`target_user_id`（保证同一条回复的分块与最终消息同分区有序）
 
 > 用户消息与 AI 回复可能落在不同分区；如果以后有 storage 消费者，落库后必须按
-> `timestamp_ms` 排序，不能依赖到达顺序。
+> 事件时间（`envelope.timestamp`）排序，不能依赖到达顺序。
 
 ## 5. MessageSent
 
@@ -120,8 +120,6 @@ Topic：`chat_group_message`。
 | `content` | 文本正文 |
 | `message_id` | 消息 ID |
 | `message_type` | `text` 等 |
-| `timestamp_ms` | 毫秒时间戳 |
-| `metadata` | 扩展字段（当前为空） |
 
 ## 6. ai_service 消费
 
@@ -217,7 +215,6 @@ model.complete(messages, tools)
 | `reply_to_msg_id` | 回复的用户消息 ID |
 | `message_id` | `ai-<用户消息 ID>` |
 | `metadata` | `reasoning`：思考全文 |
-| `timestamp_ms` | 毫秒时间戳 |
 
 错误路径：`send_error_reply` 发送固定兜底文案，`message_id = ai-err-<用户消息 ID>`，
 `reply_to_msg_id` 仍是原消息，前端据此清掉未收尾的流式条目。
