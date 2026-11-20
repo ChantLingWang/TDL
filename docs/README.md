@@ -6,6 +6,7 @@
 
 - [message-chain.md](./message-chain.md) —— 消息链路与字段传递（当前实际运行版本）
 - [storage-architecture.md](./storage-architecture.md) —— 存储现状：Kafka / MongoDB / PostgreSQL / Redis，以及尚未实现的聊天消息存储
+- [proto-turn-fields.md](./proto-turn-fields.md) —— round / turn_id / step / attempt / status 字段与幂等/有序设计（草案）
 
 ## 当前服务
 
