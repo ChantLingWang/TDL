@@ -1,7 +1,6 @@
 """Kafka 生产者模块（proto 版）。"""
 
 import logging
-import time
 
 from aiokafka import AIOKafkaProducer
 
@@ -36,14 +35,12 @@ async def send_ai_reply(
     reply_to_msg_id: str | None = None,
 ) -> None:
     """以 AI 用户身份发送一条完整回复。"""
-    ts = int(time.time() * 1000)
     reply = new_ai_reply(
         target_user_id=user_id,
         content=content,
         reply_to_msg_id=reply_to_msg_id or message_id,
         message_id=f'ai-{message_id}',
         conversation_id=conversation_id,
-        timestamp_ms=ts,
         metadata=metadata,
     )
     envelope = new_envelope('chant.chat.v1.AiReplyGenerated', 'ai-service', reply)
@@ -66,10 +63,8 @@ async def send_ai_reply_delta(
     kind: str,
     content: str,
     conversation_id: str = "",
-    metadata: dict | None = None,
 ) -> None:
     """发送一条 AI 回复的增量分块。"""
-    ts = int(time.time() * 1000)
     delta = new_ai_reply_delta(
         target_user_id=user_id,
         reply_to_msg_id=reply_to_msg_id,
@@ -78,8 +73,6 @@ async def send_ai_reply_delta(
         kind=kind,
         content=content,
         conversation_id=conversation_id,
-        timestamp_ms=ts,
-        metadata=metadata,
     )
     envelope = new_envelope('chant.chat.v1.AiReplyDelta', 'ai-service', delta)
     payload = envelope_to_json(envelope)

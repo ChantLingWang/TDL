@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"log"
-	"time"
 
 	"chat_service/app/api/models"
 	"chat_service/app/config"
@@ -43,7 +42,6 @@ func HandleChat(userInfo *UserInfo, content models.ChatMessageRequest) {
 		Content:        content.Text,
 		MessageId:      messageID,
 		MessageType:    messageType,
-		TimestampMs:    time.Now().UnixMilli(),
 	}
 
 	if err := kafka.GetProducer().SendProtoEvent(

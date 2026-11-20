@@ -15,8 +15,9 @@ message EventEnvelope {
   string source = 3;
   // 事件产生时间，Unix 毫秒
   int64 timestamp = 4;
-  // 分布式追踪 ID
-  string trace_id = 5;
+  // 5 曾是 trace_id，未使用，保留字段号
+  reserved 5;
+  reserved "trace_id";
   // 具体事件载荷的 protojson 序列化
   bytes data = 6;
 }

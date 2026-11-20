@@ -34,11 +34,7 @@ type MessageSent struct {
 	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	MessageId      string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image / file 等
-	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
-	// 消息产生时间戳（毫秒，Unix epoch）
-	TimestampMs int64 `protobuf:"varint,7,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
-	// 可扩展元数据（域名、报告摘要、方法论等）
-	Metadata      map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MessageType   string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -115,20 +111,6 @@ func (x *MessageSent) GetMessageType() string {
 	return ""
 }
 
-func (x *MessageSent) GetTimestampMs() int64 {
-	if x != nil {
-		return x.TimestampMs
-	}
-	return 0
-}
-
-func (x *MessageSent) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
-}
-
 // AiReplyGenerated AI 生成了一条完整回复。
 // 生产者: ai_service
 // 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
@@ -144,9 +126,7 @@ type AiReplyGenerated struct {
 	// 回复的是哪条用户消息
 	ReplyToMsgId string `protobuf:"bytes,5,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
 	MessageId    string `protobuf:"bytes,6,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// AI 生成回复时的时间戳（毫秒，Unix epoch）
-	TimestampMs int64 `protobuf:"varint,7,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
-	// 可扩展元数据（域名、报告摘要、方法论等）
+	// 可扩展元数据（当前只用 reasoning 存思考全文）
 	Metadata      map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -224,13 +204,6 @@ func (x *AiReplyGenerated) GetMessageId() string {
 	return ""
 }
 
-func (x *AiReplyGenerated) GetTimestampMs() int64 {
-	if x != nil {
-		return x.TimestampMs
-	}
-	return 0
-}
-
 func (x *AiReplyGenerated) GetMetadata() map[string]string {
 	if x != nil {
 		return x.Metadata
@@ -269,11 +242,7 @@ type AiReplyDelta struct {
 	// thinking / progress / content / done
 	Kind string `protobuf:"bytes,7,opt,name=kind,proto3" json:"kind,omitempty"`
 	// 增量文本；kind=done 时为空
-	Content string `protobuf:"bytes,8,opt,name=content,proto3" json:"content,omitempty"`
-	// 分块产生时间戳（毫秒，Unix epoch）
-	TimestampMs int64 `protobuf:"varint,9,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
-	// 可扩展元数据
-	Metadata      map[string]string `protobuf:"bytes,10,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Content       string `protobuf:"bytes,8,opt,name=content,proto3" json:"content,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -364,25 +333,11 @@ func (x *AiReplyDelta) GetContent() string {
 	return ""
 }
 
-func (x *AiReplyDelta) GetTimestampMs() int64 {
-	if x != nil {
-		return x.TimestampMs
-	}
-	return 0
-}
-
-func (x *AiReplyDelta) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
-}
-
 var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xfb\x02\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xf9\x01\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
@@ -390,12 +345,7 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
-	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12!\n" +
-	"\ftimestamp_ms\x18\a \x01(\x03R\vtimestampMs\x12D\n" +
-	"\bmetadata\x18\b \x03(\v2(.chant.chat.v1.MessageSent.MetadataEntryR\bmetadata\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x89\x03\n" +
+	"\fmessage_type\x18\x06 \x01(\tR\vmessageTypeJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\ftimestamp_msR\bmetadata\"\xfa\x02\n" +
 	"\x10AiReplyGenerated\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
@@ -403,12 +353,11 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12%\n" +
 	"\x0freply_to_msg_id\x18\x05 \x01(\tR\freplyToMsgId\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x06 \x01(\tR\tmessageId\x12!\n" +
-	"\ftimestamp_ms\x18\a \x01(\x03R\vtimestampMs\x12I\n" +
+	"message_id\x18\x06 \x01(\tR\tmessageId\x12I\n" +
 	"\bmetadata\x18\b \x03(\v2-.chant.chat.v1.AiReplyGenerated.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa7\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\a\x10\bR\ftimestamp_ms\"\xa4\x02\n" +
 	"\fAiReplyDelta\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
@@ -418,13 +367,9 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x10\n" +
 	"\x03seq\x18\x06 \x01(\x03R\x03seq\x12\x12\n" +
 	"\x04kind\x18\a \x01(\tR\x04kind\x12\x18\n" +
-	"\acontent\x18\b \x01(\tR\acontent\x12!\n" +
-	"\ftimestamp_ms\x18\t \x01(\x03R\vtimestampMs\x12E\n" +
-	"\bmetadata\x18\n" +
-	" \x03(\v2).chant.chat.v1.AiReplyDelta.MetadataEntryR\bmetadata\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\xa9\x01\n" +
+	"\acontent\x18\b \x01(\tR\acontentJ\x04\b\t\x10\n" +
+	"J\x04\b\n" +
+	"\x10\vR\ftimestamp_msR\bmetadataB\xa9\x01\n" +
 	"\x11com.chant.chat.v1B\n" +
 	"EventProtoP\x01Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1\xa2\x02\x03CCX\xaa\x02\rChant.Chat.V1\xca\x02\rChant\\Chat\\V1\xe2\x02\x19Chant\\Chat\\V1\\GPBMetadata\xea\x02\x0fChant::Chat::V1b\x06proto3"
 
@@ -440,24 +385,20 @@ func file_chant_chat_v1_event_proto_rawDescGZIP() []byte {
 	return file_chant_chat_v1_event_proto_rawDescData
 }
 
-var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_chant_chat_v1_event_proto_goTypes = []any{
 	(*MessageSent)(nil),      // 0: chant.chat.v1.MessageSent
 	(*AiReplyGenerated)(nil), // 1: chant.chat.v1.AiReplyGenerated
 	(*AiReplyDelta)(nil),     // 2: chant.chat.v1.AiReplyDelta
-	nil,                      // 3: chant.chat.v1.MessageSent.MetadataEntry
-	nil,                      // 4: chant.chat.v1.AiReplyGenerated.MetadataEntry
-	nil,                      // 5: chant.chat.v1.AiReplyDelta.MetadataEntry
+	nil,                      // 3: chant.chat.v1.AiReplyGenerated.MetadataEntry
 }
 var file_chant_chat_v1_event_proto_depIdxs = []int32{
-	3, // 0: chant.chat.v1.MessageSent.metadata:type_name -> chant.chat.v1.MessageSent.MetadataEntry
-	4, // 1: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
-	5, // 2: chant.chat.v1.AiReplyDelta.metadata:type_name -> chant.chat.v1.AiReplyDelta.MetadataEntry
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 0: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_chant_chat_v1_event_proto_init() }
@@ -471,7 +412,7 @@ func file_chant_chat_v1_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chant_chat_v1_event_proto_rawDesc), len(file_chant_chat_v1_event_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

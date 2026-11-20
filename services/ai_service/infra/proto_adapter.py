@@ -46,13 +46,10 @@ def new_ai_reply(
     reply_to_msg_id: str,
     message_id: str,
     conversation_id: str = "",
-    timestamp_ms: int = 0,
     metadata: dict | None = None,
 ) -> _event.AiReplyGenerated:
     """构造一条 AI 完整回复。"""
     kwargs: dict = {}
-    if timestamp_ms:
-        kwargs['timestamp_ms'] = timestamp_ms
     if metadata:
         kwargs['metadata'] = metadata
     return _event.AiReplyGenerated(
@@ -74,15 +71,8 @@ def new_ai_reply_delta(
     kind: str,
     content: str,
     conversation_id: str = "",
-    timestamp_ms: int = 0,
-    metadata: dict | None = None,
 ) -> _event.AiReplyDelta:
     """构造一条 AI 回复流式分块。"""
-    kwargs: dict = {}
-    if timestamp_ms:
-        kwargs['timestamp_ms'] = timestamp_ms
-    if metadata:
-        kwargs['metadata'] = metadata
     return _event.AiReplyDelta(
         sender_id='ai-assistant',
         target_user_id=target_user_id,
@@ -92,5 +82,4 @@ def new_ai_reply_delta(
         seq=seq,
         kind=kind,
         content=content,
-        **kwargs,
     )

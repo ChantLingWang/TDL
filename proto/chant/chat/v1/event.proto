@@ -18,11 +18,9 @@ message MessageSent {
   // text / image / file 等
   string message_type = 6;
 
-  // 消息产生时间戳（毫秒，Unix epoch）
-  int64 timestamp_ms = 7;
-
-  // 可扩展元数据（域名、报告摘要、方法论等）
-  map<string, string> metadata = 8;
+  // 7/8 曾是 timestamp_ms / metadata，未使用，保留字段号
+  reserved 7, 8;
+  reserved "timestamp_ms", "metadata";
 }
 
 // AiReplyGenerated AI 生成了一条完整回复。
@@ -40,10 +38,11 @@ message AiReplyGenerated {
   string reply_to_msg_id = 5;
   string message_id = 6;
 
-  // AI 生成回复时的时间戳（毫秒，Unix epoch）
-  int64 timestamp_ms = 7;
+  // 7 曾是 timestamp_ms，未使用，保留字段号
+  reserved 7;
+  reserved "timestamp_ms";
 
-  // 可扩展元数据（域名、报告摘要、方法论等）
+  // 可扩展元数据（当前只用 reasoning 存思考全文）
   map<string, string> metadata = 8;
 }
 
@@ -77,8 +76,8 @@ message AiReplyDelta {
   string kind = 7;
   // 增量文本；kind=done 时为空
   string content = 8;
-  // 分块产生时间戳（毫秒，Unix epoch）
-  int64 timestamp_ms = 9;
-  // 可扩展元数据
-  map<string, string> metadata = 10;
+
+  // 9/10 曾是 timestamp_ms / metadata，未使用，保留字段号
+  reserved 9, 10;
+  reserved "timestamp_ms", "metadata";
 }

@@ -27,8 +27,6 @@ func TestBroadcastAiReplyDeltaAI(t *testing.T) {
 		Seq:            3,
 		Kind:           "thinking",
 		Content:        "正在分析",
-		TimestampMs:    1786000000000,
-		Metadata:       map[string]string{"k": "v"},
 	}
 
 	BroadcastAiReplyDelta(delta, 1786000000001)
