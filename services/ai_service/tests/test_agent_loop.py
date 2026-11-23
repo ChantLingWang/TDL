@@ -284,3 +284,43 @@ def test_tool_result_truncated():
     output = res.steps[1].results[0].result
     assert "已截断" in output
     assert len(output) <= 40
+
+
+def test_step_events_follow_phases():
+    async def echo(ctx, text=""):
+        return f"echo:{text}"
+
+    box = _box(_tool("echo", echo), active=("echo",))
+    call = ToolCall(id="c1", name="echo", arguments={"text": "hi"})
+    llm = ScriptedLLM(
+        [
+            _result(reasoning="先查工具", tool_calls=[call]),
+            _result(content="done", reasoning="再回答"),
+        ]
+    )
+
+    events = []
+
+    async def on_step(event):
+        events.append(event)
+
+    res = asyncio.run(
+        AgentLoop(llm, box, on_step=on_step).run([Message(role="user", content="hi")])
+    )
+
+    assert [event.kind for event in events] == [
+        "THINK",
+        "TOOL_CALL",
+        "TOOL_RESULT",
+        "THINK",
+        "RESULT",
+    ]
+    assert [event.step for event in events] == [1, 2, 3, 4, 5]
+    assert events[0].payload["think"] == "先查工具"
+    assert events[1].payload["calls"][0]["id"] == "c1"
+    assert events[1].payload["calls"][0]["name"] == "echo"
+    assert events[2].payload["results"][0]["id"] == "c1"
+    assert events[2].payload["results"][0]["status"] == "completed"
+    assert events[3].payload["think"] == "再回答"
+    assert events[4].payload == {"result": "done", "status": "completed", "reason": ""}
+    assert res.text == "done"

@@ -42,6 +42,15 @@ class Step:
 
 
 @dataclass(slots=True)
+class StepEvent:
+    """发给前端的 step 事件（THINK / TOOL_CALL / TOOL_RESULT / RESULT）。"""
+
+    step: int
+    kind: str
+    payload: dict
+
+
+@dataclass(slots=True)
 class LoopResult:
     """一次 loop 的最终结果。"""
 
@@ -57,6 +66,7 @@ class LoopResult:
 __all__ = [
     "LoopResult",
     "Step",
+    "StepEvent",
     "StepKind",
     "StopReason",
     "ToolResult",

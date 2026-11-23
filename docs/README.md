@@ -47,11 +47,12 @@ chat gateway（鉴权 + WS + Kafka，不落库）
 Kafka topic: chat_group_message
    │
    ├──► ai_service（AgentLoop + llm_tools）──► DeepSeek
-   │         │  AiReplyDelta / AiReplyGenerated（key = target_user_id）
+   │         │  AiTurnStep（THINK / TOOL_CALL / TOOL_RESULT / RESULT，
+   │         │              key = conversation_id）
    │         ▼
    │   Kafka topic: chat_group_message
    │         │
-   │         └──► chat gateway（WebSocket 推送，不落库）
+   │         └──► chat gateway（WebSocket 推送 ai_step，不落库）
 ```
 
 > **注意**：当前没有 storage 消费者，用户消息和 AI 回复都不会落库；

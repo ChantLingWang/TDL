@@ -2,6 +2,6 @@
 
 from runtime.agent_loop.loop import AgentLoop
 from runtime.agent_loop.config import LoopConfig
-from runtime.agent_loop.schemas import LoopResult, Step, ToolResult
+from runtime.agent_loop.schemas import LoopResult, Step, StepEvent, ToolResult
 
-__all__ = ["AgentLoop", "LoopConfig", "LoopResult", "Step", "ToolResult"]
+__all__ = ["AgentLoop", "LoopConfig", "LoopResult", "Step", "StepEvent", "ToolResult"]

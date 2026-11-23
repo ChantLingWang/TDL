@@ -14,25 +14,6 @@ func RegisterAiReplyBroadcast(fn func(targetUserID string, message []byte)) {
 	aiReplyBroadcast = fn
 }
 
-// BroadcastAiReply 将 AI 完整回复推送给目标用户。
-func BroadcastAiReply(reply *chatv1.AiReplyGenerated, ts int64) {
-	if aiReplyBroadcast == nil {
-		return
-	}
-	payload := map[string]interface{}{
-		"type":            "ai_chat",
-		"conversation_id": reply.ConversationId,
-		"sender":          reply.SenderId,
-		"content":         reply.Content,
-		"message_id":      reply.MessageId,
-		"reply_to_msg_id": reply.ReplyToMsgId,
-		"metadata":        reply.Metadata,
-		"time":            ts,
-	}
-	message, _ := json.Marshal(payload)
-	aiReplyBroadcast(reply.TargetUserId, message)
-}
-
 // BroadcastAiTurnStep 将 AI 的一步推送给目标用户，payload 作为嵌套 JSON 发送。
 func BroadcastAiTurnStep(step *chatv1.AiTurnStep, ts int64) {
 	if aiReplyBroadcast == nil {
@@ -64,24 +45,4 @@ func BroadcastAiTurnStep(step *chatv1.AiTurnStep, ts int64) {
 		return
 	}
 	aiReplyBroadcast(step.TargetUserId, message)
-}
-
-// BroadcastAiReplyDelta 将 AI 流式分块实时推送给目标用户（不落库）。
-func BroadcastAiReplyDelta(delta *chatv1.AiReplyDelta, ts int64) {
-	if aiReplyBroadcast == nil {
-		return
-	}
-	payload := map[string]interface{}{
-		"type":            "ai_chat",
-		"conversation_id": delta.ConversationId,
-		"sender":          delta.SenderId,
-		"content":         delta.Content,
-		"message_id":      delta.MessageId,
-		"reply_to_msg_id": delta.ReplyToMsgId,
-		"kind":            delta.Kind,
-		"seq":             delta.Seq,
-		"time":            ts,
-	}
-	message, _ := json.Marshal(payload)
-	aiReplyBroadcast(delta.TargetUserId, message)
 }

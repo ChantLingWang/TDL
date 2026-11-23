@@ -40,46 +40,28 @@ def new_envelope(event_type: str, source: str, msg) -> _envelope.EventEnvelope:
     )
 
 
-def new_ai_reply(
+def new_turn_step(
+    sender_id: str,
     target_user_id: str,
-    content: str,
+    conversation_id: str,
     reply_to_msg_id: str,
     message_id: str,
-    conversation_id: str = "",
-    metadata: dict | None = None,
-) -> _event.AiReplyGenerated:
-    """构造一条 AI 完整回复。"""
-    kwargs: dict = {}
-    if metadata:
-        kwargs['metadata'] = metadata
-    return _event.AiReplyGenerated(
-        sender_id='ai-assistant',
-        target_user_id=target_user_id,
-        conversation_id=conversation_id,
-        content=content,
-        reply_to_msg_id=reply_to_msg_id,
-        message_id=message_id,
-        **kwargs,
-    )
-
-
-def new_ai_reply_delta(
-    target_user_id: str,
-    reply_to_msg_id: str,
-    message_id: str,
-    seq: int,
+    round_no: int,
+    step: int,
+    attempt: int,
     kind: str,
-    content: str,
-    conversation_id: str = "",
-) -> _event.AiReplyDelta:
-    """构造一条 AI 回复流式分块。"""
-    return _event.AiReplyDelta(
-        sender_id='ai-assistant',
+    payload: str,
+) -> _event.AiTurnStep:
+    """构造一条 AI step 事件。payload 是 JSON 字符串。"""
+    return _event.AiTurnStep(
+        sender_id=sender_id,
         target_user_id=target_user_id,
         conversation_id=conversation_id,
         reply_to_msg_id=reply_to_msg_id,
         message_id=message_id,
-        seq=seq,
+        round=round_no,
+        step=step,
+        attempt=attempt,
         kind=kind,
-        content=content,
+        payload=payload,
     )

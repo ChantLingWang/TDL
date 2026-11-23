@@ -1,6 +1,7 @@
 # Proto 字段重设计：step 流
 
-> 状态：**已定稿，开始实现**。
+> 状态：**已落地**。
+> 2026-11-23：Phase 1/2 已完成，旧的 `AiReplyDelta` / `AiReplyGenerated` 已删除。
 > 前置：PR #1 已把未使用字段清掉。
 
 ## 1. 目标
@@ -46,7 +47,7 @@ step 5  RESULT       result: "今天天气……", status: completed
 | `MessageSent` | gateway | ai_service | 用户消息，开启一轮 |
 | `AiTurnStep` | ai_service | gateway | AI 的每一步，含最终 RESULT |
 
-`AiReplyDelta` 和 `AiReplyGenerated` 在迁移完成后删除。
+`AiReplyDelta` 和 `AiReplyGenerated` 已删除。
 
 ### MessageSent 新增
 
@@ -216,7 +217,7 @@ gateway 不是业务存储，它只做入口计数、路由和推送：
 - 工具调用/返回带 tool_call id；
 - payload 沿用 8000 字符截断；
 - RESULT 带 status + reason；
-- 没有 seq、没有 AiReplyDelta/AiReplyGenerated（Phase 3 删除）。
+- 没有 seq、没有 AiReplyDelta/AiReplyGenerated（已删除）。
 
 待定（后续）：
 

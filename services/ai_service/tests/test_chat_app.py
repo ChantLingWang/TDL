@@ -1,6 +1,7 @@
 """apps.chat.service 装配测试：假 producer、假 LLM，不触网。"""
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from llm_relay.types import LLMResult, Message, Usage  # noqa: E402
 
 
 class FakeLLM:
-    """返回一个完整的最终回答，并记录每次请求的 tools。"""
+    """返回一个完整回答，并记录每次请求的 tools。"""
 
     def __init__(self):
         self.calls: list[dict] = []
@@ -29,9 +30,14 @@ class FakeLLM:
         )
 
 
-def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
-    sent: list[tuple] = []
-    fake_llm = FakeLLM()
+class BoomLLM:
+    async def complete(self, messages, **kwargs):
+        raise RuntimeError("boom")
+
+
+def _run(monkeypatch, llm):
+    steps = []
+    costs = []
 
     async def fake_assemble(conversation_id, system_prompt, history, content, current_msg_id=""):
         assert conversation_id == "conv-1"
@@ -40,22 +46,15 @@ def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
         assert "工具目录" in system_prompt
         return [Message("user", "hi")]
 
-    async def fake_delta(
-        producer, user_id, msg_id, reply_id, seq, kind, content,
-        conversation_id="",
-    ):
-        sent.append(("delta", kind, content, seq, conversation_id))
-
-    async def fake_reply(producer, user_id, content, message_id, **kwargs):
-        sent.append(("final", content, kwargs.get("metadata", {}), kwargs.get("conversation_id", "")))
+    async def fake_send_step(producer, step):
+        steps.append(step)
 
     async def fake_insert(**kwargs):
-        sent.append(("cost", kwargs["total_tokens"]))
+        costs.append(kwargs)
 
     monkeypatch.setattr(service, "assemble_context", fake_assemble)
-    monkeypatch.setattr(service, "llm", fake_llm)
-    monkeypatch.setattr(service, "send_ai_reply_delta", fake_delta)
-    monkeypatch.setattr(service, "send_ai_reply", fake_reply)
+    monkeypatch.setattr(service, "llm", llm)
+    monkeypatch.setattr(service, "send_turn_step", fake_send_step)
     monkeypatch.setattr(service, "insert_cost", fake_insert)
 
     asyncio.run(
@@ -67,27 +66,42 @@ def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
                 "conversation_id": "conv-1",
                 "content": "hi",
                 "message_id": "m1",
+                "round": 3,
             },
         )
     )
+    return steps, costs
 
-    kinds = [item[1] for item in sent if item[0] == "delta"]
-    assert "progress" in kinds
-    assert "thinking" in kinds
-    assert "content" in kinds
-    assert "done" in kinds
-    assert "".join(item[1] for item in sent if item[0] == "final") == "你好"
-    assert any(item[0] == "cost" and item[1] == 12 for item in sent)
 
-    # 所有 delta 都携带同一个 conversation_id
-    assert {item[4] for item in sent if item[0] == "delta"} == {"conv-1"}
+def test_handle_message_emits_step_stream(monkeypatch):
+    fake_llm = FakeLLM()
+    steps, costs = _run(monkeypatch, fake_llm)
 
-    # AgentLoop 第一次请求带的是常驻工具 load_tools
-    tools = fake_llm.calls[0]["tools"]
-    assert [item.name for item in tools] == ["load_tools"]
+    assert [step.kind for step in steps] == ["THINK", "RESULT"]
+    assert [step.step for step in steps] == [1, 2]
+    assert steps[0].round == 3
+    assert steps[0].conversation_id == "conv-1"
+    assert steps[0].reply_to_msg_id == "m1"
+    assert steps[0].message_id == "ai-m1"
 
-    metadata = next(item[2] for item in sent if item[0] == "final")
-    assert metadata["reasoning"] == "想一下"
+    think = json.loads(steps[0].payload)
+    assert think["think"] == "想一下"
 
-    final_conversation = next(item[3] for item in sent if item[0] == "final")
-    assert final_conversation == "conv-1"
+    result = json.loads(steps[1].payload)
+    assert result["result"] == "你好"
+    assert result["status"] == "completed"
+    assert result["reason"] == ""
+
+    assert costs and costs[0]["total_tokens"] == 12
+    assert [item.name for item in fake_llm.calls[0]["tools"]] == ["load_tools"]
+
+
+def test_handle_message_reports_failure_as_result_step(monkeypatch):
+    steps, _ = _run(monkeypatch, BoomLLM())
+
+    assert len(steps) == 1
+    assert steps[0].kind == "RESULT"
+    assert steps[0].step == 1
+    payload = json.loads(steps[0].payload)
+    assert payload["status"] == "failed"
+    assert "boom" in payload["reason"]

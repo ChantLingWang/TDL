@@ -31,7 +31,7 @@
 `chat_group_message` 的 key：
 
 - `MessageSent`：`conversation_id`
-- `AiReplyDelta` / `AiReplyGenerated`：`target_user_id`
+- `AiTurnStep`：`conversation_id`
 
 ## 3. MongoDB
 

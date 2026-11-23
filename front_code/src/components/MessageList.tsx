@@ -1,36 +1,22 @@
 // ============================================================================
-// 消息列表 —— 按发送者/时间分组，挂靠思考步骤，滚动到底
+// 消息列表 —— 用户消息 + AI step 流
 // ============================================================================
 import { useEffect, useRef } from 'react';
-import type { WsMessage } from '../types/chat';
+import type { StepStream, WsMessage } from '../types/chat';
 import MessageBubble from './MessageBubble';
+import StepTimeline from './StepTimeline';
 import styles from './MessageList.module.scss';
-
-/** 一条正在流式累积的 AI 回复 */
-export interface StreamEntry {
-  group_id: string;
-  sender: string;
-  reasoning: string;
-  content: string;
-  steps: string[];
-  done: boolean;
-  time?: number;
-  reply_to_msg_id?: string;
-}
 
 interface MessageListProps {
   messages: WsMessage[];
   userId: string;
-  /** 按用户消息 message_id 键控的思考步骤 */
-  progressSteps: Record<string, string[]>;
-  /** 当前会话正在流式累积的回复（key 为回复 message_id） */
-  streams: Record<string, StreamEntry>;
+  conversationId: string;
+  streams: Record<string, StepStream>;
   hasMoreHistory: boolean;
   loadingHistory: boolean;
   onLoadMore: () => void;
 }
 
-/** 同一发送者 3 分钟内的消息并为一组 */
 function groupMessages(messages: WsMessage[]): WsMessage[][] {
   return messages.reduce<WsMessage[][]>((acc, msg) => {
     const prev = acc[acc.length - 1];
@@ -47,22 +33,41 @@ function groupMessages(messages: WsMessage[]): WsMessage[][] {
   }, []);
 }
 
+interface ResultView {
+  content: string;
+  status: string;
+  reason: string;
+  time?: number;
+}
+
+const resultText = (stream: StepStream): ResultView => {
+  for (let i = stream.steps.length - 1; i >= 0; i -= 1) {
+    const step = stream.steps[i];
+    if (step.kind === 'RESULT') {
+      return {
+        content: step.payload.result || '',
+        status: step.payload.status || '',
+        reason: step.payload.reason || '',
+        time: step.time,
+      };
+    }
+  }
+  return { content: '', status: '', reason: '' };
+};
+
 const MessageList: React.FC<MessageListProps> = ({
-  messages, userId, progressSteps, streams, hasMoreHistory, loadingHistory, onLoadMore,
+  messages, userId, conversationId, streams, hasMoreHistory, loadingHistory, onLoadMore,
 }) => {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, progressSteps, streams]);
+  }, [messages, streams]);
 
   const grouped = groupMessages(messages);
-
-  // 流式条目：跳过已有最终消息的（以服务端整块为准）
-  const finalIds = new Set(messages.filter((m) => !m.kind).map((m) => m.message_id));
   const streamEntries = Object.entries(streams)
-    .filter(([id]) => !finalIds.has(id))
-    .sort((a, b) => (a[1].time || 0) - (b[1].time || 0));
+    .filter(([, s]) => s.conversation_id === conversationId)
+    .sort((a, b) => (a[1].steps[0]?.time || 0) - (b[1].steps[0]?.time || 0));
 
   return (
     <div className={styles.list}>
@@ -73,10 +78,9 @@ const MessageList: React.FC<MessageListProps> = ({
           </button>
         </div>
       )}
+
       {grouped.map((group, gi) => {
-        const last = group[group.length - 1];
         const mine = group[0]?.sender === userId;
-        const steps = mine ? progressSteps[last.message_id || ''] : undefined;
         return (
           <div key={gi}>
             {group.map((m, mi) => (
@@ -86,33 +90,47 @@ const MessageList: React.FC<MessageListProps> = ({
                 mine={mine}
                 showName={mi === 0}
                 showTime={mi === group.length - 1}
-                thinkingSteps={steps}
               />
             ))}
           </div>
         );
       })}
-      {streamEntries.map(([id, s]) => (
-        <MessageBubble
-          key={'stream-' + id}
-          message={{
-            type: 'chat',
-            sender: s.sender,
-            content: s.content,
-            time: s.time,
-            message_id: id,
-            group_id: s.group_id,
-            reply_to_msg_id: s.reply_to_msg_id,
-          }}
-          mine={false}
-          showName={true}
-          showTime={false}
-          thinkingSteps={s.steps}
-          streamingText={s.reasoning}
-          streamingContent={s.content}
-          streaming={!s.done}
-        />
-      ))}
+
+      {streamEntries.map(([id, stream]) => {
+        const { content, status, reason, time } = resultText(stream);
+        let statusText = '';
+        if (status === 'canceled') {
+          statusText = '已取消' + (reason ? '：' + reason : '');
+        } else if (status === 'failed') {
+          statusText = '失败' + (reason ? '：' + reason : '');
+        } else if (stream.done && !content) {
+          statusText = '（空回复）';
+        }
+        const finalContent = content || statusText;
+
+        return (
+          <div key={'stream-' + id} className={styles.streamBlock}>
+            <StepTimeline steps={stream.steps} streaming={!stream.done} />
+            {stream.done && finalContent && (
+              <MessageBubble
+                message={{
+                  type: 'chat',
+                  sender: stream.sender || 'ai-assistant',
+                  content: finalContent,
+                  time,
+                  message_id: id,
+                  group_id: stream.conversation_id,
+                  reply_to_msg_id: stream.reply_to_msg_id,
+                }}
+                mine={false}
+                showName
+                showTime={false}
+              />
+            )}
+          </div>
+        );
+      })}
+
       <div ref={endRef} />
     </div>
   );

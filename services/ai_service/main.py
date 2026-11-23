@@ -46,12 +46,9 @@ async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
             "conversation_id": msg.conversation_id,
             "content": msg.content,
             "message_id": msg.message_id,
+            "round": msg.round,
         }
         await handle_message(producer, data)
-
-    elif event_type == "chant.chat.v1.AiReplyGenerated":
-        # AI 自己的回复，忽略避免循环
-        pass
 
     else:
         logger.debug("忽略事件类型: %s", event_type)

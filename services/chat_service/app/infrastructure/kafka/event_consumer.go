@@ -15,10 +15,6 @@ func HandleProtoEnvelope(ctx context.Context, env *commonv1.EventEnvelope) error
 	switch env.EventType {
 	case "chant.chat.v1.AiTurnStep":
 		return handleAiTurnStep(ctx, env)
-	case "chant.chat.v1.AiReplyGenerated":
-		return handleAiReply(ctx, env)
-	case "chant.chat.v1.AiReplyDelta":
-		return handleAiReplyDelta(ctx, env)
 	case "chant.chat.v1.MessageSent":
 		// gateway 自己发出的用户消息，不需要回环消费。
 		return nil
@@ -35,25 +31,5 @@ func handleAiTurnStep(ctx context.Context, env *commonv1.EventEnvelope) error {
 		return err
 	}
 	services.BroadcastAiTurnStep(step, env.Timestamp)
-	return nil
-}
-
-// handleAiReplyDelta 处理 AI 流式分块 —— 仅实时 WS 转发，不落库。
-func handleAiReplyDelta(ctx context.Context, env *commonv1.EventEnvelope) error {
-	delta := new(chatv1.AiReplyDelta)
-	if err := sdk_kafka.UnmarshalData(env, delta); err != nil {
-		return err
-	}
-	services.BroadcastAiReplyDelta(delta, env.Timestamp)
-	return nil
-}
-
-// handleAiReply 处理 AI 完整回复 —— 仅实时 WS 转发，不落库。
-func handleAiReply(ctx context.Context, env *commonv1.EventEnvelope) error {
-	reply := new(chatv1.AiReplyGenerated)
-	if err := sdk_kafka.UnmarshalData(env, reply); err != nil {
-		return err
-	}
-	services.BroadcastAiReply(reply, env.Timestamp)
 	return nil
 }
