@@ -34,7 +34,9 @@ type MessageSent struct {
 	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	MessageId      string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image / file 等
-	MessageType   string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	// 第几轮，由 gateway 分配
+	Round         int64 `protobuf:"varint,9,opt,name=round,proto3" json:"round,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,6 +113,144 @@ func (x *MessageSent) GetMessageType() string {
 	return ""
 }
 
+func (x *MessageSent) GetRound() int64 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+// AiTurnStep AI 处理过程中的一步。
+// 生产者: ai_service
+// 消费者: gateway（WS 推送）、storage（后续按 step 落库）
+//
+// kind 取值：
+//
+//	"THINK"        思考
+//	"TOOL_CALL"    工具调用（一批算一步，没有 status）
+//	"TOOL_RESULT"  工具返回（一批算一步，每个工具带 status / duration）
+//	"RESULT"       最终回答 + 本轮终止状态
+type AiTurnStep struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SenderId       string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	TargetUserId   string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	// 回复的是哪条用户消息
+	ReplyToMsgId string `protobuf:"bytes,4,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
+	// 最终回复 ID（ai-<用户消息ID>）
+	MessageId string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Round     int64  `protobuf:"varint,6,opt,name=round,proto3" json:"round,omitempty"`
+	// 步号，轮内从 1 递增
+	Step int64 `protobuf:"varint,7,opt,name=step,proto3" json:"step,omitempty"`
+	// 重试次数，默认 0
+	Attempt int32  `protobuf:"varint,8,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	Kind    string `protobuf:"bytes,9,opt,name=kind,proto3" json:"kind,omitempty"`
+	// 该步的 JSON
+	Payload       string `protobuf:"bytes,10,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AiTurnStep) Reset() {
+	*x = AiTurnStep{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AiTurnStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AiTurnStep) ProtoMessage() {}
+
+func (x *AiTurnStep) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AiTurnStep.ProtoReflect.Descriptor instead.
+func (*AiTurnStep) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AiTurnStep) GetSenderId() string {
+	if x != nil {
+		return x.SenderId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetReplyToMsgId() string {
+	if x != nil {
+		return x.ReplyToMsgId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetRound() int64 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetStep() int64 {
+	if x != nil {
+		return x.Step
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
 // AiReplyGenerated AI 生成了一条完整回复。
 // 生产者: ai_service
 // 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
@@ -134,7 +274,7 @@ type AiReplyGenerated struct {
 
 func (x *AiReplyGenerated) Reset() {
 	*x = AiReplyGenerated{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +286,7 @@ func (x *AiReplyGenerated) String() string {
 func (*AiReplyGenerated) ProtoMessage() {}
 
 func (x *AiReplyGenerated) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -159,7 +299,7 @@ func (x *AiReplyGenerated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AiReplyGenerated.ProtoReflect.Descriptor instead.
 func (*AiReplyGenerated) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AiReplyGenerated) GetSenderId() string {
@@ -249,7 +389,7 @@ type AiReplyDelta struct {
 
 func (x *AiReplyDelta) Reset() {
 	*x = AiReplyDelta{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +401,7 @@ func (x *AiReplyDelta) String() string {
 func (*AiReplyDelta) ProtoMessage() {}
 
 func (x *AiReplyDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +414,7 @@ func (x *AiReplyDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AiReplyDelta.ProtoReflect.Descriptor instead.
 func (*AiReplyDelta) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AiReplyDelta) GetSenderId() string {
@@ -337,7 +477,7 @@ var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xf9\x01\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\x8f\x02\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
@@ -345,7 +485,22 @@ const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
-	"\fmessage_type\x18\x06 \x01(\tR\vmessageTypeJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\ftimestamp_msR\bmetadata\"\xfa\x02\n" +
+	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12\x14\n" +
+	"\x05round\x18\t \x01(\x03R\x05roundJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\ftimestamp_msR\bmetadata\"\xb0\x02\n" +
+	"\n" +
+	"AiTurnStep\x12\x1b\n" +
+	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
+	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12%\n" +
+	"\x0freply_to_msg_id\x18\x04 \x01(\tR\freplyToMsgId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x14\n" +
+	"\x05round\x18\x06 \x01(\x03R\x05round\x12\x12\n" +
+	"\x04step\x18\a \x01(\x03R\x04step\x12\x18\n" +
+	"\aattempt\x18\b \x01(\x05R\aattempt\x12\x12\n" +
+	"\x04kind\x18\t \x01(\tR\x04kind\x12\x18\n" +
+	"\apayload\x18\n" +
+	" \x01(\tR\apayload\"\xfa\x02\n" +
 	"\x10AiReplyGenerated\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
@@ -385,15 +540,16 @@ func file_chant_chat_v1_event_proto_rawDescGZIP() []byte {
 	return file_chant_chat_v1_event_proto_rawDescData
 }
 
-var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_chant_chat_v1_event_proto_goTypes = []any{
 	(*MessageSent)(nil),      // 0: chant.chat.v1.MessageSent
-	(*AiReplyGenerated)(nil), // 1: chant.chat.v1.AiReplyGenerated
-	(*AiReplyDelta)(nil),     // 2: chant.chat.v1.AiReplyDelta
-	nil,                      // 3: chant.chat.v1.AiReplyGenerated.MetadataEntry
+	(*AiTurnStep)(nil),       // 1: chant.chat.v1.AiTurnStep
+	(*AiReplyGenerated)(nil), // 2: chant.chat.v1.AiReplyGenerated
+	(*AiReplyDelta)(nil),     // 3: chant.chat.v1.AiReplyDelta
+	nil,                      // 4: chant.chat.v1.AiReplyGenerated.MetadataEntry
 }
 var file_chant_chat_v1_event_proto_depIdxs = []int32{
-	3, // 0: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
+	4, // 0: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -412,7 +568,7 @@ func file_chant_chat_v1_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chant_chat_v1_event_proto_rawDesc), len(file_chant_chat_v1_event_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

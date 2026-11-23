@@ -21,6 +21,36 @@ message MessageSent {
   // 7/8 曾是 timestamp_ms / metadata，未使用，保留字段号
   reserved 7, 8;
   reserved "timestamp_ms", "metadata";
+
+  // 第几轮，由 gateway 分配
+  int64 round = 9;
+}
+
+// AiTurnStep AI 处理过程中的一步。
+// 生产者: ai_service
+// 消费者: gateway（WS 推送）、storage（后续按 step 落库）
+//
+// kind 取值：
+//   "THINK"        思考
+//   "TOOL_CALL"    工具调用（一批算一步，没有 status）
+//   "TOOL_RESULT"  工具返回（一批算一步，每个工具带 status / duration）
+//   "RESULT"       最终回答 + 本轮终止状态
+message AiTurnStep {
+  string sender_id = 1;
+  string target_user_id = 2;
+  string conversation_id = 3;
+  // 回复的是哪条用户消息
+  string reply_to_msg_id = 4;
+  // 最终回复 ID（ai-<用户消息ID>）
+  string message_id = 5;
+  int64 round = 6;
+  // 步号，轮内从 1 递增
+  int64 step = 7;
+  // 重试次数，默认 0
+  int32 attempt = 8;
+  string kind = 9;
+  // 该步的 JSON
+  string payload = 10;
 }
 
 // AiReplyGenerated AI 生成了一条完整回复。

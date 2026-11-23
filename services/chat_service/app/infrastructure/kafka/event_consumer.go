@@ -13,6 +13,8 @@ import (
 // HandleProtoEnvelope gateway 只消费 AI 回复；用户消息由 gateway 自己生产。
 func HandleProtoEnvelope(ctx context.Context, env *commonv1.EventEnvelope) error {
 	switch env.EventType {
+	case "chant.chat.v1.AiTurnStep":
+		return handleAiTurnStep(ctx, env)
 	case "chant.chat.v1.AiReplyGenerated":
 		return handleAiReply(ctx, env)
 	case "chant.chat.v1.AiReplyDelta":
@@ -24,6 +26,16 @@ func HandleProtoEnvelope(ctx context.Context, env *commonv1.EventEnvelope) error
 		log.Printf("忽略未知事件类型: %s", env.EventType)
 		return nil
 	}
+}
+
+// handleAiTurnStep 处理 AI 的一步 —— 仅实时 WS 转发，不落库。
+func handleAiTurnStep(ctx context.Context, env *commonv1.EventEnvelope) error {
+	step := new(chatv1.AiTurnStep)
+	if err := sdk_kafka.UnmarshalData(env, step); err != nil {
+		return err
+	}
+	services.BroadcastAiTurnStep(step, env.Timestamp)
+	return nil
 }
 
 // handleAiReplyDelta 处理 AI 流式分块 —— 仅实时 WS 转发，不落库。
