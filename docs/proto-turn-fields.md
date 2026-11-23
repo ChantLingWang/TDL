@@ -51,14 +51,35 @@ step 4  THINK         "25℃晴，我应该这样回复"
 step 5  RESULT        content: "今天天气晴，25 度……"
 ```
 
-## 4. 字段
+## 4. 字段分类
+
+| 分类 | 字段 | 作用 |
+|---|---|---|
+| **归属/身份** | `conversation_id` | 会话范围，Kafka key |
+| | `reply_to_msg_id` | 这一轮回答哪条用户消息，轮的标识 |
+| | `message_id` | 这一条 AI 回复的流 ID，前端归组、幂等 |
+| **顺序** | `round` | 第几轮，跨轮排序/显示 |
+| | `step` | 轮内第几步（THINK/RESULT/OBSERVATION 共用编号） |
+| | `seq` | 轮内第几个事件（step 事件和 delta 共用） |
+| | `attempt` | 第几次重试，正常为 0 |
+| **类型** | `kind` | THINK / RESULT / OBSERVATION |
+| | `result_type` | CONTENT / TOOL_CALL（仅 RESULT） |
+| **展示** | `name` | 工具名 |
+| | `status` | requested / running / completed / failed / timeout |
+| | `detail` | 给用户看的摘要 |
+| | `payload` | 工具参数 / 工具返回 JSON |
+| | `duration_ms` | 工具执行耗时 |
+
+> 不再引入 `turn_id`：一轮的身份由 `(conversation_id, reply_to_msg_id)` 确定，
+> 用户消息本身已经有唯一的 `message_id`。
+
+## 5. 字段
 
 ### MessageSent
 
 | Tag | 字段 | 类型 | 说明 |
 |---|---|---|---|
 | 9 | `round` | int64 | 第几轮，每会话单调递增 |
-| 10 | `turn_id` | string | 本轮唯一 ID（UUID） |
 
 > 7、8 已 reserved（原 timestamp_ms / metadata）。
 
@@ -67,9 +88,8 @@ step 5  RESULT        content: "今天天气晴，25 度……"
 | Tag | 字段 | 类型 | 说明 |
 |---|---|---|---|
 | 11 | `round` | int64 | 对应 MessageSent.round |
-| 12 | `turn_id` | string | 对应 MessageSent.turn_id |
-| 13 | `step` | int64 | 这条文本属于哪一步 |
-| 14 | `attempt` | int32 | 同一轮的重试次数，默认 0 |
+| 12 | `step` | int64 | 这条文本属于哪一步 |
+| 13 | `attempt` | int32 | 同一轮的重试次数，默认 0 |
 
 > `seq`（Tag 6）保留，语义改为**轮内事件序号**：用户消息为 0，之后所有事件从 1 递增。
 > 9、10 已 reserved（原 timestamp_ms / metadata）。
@@ -83,33 +103,31 @@ step 5  RESULT        content: "今天天气晴，25 度……"
 | 3 | `conversation_id` | string | 会话 ID |
 | 4 | `reply_to_msg_id` | string | 回复哪条用户消息 |
 | 5 | `message_id` | string | 最终回复 ID（`ai-<用户消息ID>`），前端按它归组 |
-| 6 | `turn_id` | string | 本轮 ID |
-| 7 | `round` | int64 | 轮号 |
-| 8 | `step` | int64 | 步号，轮内从 1 递增 |
-| 9 | `seq` | int64 | 轮内事件序号 |
-| 10 | `attempt` | int32 | 重试次数 |
-| 11 | `kind` | StepKind | THINK / RESULT / OBSERVATION |
-| 12 | `result_type` | ResultType | kind=RESULT 时：CONTENT / TOOL_CALL |
-| 13 | `name` | string | 工具名（OBSERVATION / TOOL_CALL） |
-| 14 | `status` | StepStatus | requested / running / completed / failed / timeout |
-| 15 | `detail` | string | 给用户看的摘要 |
-| 16 | `payload` | string | 结构化数据（工具参数 / 工具返回 JSON） |
-| 17 | `duration_ms` | int64 | 工具执行耗时 |
-| 18 | `metadata` | map | 扩展字段 |
+| 6 | `round` | int64 | 轮号 |
+| 7 | `step` | int64 | 步号，轮内从 1 递增 |
+| 8 | `seq` | int64 | 轮内事件序号 |
+| 9 | `attempt` | int32 | 重试次数 |
+| 10 | `kind` | StepKind | THINK / RESULT / OBSERVATION |
+| 11 | `result_type` | ResultType | kind=RESULT 时：CONTENT / TOOL_CALL |
+| 12 | `name` | string | 工具名（OBSERVATION / TOOL_CALL） |
+| 13 | `status` | StepStatus | requested / running / completed / failed / timeout |
+| 14 | `detail` | string | 给用户看的摘要 |
+| 15 | `payload` | string | 结构化数据（工具参数 / 工具返回 JSON） |
+| 16 | `duration_ms` | int64 | 工具执行耗时 |
+| 17 | `metadata` | map | 扩展字段 |
 
 ### AiReplyGenerated
 
 | Tag | 字段 | 类型 | 说明 |
 |---|---|---|---|
 | 9 | `round` | int64 | 同上 |
-| 10 | `turn_id` | string | 同上 |
-| 11 | `step` | int64 | 最后一个逻辑步骤 |
-| 12 | `seq` | int64 | 本轮最后一个事件序号 |
-| 13 | `attempt` | int32 | 同上 |
-| 14 | `status` | TurnStatus | 终止状态 |
-| 15 | `status_reason` | string | 取消/失败原因 |
+| 10 | `step` | int64 | 最后一个逻辑步骤 |
+| 11 | `seq` | int64 | 本轮最后一个事件序号 |
+| 12 | `attempt` | int32 | 同上 |
+| 13 | `status` | TurnStatus | 终止状态 |
+| 14 | `status_reason` | string | 取消/失败原因 |
 
-> 7 已 reserved（原 timestamp_ms）。
+> 7 已 reserved（原 timestamp_ms）；8 仍是 `metadata`（reasoning）。
 
 ### 枚举
 
@@ -145,53 +163,48 @@ enum TurnStatus {
 }
 ```
 
-## 5. 字段归属
+## 6. 字段归属
 
 | 字段 | 写者 | 规则 |
 |---|---|---|
 | `conversation_id` | gateway | 会话 ID，同时是 Kafka key |
-| `message_id` | 客户端 / gateway | 用户消息唯一键 |
+| `message_id`（用户） | 客户端 / gateway | 用户消息唯一键 |
 | `round` | **gateway** | 每会话原子递增，不复用 |
-| `turn_id` | **gateway** | UUID，本轮唯一 |
-| `step` | **ai_service** | 轮内从 1 递增，THINK/RESULT/OBSERVATION 共用 |
+| `reply_to_msg_id` | **ai_service** | 从 MessageSent.message_id 复制 |
+| `message_id`（AI） | **ai_service** | `ai-<用户消息ID>` |
+| `step` | **ai_service** | 轮内从 1 递增，三种 step 共用 |
 | `seq` | **ai_service** | 轮内事件序号，step 事件和 delta 共用 |
 | `attempt` | **ai_service** | 重试时 +1 |
 | `status` / `status_reason` | **ai_service** | 终止事件 / 工具状态 |
 
-约束：
-
-- 同一个 turn 的 `step` / `seq` 只能有一个写者（ai_service）；
-- `round` 不能靠内存计数器，多实例/重启会重复。
-
-## 6. 排序
+## 7. 排序
 
 - Kafka key：**所有会话事件统一用 `conversation_id`**；
-- 逻辑顺序：`(round, seq)`；
-- `step` 用于分组（一次思考、一次工具调用、一次工具返回、一次最终输出）；
+- 跨轮顺序：`round`；
+- 轮内顺序：`seq`（所有事件），`step` 用于分组；
 - `timestamp` 只用于展示，不参与排序。
 
-## 7. 幂等
+## 8. 幂等
 
 | 层 | 唯一键 | 在哪生效 |
 |---|---|---|
 | 用户消息 | `(conversation_id, message_id)` | gateway / storage 唯一索引 |
-| 一轮执行 | `turn_id` | ai_service 开跑前 `SETNX` |
-| 事件 | `(turn_id, attempt, seq)` | storage 唯一索引 |
-| 步 | `(turn_id, attempt, step)` | storage 唯一索引（step 事件） |
-| 最终回复 | `(turn_id, attempt)` | storage upsert |
+| 一轮执行 | `(conversation_id, reply_to_msg_id)` | ai_service 开跑前 `SETNX` |
+| 事件 | `(conversation_id, reply_to_msg_id, attempt, seq)` | storage 唯一索引 |
+| 步 | `(conversation_id, reply_to_msg_id, attempt, step)` | storage 唯一索引（step 事件） |
+| 最终回复 | `(conversation_id, reply_to_msg_id, attempt)` | storage upsert |
 | Kafka 事件 | `event_id` | 消费端可选去重 |
-| Kafka 生产者 | `enable.idempotence=true` | producer |
 
 注意：
 
 - `round` **不是**幂等键，只负责顺序；
-- 重试必须复用 `turn_id` 和 `round`，只递增 `attempt`；
-- 每个 `(turn_id, attempt)` 只能有一个终止事件。
+- 重试必须复用 `reply_to_msg_id` 和 `round`，只递增 `attempt`；
+- 每个 `(conversation_id, reply_to_msg_id, attempt)` 只能有一个终止事件。
 
-## 8. 生命周期
+## 9. 生命周期
 
 ```
-MessageSent(round, turn_id)
+MessageSent(round)
   → THINK? / RESULT? / OBSERVATION? ...（0..N 步）
   → AiReplyGenerated(status=COMPLETED | CANCELED | FAILED)
 ```
@@ -201,14 +214,14 @@ MessageSent(round, turn_id)
 - `round` 一旦分配就不回收，即使这一轮被取消；
 - 工具失败/超时是 `OBSERVATION(status=failed/timeout)`，不一定终止整轮。
 
-## 9. 重试与取消
+## 10. 重试与取消
 
 ### 重试
 
-- 同一个 `turn_id` + `round`，`attempt + 1`；
+- 同一个 `reply_to_msg_id` + `round`，`attempt + 1`；
 - 每个 attempt 的 `step` / `seq` 从 1 重新开始；
-- storage 唯一键是 `(turn_id, attempt, seq)`，重试不会覆盖旧事件；
-- 消费端在开跑前用 `(turn_id, attempt)` 去重，避免重复调 LLM。
+- storage 唯一键是 `(conversation_id, reply_to_msg_id, attempt, seq)`；
+- 消费端在开跑前用 `(conversation_id, reply_to_msg_id, attempt)` 去重，避免重复调 LLM。
 
 ### 取消
 
@@ -217,7 +230,7 @@ MessageSent(round, turn_id)
 - 旧用户消息仍要入库，并标记为已取消（storage 阶段实现）；
 - 当前实现仍是“同会话排队”，取消是下一阶段。
 
-## 10. Kafka key
+## 11. Kafka key
 
 | 事件 | 现在 | 建议 |
 |---|---|---|
@@ -228,25 +241,25 @@ MessageSent(round, turn_id)
 
 gateway 仍然用 `target_user_id` 字段决定推给谁，key 只影响分区。
 
-## 11. 兼容与灰度
+## 12. 兼容与灰度
 
-- 新字段全部可选；旧事件缺省 `round=0`、`turn_id=""`、`attempt=0`；
+- 新字段全部可选；旧事件缺省 `round=0`、`attempt=0`；
 - `seq` 语义从“回复内 0 开始”改为“轮内 1 开始”，前端按 seq 排序不受影响；
 - `AiTurnStep` 是新事件类型，旧消费者忽略即可；
 - 不要把新字段塞进 `metadata`；
 - proto 字段号已 reserved 的不要复用。
 
-## 12. 实施步骤
+## 13. 实施步骤
 
 1. proto 加字段 + `AiTurnStep` + 三个枚举，重新生成 Go/Python；
-2. gateway：分配 `round` / `turn_id`；消费并广播 `AiTurnStep`；AI 回复 key 改 `conversation_id`；
+2. gateway：分配 `round`；消费并广播 `AiTurnStep`；AI 回复 key 改 `conversation_id`；
 3. ai_service：在 AgentLoop 中按 THINK / RESULT / OBSERVATION 发 step 事件；分配 `step`/`seq`/`attempt`；终态写 `status`；
 4. 前端：渲染 step 事件（思考 / 工具调用 / 工具返回 / 最终输出）；
-5. 测试：step 顺序、seq 单调、同轮重试幂等键、终止事件唯一、工具失败仍可展示；
+5. 测试：step 顺序、seq 单调、重试幂等键、终止事件唯一、工具失败仍可展示；
 6. 更新 `docs/message-chain.md`；
 7. 手动提交 / 幂等消费 / storage 放到后续阶段。
 
-## 13. 待拍板
+## 14. 待拍板
 
 1. **`round` 谁分配**
    - gateway + Redis `INCR`（推荐，快且准）；
@@ -261,5 +274,3 @@ gateway 仍然用 `target_user_id` 字段决定推给谁，key 只影响分区�
 4. **`AiTurnStep.payload` 形态**
    - 先用 JSON 字符串，简单；
    - 或定义结构化的 `repeated ToolResult`，以后再加。
-5. **是否现在加 `client_message_id` / `schema_version`**
-   - 本草案暂不加，避免再次引入噪音。
