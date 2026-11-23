@@ -1,7 +1,6 @@
 """apps.chat.service 装配测试：假 producer、假 LLM，不触网。"""
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -9,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from apps.chat import service  # noqa: E402
+from chant.chat.v1 import event_pb2 as chat_event  # noqa: E402
 from llm_relay.types import LLMResult, Message, Usage  # noqa: E402
 
 
@@ -77,20 +77,17 @@ def test_handle_message_emits_step_stream(monkeypatch):
     fake_llm = FakeLLM()
     steps, costs = _run(monkeypatch, fake_llm)
 
-    assert [step.kind for step in steps] == ["THINK", "RESULT"]
+    assert [step.WhichOneof("payload") for step in steps] == ["think", "result"]
     assert [step.step for step in steps] == [1, 2]
     assert steps[0].round == 3
     assert steps[0].conversation_id == "conv-1"
     assert steps[0].reply_to_msg_id == "m1"
     assert steps[0].message_id == "ai-m1"
+    assert steps[0].think.think == "想一下"
 
-    think = json.loads(steps[0].payload)
-    assert think["think"] == "想一下"
-
-    result = json.loads(steps[1].payload)
-    assert result["result"] == "你好"
-    assert result["status"] == "completed"
-    assert result["reason"] == ""
+    assert steps[1].result.result == "你好"
+    assert steps[1].result.status == chat_event.RESULT_STATUS_COMPLETED
+    assert steps[1].result.reason == ""
 
     assert costs and costs[0]["total_tokens"] == 12
     assert [item.name for item in fake_llm.calls[0]["tools"]] == ["load_tools"]
@@ -100,8 +97,7 @@ def test_handle_message_reports_failure_as_result_step(monkeypatch):
     steps, _ = _run(monkeypatch, BoomLLM())
 
     assert len(steps) == 1
-    assert steps[0].kind == "RESULT"
+    assert steps[0].WhichOneof("payload") == "result"
     assert steps[0].step == 1
-    payload = json.loads(steps[0].payload)
-    assert payload["status"] == "failed"
-    assert "boom" in payload["reason"]
+    assert steps[0].result.status == chat_event.RESULT_STATUS_FAILED
+    assert "boom" in steps[0].result.reason

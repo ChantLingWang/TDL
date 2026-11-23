@@ -22,9 +22,10 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x63hant/chat/v1/event.proto\x12\rchant.chat.v1\"\xbf\x01\n\x0bMessageSent\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\r\n\x05round\x18\t \x01(\x03J\x04\x08\x07\x10\x08J\x04\x08\x08\x10\tR\x0ctimestamp_msR\x08metadata\"\xca\x01\n\nAiTurnStep\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x03 \x01(\t\x12\x17\n\x0freply_to_msg_id\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\r\n\x05round\x18\x06 \x01(\x03\x12\x0c\n\x04step\x18\x07 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x08 \x01(\x05\x12\x0c\n\x04kind\x18\t \x01(\t\x12\x0f\n\x07payload\x18\n \x01(\tB4Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19\x63hant/chat/v1/event.proto\x12\rchant.chat.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xbf\x01\n\x0bMessageSent\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\x14\n\x0cmessage_type\x18\x06 \x01(\t\x12\r\n\x05round\x18\t \x01(\x03J\x04\x08\x07\x10\x08J\x04\x08\x08\x10\tR\x0ctimestamp_msR\x08metadata\"\x1d\n\x0cThinkPayload\x12\r\n\x05think\x18\x01 \x01(\t\"K\n\x08ToolCall\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12%\n\x05input\x18\x03 \x01(\x0b\x32\x16.google.protobuf.Value\"9\n\x0fToolCallPayload\x12&\n\x05\x63\x61lls\x18\x01 \x03(\x0b\x32\x17.chant.chat.v1.ToolCall\"\x9e\x01\n\nToolResult\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\'\n\x07payload\x18\x03 \x01(\x0b\x32\x16.google.protobuf.Value\x12)\n\x06status\x18\x04 \x01(\x0e\x32\x19.chant.chat.v1.ToolStatus\x12\x13\n\x0b\x64uration_ms\x18\x05 \x01(\x03\x12\r\n\x05\x65rror\x18\x06 \x01(\t\"?\n\x11ToolResultPayload\x12*\n\x07results\x18\x01 \x03(\x0b\x32\x19.chant.chat.v1.ToolResult\"\\\n\rResultPayload\x12\x0e\n\x06result\x18\x01 \x01(\t\x12+\n\x06status\x18\x02 \x01(\x0e\x32\x1b.chant.chat.v1.ResultStatus\x12\x0e\n\x06reason\x18\x03 \x01(\t\"\x9d\x03\n\nAiTurnStep\x12\x11\n\tsender_id\x18\x01 \x01(\t\x12\x16\n\x0etarget_user_id\x18\x02 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x03 \x01(\t\x12\x17\n\x0freply_to_msg_id\x18\x04 \x01(\t\x12\x12\n\nmessage_id\x18\x05 \x01(\t\x12\r\n\x05round\x18\x06 \x01(\x03\x12\x0c\n\x04step\x18\x07 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x08 \x01(\x05\x12,\n\x05think\x18\x0b \x01(\x0b\x32\x1b.chant.chat.v1.ThinkPayloadH\x00\x12\x33\n\ttool_call\x18\x0c \x01(\x0b\x32\x1e.chant.chat.v1.ToolCallPayloadH\x00\x12\x37\n\x0btool_result\x18\r \x01(\x0b\x32 .chant.chat.v1.ToolResultPayloadH\x00\x12.\n\x06result\x18\x0e \x01(\x0b\x32\x1c.chant.chat.v1.ResultPayloadH\x00\x42\t\n\x07payloadJ\x04\x08\t\x10\nJ\x04\x08\n\x10\x0bR\x04kindR\x07payload*\x80\x01\n\x0cResultStatus\x12\x1d\n\x19RESULT_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n\x17RESULT_STATUS_COMPLETED\x10\x01\x12\x1a\n\x16RESULT_STATUS_CANCELED\x10\x02\x12\x18\n\x14RESULT_STATUS_FAILED\x10\x03*u\n\nToolStatus\x12\x1b\n\x17TOOL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n\x15TOOL_STATUS_COMPLETED\x10\x01\x12\x16\n\x12TOOL_STATUS_FAILED\x10\x02\x12\x17\n\x13TOOL_STATUS_TIMEOUT\x10\x03\x42\x34Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,8 +33,24 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chant.chat.v1.event_pb2', _
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1'
-  _globals['_MESSAGESENT']._serialized_start=45
-  _globals['_MESSAGESENT']._serialized_end=236
-  _globals['_AITURNSTEP']._serialized_start=239
-  _globals['_AITURNSTEP']._serialized_end=441
+  _globals['_RESULTSTATUS']._serialized_start=1172
+  _globals['_RESULTSTATUS']._serialized_end=1300
+  _globals['_TOOLSTATUS']._serialized_start=1302
+  _globals['_TOOLSTATUS']._serialized_end=1419
+  _globals['_MESSAGESENT']._serialized_start=75
+  _globals['_MESSAGESENT']._serialized_end=266
+  _globals['_THINKPAYLOAD']._serialized_start=268
+  _globals['_THINKPAYLOAD']._serialized_end=297
+  _globals['_TOOLCALL']._serialized_start=299
+  _globals['_TOOLCALL']._serialized_end=374
+  _globals['_TOOLCALLPAYLOAD']._serialized_start=376
+  _globals['_TOOLCALLPAYLOAD']._serialized_end=433
+  _globals['_TOOLRESULT']._serialized_start=436
+  _globals['_TOOLRESULT']._serialized_end=594
+  _globals['_TOOLRESULTPAYLOAD']._serialized_start=596
+  _globals['_TOOLRESULTPAYLOAD']._serialized_end=659
+  _globals['_RESULTPAYLOAD']._serialized_start=661
+  _globals['_RESULTPAYLOAD']._serialized_end=753
+  _globals['_AITURNSTEP']._serialized_start=756
+  _globals['_AITURNSTEP']._serialized_end=1169
 # @@protoc_insertion_point(module_scope)

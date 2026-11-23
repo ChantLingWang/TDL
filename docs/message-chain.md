@@ -94,6 +94,9 @@ Topic：`chat_group_message`。
 
 信封见 [envelope.proto](../proto/chant/common/v1/envelope.proto)：`event_id`、`event_type`、`source`、`timestamp`、`data`。
 
+Kafka value 是 **EventEnvelope 的 protobuf 二进制**，`data` 是具体事件的 protobuf 二进制；
+没有 protojson、没有 base64、没有 JSON 字符串嵌套。
+
 ## 5. MessageSent
 
 定义见 [event.proto](../proto/chant/chat/v1/event.proto)。
@@ -138,12 +141,14 @@ model.complete(messages, tools)
 
 step 类型：
 
-| kind | 含义 | payload |
+| oneof 分支 | 含义 | payload message |
 |---|---|---|
-| `THINK` | 思考 | `{"think": "..."}` |
-| `TOOL_CALL` | 工具调用 | `{"calls":[{"id","name","input"}]}` |
-| `TOOL_RESULT` | 工具返回 | `{"results":[{"id","name","payload","status","duration_ms","error"}]}` |
-| `RESULT` | 最终回答 + 终止 | `{"result","status","reason"}` |
+| `think` | 思考 | `ThinkPayload{think}` |
+| `tool_call` | 工具调用 | `ToolCallPayload{calls: ToolCall{id,name,input:Value}}` |
+| `tool_result` | 工具返回 | `ToolResultPayload{results: ToolResult{id,name,payload:Value,status,duration_ms,error}}` |
+| `result` | 最终回答 + 终止 | `ResultPayload{result,status,reason}` |
+
+`ToolStatus` 和 `ResultStatus` 都是枚举，不再是字符串。
 
 - 一批工具 = 一个 TOOL_CALL + 一个 TOOL_RESULT；
 - 工具执行过程本身不发事件；
@@ -174,8 +179,10 @@ step 类型：
 | `round` | 轮号 |
 | `step` | 步号，轮内从 1 递增 |
 | `attempt` | 重试次数，默认 0 |
-| `kind` | THINK / TOOL_CALL / TOOL_RESULT / RESULT |
-| `payload` | 该步的 JSON 字符串 |
+| `oneof payload` | `think` / `tool_call` / `tool_result` / `result` |
+
+`AiTurnStep` 没有 kind 字段：oneof 的分支就是 kind。gateway 推送 WS 时把它转成
+`kind` 字符串和 `payload` JSON 对象，前端协议不变。
 
 ## 9. gateway 消费并推送
 
@@ -202,7 +209,7 @@ WS 推送：
 }
 ```
 
-`payload` 会被 gateway 解析成嵌套 JSON 对象；解析失败时原样作为字符串发送。
+gateway 从 typed oneof 生成 `kind` 和 `payload` JSON 对象；前端不需要知道 protobuf。
 
 ## 10. 前端渲染
 

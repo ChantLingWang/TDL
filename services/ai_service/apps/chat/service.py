@@ -7,7 +7,6 @@
     - AgentLoop 每完成一步，就把 AiTurnStep 发回 Kafka
 """
 
-import json
 import logging
 import uuid
 
@@ -49,7 +48,7 @@ async def _send_step(
         step=step,
         attempt=attempt,
         kind=kind,
-        payload=json.dumps(payload, ensure_ascii=False, default=str),
+        payload=payload,
     )
     await send_turn_step(producer, proto)
 

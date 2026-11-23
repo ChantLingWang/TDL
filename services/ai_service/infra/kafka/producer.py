@@ -5,7 +5,7 @@ import logging
 from aiokafka import AIOKafkaProducer
 
 from config.settings import settings
-from infra.proto_adapter import envelope_to_json, new_envelope
+from infra.proto_adapter import envelope_to_bytes, new_envelope
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ async def create_producer() -> AIOKafkaProducer:
 async def send_turn_step(producer: AIOKafkaProducer, step) -> None:
     """发送一条 AiTurnStep；key 用 conversation_id 保证同会话有序。"""
     envelope = new_envelope("chant.chat.v1.AiTurnStep", "ai-service", step)
-    payload = envelope_to_json(envelope)
+    payload = envelope_to_bytes(envelope)
     await producer.send(
         topic=settings.kafka_topic,
         key=step.conversation_id.encode(),

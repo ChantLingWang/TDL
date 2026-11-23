@@ -25,7 +25,7 @@ async def create_consumer() -> AIOKafkaConsumer:
         settings.kafka_topic,
         bootstrap_servers=settings.kafka_brokers,
         group_id=settings.kafka_group_id,
-        value_deserializer=lambda m: m.decode("utf-8"),  # 保持原始字符串
+        value_deserializer=lambda m: m,  # protobuf 二进制
         auto_offset_reset="latest",
         enable_auto_commit=True,
     )
