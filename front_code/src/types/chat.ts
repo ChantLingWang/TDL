@@ -91,11 +91,24 @@ export interface WsMessage {
   steps?: StepEntry[];
 }
 
+/** 用户消息里的一段内容 */
+export type ContentPartType = 'text' | 'image' | 'audio' | 'video';
+
+export interface ContentPart {
+  type: ContentPartType;
+  text?: string;
+  /** base64，gateway 会解码成 bytes */
+  data?: string;
+  mime_type?: string;
+  /** 透传用：宽高、时长、文件名、追踪探针等 */
+  metadata?: Record<string, unknown>;
+}
+
 /** 发送到 WS 的载荷 */
 export interface SendPayload {
   type: 'chat';
   content: {
-    text: string;
+    parts: ContentPart[];
     message_id: string;
     message_type: string;
     conversation_id: string;

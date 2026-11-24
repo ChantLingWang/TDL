@@ -55,13 +55,14 @@ def test_message_sent_binary_roundtrip():
         sender_id="u1",
         target_user_id="ai-assistant",
         conversation_id="conv-1",
-        content="hi",
+        parts=[chat_event.ContentPart(type="text", text="hi")],
         message_id="m1",
         round=5,
     )
     env = new_envelope("chant.chat.v1.MessageSent", "chat-service", sent)
     out = parse_message_sent(parse_envelope(envelope_to_bytes(env)))
-    assert out.content == "hi"
+    assert out.parts[0].type == "text"
+    assert out.parts[0].text == "hi"
     assert out.round == 5
 
 

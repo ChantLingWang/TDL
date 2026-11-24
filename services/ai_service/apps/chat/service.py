@@ -55,11 +55,48 @@ async def _send_step(
 
 async def handle_message(producer, event_data: dict) -> None:
     user_id = event_data.get("sender_id", "")
-    content = event_data.get("content", "")
     msg_id = event_data.get("message_id", "")
     conversation_id = event_data.get("conversation_id", "") or f"conv-{uuid.uuid4()}"
     round_no = int(event_data.get("round") or 0)
     attempt = 0
+    reply_id = f"ai-{msg_id}"
+    last_step = 0
+
+    parts = event_data.get("parts") or []
+    text_parts = [str(p.get("text") or "") for p in parts if p.get("type") == "text"]
+    media_parts = [p for p in parts if p.get("type") != "text"]
+    content = "\n".join(text_parts).strip()
+
+    # 多模态链路尚未接入；先明确拒绝，避免把图片当文本静默丢掉。
+    if media_parts:
+        await _send_step(
+            producer,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            msg_id=msg_id,
+            reply_id=reply_id,
+            round_no=round_no,
+            step=1,
+            attempt=attempt,
+            kind="RESULT",
+            payload={"status": "failed", "reason": "当前模型暂不支持图片/音频/视频输入"},
+        )
+        return
+
+    if not content:
+        await _send_step(
+            producer,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            msg_id=msg_id,
+            reply_id=reply_id,
+            round_no=round_no,
+            step=1,
+            attempt=attempt,
+            kind="RESULT",
+            payload={"status": "failed", "reason": "消息内容为空"},
+        )
+        return
 
     # 每个任务一个 Toolbox；load_tools 在本次任务内生效，跨任务不共享。
     toolbox = Toolbox(
@@ -76,9 +113,6 @@ async def handle_message(producer, event_data: dict) -> None:
     messages = await assemble_context(
         conversation_id, system_prompt, [], content, current_msg_id=msg_id
     )
-
-    reply_id = f"ai-{msg_id}"
-    last_step = 0
 
     async def on_step(event: StepEvent) -> None:
         nonlocal last_step

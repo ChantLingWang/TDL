@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"chat_service/app/api/models"
@@ -12,6 +16,15 @@ import (
 
 	chatv1 "github.com/chant/chant/gen/go/chant/chat/v1"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+const (
+	maxParts      = 8
+	maxPartBytes  = 5 << 20  // 5MB / part
+	maxTotalBytes = 10 << 20 // 10MB / message
+	maxMetaKeys   = 32
+	maxMetaBytes  = 4 << 10 // 4KB
 )
 
 // roundRequest 一次待分配的发送请求。
@@ -44,9 +57,9 @@ func GetRoundAllocator() *RoundAllocator {
 	return allocator
 }
 
-// Submit 提交一条待发送消息；只做校验，实际 round 分配在 run 里串行完成。
+// Submit 提交一条待发送消息；只做非空校验，实际 round 分配在 run 里串行完成。
 func (r *RoundAllocator) Submit(userInfo *UserInfo, content models.ChatMessageRequest) {
-	if content.Text == "" {
+	if strings.TrimSpace(content.Text) == "" && len(content.Parts) == 0 {
 		return
 	}
 	r.requests <- roundRequest{userInfo: userInfo, content: content}
@@ -59,6 +72,13 @@ func (r *RoundAllocator) run() {
 }
 
 func (r *RoundAllocator) publish(req roundRequest) {
+	parts, err := buildParts(req.content)
+	if err != nil {
+		log.Printf("消息内容非法 user=%s conversation=%s err=%v",
+			req.userInfo.UserID, req.content.ConversationID, err)
+		return
+	}
+
 	conversationID := req.content.ConversationID
 	if conversationID == "" {
 		conversationID = uuid.NewString()
@@ -80,10 +100,10 @@ func (r *RoundAllocator) publish(req roundRequest) {
 		SenderId:       req.userInfo.UserID,
 		TargetUserId:   config.AIUserID,
 		ConversationId: conversationID,
-		Content:        req.content.Text,
 		MessageId:      messageID,
 		MessageType:    messageType,
 		Round:          round,
+		Parts:          parts,
 	}
 
 	if err := kafka.GetProducer().SendProtoEvent(
@@ -98,4 +118,97 @@ func (r *RoundAllocator) publish(req roundRequest) {
 func (r *RoundAllocator) nextRound(conversationID string) int64 {
 	r.rounds[conversationID]++
 	return r.rounds[conversationID]
+}
+
+// buildParts 校验并转换前端 parts；兼容旧客户端的 text。
+func buildParts(content models.ChatMessageRequest) ([]*chatv1.ContentPart, error) {
+	rawParts := content.Parts
+	if len(rawParts) == 0 {
+		if strings.TrimSpace(content.Text) == "" {
+			return nil, errors.New("消息内容为空")
+		}
+		rawParts = []models.ChatPart{{Type: "text", Text: content.Text}}
+	}
+
+	if len(rawParts) > maxParts {
+		return nil, fmt.Errorf("parts 最多 %d 个", maxParts)
+	}
+
+	parts := make([]*chatv1.ContentPart, 0, len(rawParts))
+	textCount := 0
+	totalBytes := 0
+
+	for index, raw := range rawParts {
+		partType := strings.ToLower(strings.TrimSpace(raw.Type))
+		if partType == "" {
+			partType = "text"
+		}
+
+		part := &chatv1.ContentPart{
+			Type:     partType,
+			Text:     raw.Text,
+			Data:     raw.Data,
+			MimeType: raw.MimeType,
+		}
+
+		switch partType {
+		case "text":
+			textCount++
+			if textCount > 1 {
+				return nil, errors.New("最多一个文本 part")
+			}
+			if strings.TrimSpace(raw.Text) == "" {
+				return nil, errors.New("文本 part 不能为空")
+			}
+			if len(raw.Data) > 0 {
+				return nil, errors.New("文本 part 不允许 data")
+			}
+			if index != len(rawParts)-1 {
+				return nil, errors.New("文本 part 必须放在最后")
+			}
+
+		case "image", "audio", "video":
+			if len(raw.Data) == 0 {
+				return nil, fmt.Errorf("%s part 缺少 data", partType)
+			}
+			if strings.TrimSpace(raw.MimeType) == "" {
+				return nil, fmt.Errorf("%s part 缺少 mime_type", partType)
+			}
+			if strings.TrimSpace(raw.Text) != "" {
+				return nil, fmt.Errorf("%s part 不允许 text", partType)
+			}
+			if len(raw.Data) > maxPartBytes {
+				return nil, fmt.Errorf("%s part 超过 %d bytes", partType, maxPartBytes)
+			}
+			totalBytes += len(raw.Data)
+			if totalBytes > maxTotalBytes {
+				return nil, fmt.Errorf("媒体总大小超过 %d bytes", maxTotalBytes)
+			}
+
+		default:
+			return nil, fmt.Errorf("不支持的 part type: %s", partType)
+		}
+
+		if len(raw.Metadata) > 0 {
+			if len(raw.Metadata) > maxMetaKeys {
+				return nil, fmt.Errorf("metadata 最多 %d 个 key", maxMetaKeys)
+			}
+			rawMeta, err := json.Marshal(raw.Metadata)
+			if err != nil {
+				return nil, fmt.Errorf("metadata 不是合法 JSON: %w", err)
+			}
+			if len(rawMeta) > maxMetaBytes {
+				return nil, fmt.Errorf("metadata 超过 %d bytes", maxMetaBytes)
+			}
+			meta, err := structpb.NewStruct(raw.Metadata)
+			if err != nil {
+				return nil, fmt.Errorf("metadata 转换失败: %w", err)
+			}
+			part.Metadata = meta
+		}
+
+		parts = append(parts, part)
+	}
+
+	return parts, nil
 }

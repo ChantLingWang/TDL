@@ -57,12 +57,29 @@ Kafka value 是 **EventEnvelope 的 protobuf 二进制**；
 | 1 | sender_id | string |
 | 2 | target_user_id | string |
 | 3 | conversation_id | string |
-| 4 | content | string |
+| 4 | reserved | —（原 content） |
 | 5 | message_id | string |
 | 6 | message_type | string |
 | 9 | round | int64 |
+| 10 | parts | repeated ContentPart |
 
 7/8 已 reserved。
+
+```proto
+message ContentPart {
+  string type = 1;                    // text / image / audio / video
+  string text = 2;                    // type=text
+  bytes data = 3;                     // type=image/audio/video
+  string mime_type = 4;
+  google.protobuf.Struct metadata = 5; // 任意 JSON，透传用
+}
+```
+
+- 文本最多一个 part，放最后；
+- 图片/音频/视频可多个，顺序即 image0、image1；
+- 媒体 data 是 bytes；前端 base64 在 gateway 解码；
+- metadata 不参与核心处理，只透传（宽高、时长、文件名、追踪探针等）；
+- 当前 ai_service 只处理 text，媒体 part 会返回失败 RESULT。
 
 ## 5. AiTurnStep
 

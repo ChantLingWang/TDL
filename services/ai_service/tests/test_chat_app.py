@@ -35,9 +35,10 @@ class BoomLLM:
         raise RuntimeError("boom")
 
 
-def _run(monkeypatch, llm):
+def _run(monkeypatch, llm, parts=None):
     steps = []
     costs = []
+    input_parts = parts or [{"type": "text", "text": "hi"}]
 
     async def fake_assemble(conversation_id, system_prompt, history, content, current_msg_id=""):
         assert conversation_id == "conv-1"
@@ -64,7 +65,7 @@ def _run(monkeypatch, llm):
                 "sender_id": "u1",
                 "target_user_id": "ai-assistant",
                 "conversation_id": "conv-1",
-                "content": "hi",
+                "parts": input_parts,
                 "message_id": "m1",
                 "round": 3,
             },
@@ -101,3 +102,18 @@ def test_handle_message_reports_failure_as_result_step(monkeypatch):
     assert steps[0].step == 1
     assert steps[0].result.status == chat_event.RESULT_STATUS_FAILED
     assert "boom" in steps[0].result.reason
+
+
+def test_handle_message_rejects_media_until_multimodal(monkeypatch):
+    fake_llm = FakeLLM()
+    steps, _ = _run(
+        monkeypatch,
+        fake_llm,
+        parts=[{"type": "image", "data": b"x", "mime_type": "image/png"}],
+    )
+
+    assert fake_llm.calls == []
+    assert len(steps) == 1
+    assert steps[0].WhichOneof("payload") == "result"
+    assert steps[0].result.status == chat_event.RESULT_STATUS_FAILED
+    assert "暂不支持" in steps[0].result.reason

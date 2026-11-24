@@ -24,6 +24,19 @@ enum ToolStatus {
 
 // ==================== 用户消息 ====================
 
+// ContentPart 用户消息里的一段内容。
+// type = text / image / audio / video；文本最多一个，媒体可以多个。
+message ContentPart {
+  string type = 1;
+  // type=text 时使用
+  string text = 2;
+  // type=image/audio/video 时使用；前端 base64，gateway 解码成 bytes
+  bytes data = 3;
+  string mime_type = 4;
+  // 透传用：宽高、时长、文件名、追踪探针等，任意 JSON 对象
+  google.protobuf.Struct metadata = 5;
+}
+
 // MessageSent 用户向 AI 发送了一条消息。
 // 生产者: gateway(chat_service)
 // 消费者: ai_service
@@ -33,7 +46,11 @@ message MessageSent {
   string target_user_id = 2;
   // AI 会话 ID，由 gateway 生成的 UUID
   string conversation_id = 3;
-  string content = 4;
+
+  // 4 曾是 content 字符串，改为下面的 parts
+  reserved 4;
+  reserved "content";
+
   string message_id = 5;
   // text / image / file 等
   string message_type = 6;
@@ -44,6 +61,9 @@ message MessageSent {
 
   // 第几轮，由 gateway 分配
   int64 round = 9;
+
+  // 内容列表：文本一个，媒体多个
+  repeated ContentPart parts = 10;
 }
 
 // ==================== step payload ====================

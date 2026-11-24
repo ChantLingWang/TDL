@@ -147,7 +147,7 @@ const ChatPage: React.FC = () => {
     const payload: SendPayload = {
       type: 'chat',
       content: {
-        text,
+        parts: [{ type: 'text', text }],
         message_id: msgId,
         message_type: 'text',
         conversation_id: currentGid,

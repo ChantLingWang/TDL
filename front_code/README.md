@@ -49,7 +49,7 @@
 - 前端累积：`streams: Record<message_id, StepStream>`，按 `step` 排序；收到 RESULT 置 `done=true`，有 result 就渲染最终回答，取消/失败渲染 status + reason
 - 历史接口尚未实现；接入后若返回**新 → 旧**，前端必须 `reverse()`
 - 历史消息思考全文在 `metadata.reasoning`，映射到 `WsMessage.reasoning`
-- 发送：`SendPayload` 结构见 `types/chat.ts`，只带 text / message_id / message_type / conversation_id
+- 发送：`SendPayload` 结构见 `types/chat.ts`，带 parts / message_id / message_type / conversation_id；文本是 `{type:"text",text}`
 - 去重：按 `message_id + step` 覆盖同一 step；旧 `attempt` / 旧 `round` 的迟到事件直接忽略
 
 ## 5. 常见修改的标准步骤

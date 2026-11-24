@@ -126,6 +126,87 @@ func (ToolStatus) EnumDescriptor() ([]byte, []int) {
 	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
 }
 
+// ContentPart 用户消息里的一段内容。
+// type = text / image / audio / video；文本最多一个，媒体可以多个。
+type ContentPart struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// type=text 时使用
+	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// type=image/audio/video 时使用；前端 base64，gateway 解码成 bytes
+	Data     []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	MimeType string `protobuf:"bytes,4,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	// 透传用：宽高、时长、文件名、追踪探针等，任意 JSON 对象
+	Metadata      *structpb.Struct `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContentPart) Reset() {
+	*x = ContentPart{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContentPart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContentPart) ProtoMessage() {}
+
+func (x *ContentPart) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContentPart.ProtoReflect.Descriptor instead.
+func (*ContentPart) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ContentPart) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ContentPart) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *ContentPart) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ContentPart) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *ContentPart) GetMetadata() *structpb.Struct {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 // MessageSent 用户向 AI 发送了一条消息。
 // 生产者: gateway(chat_service)
 // 消费者: ai_service
@@ -136,19 +217,20 @@ type MessageSent struct {
 	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	// AI 会话 ID，由 gateway 生成的 UUID
 	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	MessageId      string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image / file 等
 	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
 	// 第几轮，由 gateway 分配
-	Round         int64 `protobuf:"varint,9,opt,name=round,proto3" json:"round,omitempty"`
+	Round int64 `protobuf:"varint,9,opt,name=round,proto3" json:"round,omitempty"`
+	// 内容列表：文本一个，媒体多个
+	Parts         []*ContentPart `protobuf:"bytes,10,rep,name=parts,proto3" json:"parts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MessageSent) Reset() {
 	*x = MessageSent{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -160,7 +242,7 @@ func (x *MessageSent) String() string {
 func (*MessageSent) ProtoMessage() {}
 
 func (x *MessageSent) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -173,7 +255,7 @@ func (x *MessageSent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageSent.ProtoReflect.Descriptor instead.
 func (*MessageSent) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{0}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *MessageSent) GetSenderId() string {
@@ -193,13 +275,6 @@ func (x *MessageSent) GetTargetUserId() string {
 func (x *MessageSent) GetConversationId() string {
 	if x != nil {
 		return x.ConversationId
-	}
-	return ""
-}
-
-func (x *MessageSent) GetContent() string {
-	if x != nil {
-		return x.Content
 	}
 	return ""
 }
@@ -225,6 +300,13 @@ func (x *MessageSent) GetRound() int64 {
 	return 0
 }
 
+func (x *MessageSent) GetParts() []*ContentPart {
+	if x != nil {
+		return x.Parts
+	}
+	return nil
+}
+
 // THINK：AI 的思考
 type ThinkPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -235,7 +317,7 @@ type ThinkPayload struct {
 
 func (x *ThinkPayload) Reset() {
 	*x = ThinkPayload{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -247,7 +329,7 @@ func (x *ThinkPayload) String() string {
 func (*ThinkPayload) ProtoMessage() {}
 
 func (x *ThinkPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -260,7 +342,7 @@ func (x *ThinkPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThinkPayload.ProtoReflect.Descriptor instead.
 func (*ThinkPayload) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ThinkPayload) GetThink() string {
@@ -282,7 +364,7 @@ type ToolCall struct {
 
 func (x *ToolCall) Reset() {
 	*x = ToolCall{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +376,7 @@ func (x *ToolCall) String() string {
 func (*ToolCall) ProtoMessage() {}
 
 func (x *ToolCall) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +389,7 @@ func (x *ToolCall) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolCall.ProtoReflect.Descriptor instead.
 func (*ToolCall) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ToolCall) GetId() string {
@@ -340,7 +422,7 @@ type ToolCallPayload struct {
 
 func (x *ToolCallPayload) Reset() {
 	*x = ToolCallPayload{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +434,7 @@ func (x *ToolCallPayload) String() string {
 func (*ToolCallPayload) ProtoMessage() {}
 
 func (x *ToolCallPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +447,7 @@ func (x *ToolCallPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolCallPayload.ProtoReflect.Descriptor instead.
 func (*ToolCallPayload) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{3}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ToolCallPayload) GetCalls() []*ToolCall {
@@ -390,7 +472,7 @@ type ToolResult struct {
 
 func (x *ToolResult) Reset() {
 	*x = ToolResult{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -402,7 +484,7 @@ func (x *ToolResult) String() string {
 func (*ToolResult) ProtoMessage() {}
 
 func (x *ToolResult) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -415,7 +497,7 @@ func (x *ToolResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolResult.ProtoReflect.Descriptor instead.
 func (*ToolResult) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{4}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ToolResult) GetId() string {
@@ -469,7 +551,7 @@ type ToolResultPayload struct {
 
 func (x *ToolResultPayload) Reset() {
 	*x = ToolResultPayload{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +563,7 @@ func (x *ToolResultPayload) String() string {
 func (*ToolResultPayload) ProtoMessage() {}
 
 func (x *ToolResultPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +576,7 @@ func (x *ToolResultPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolResultPayload.ProtoReflect.Descriptor instead.
 func (*ToolResultPayload) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{5}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ToolResultPayload) GetResults() []*ToolResult {
@@ -516,7 +598,7 @@ type ResultPayload struct {
 
 func (x *ResultPayload) Reset() {
 	*x = ResultPayload{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +610,7 @@ func (x *ResultPayload) String() string {
 func (*ResultPayload) ProtoMessage() {}
 
 func (x *ResultPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +623,7 @@ func (x *ResultPayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResultPayload.ProtoReflect.Descriptor instead.
 func (*ResultPayload) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{6}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ResultPayload) GetResult() string {
@@ -595,7 +677,7 @@ type AiTurnStep struct {
 
 func (x *AiTurnStep) Reset() {
 	*x = AiTurnStep{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -607,7 +689,7 @@ func (x *AiTurnStep) String() string {
 func (*AiTurnStep) ProtoMessage() {}
 
 func (x *AiTurnStep) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -620,7 +702,7 @@ func (x *AiTurnStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AiTurnStep.ProtoReflect.Descriptor instead.
 func (*AiTurnStep) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{7}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AiTurnStep) GetSenderId() string {
@@ -754,16 +836,23 @@ var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x8f\x02\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x9b\x01\n" +
+	"\vContentPart\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12\x1b\n" +
+	"\tmime_type\x18\x04 \x01(\tR\bmimeType\x123\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xb6\x02\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
-	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x18\n" +
-	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1d\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
 	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12\x14\n" +
-	"\x05round\x18\t \x01(\x03R\x05roundJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\ftimestamp_msR\bmetadata\"$\n" +
+	"\x05round\x18\t \x01(\x03R\x05round\x120\n" +
+	"\x05parts\x18\n" +
+	" \x03(\v2\x1a.chant.chat.v1.ContentPartR\x05partsJ\x04\b\x04\x10\x05J\x04\b\a\x10\bJ\x04\b\b\x10\tR\acontentR\ftimestamp_msR\bmetadata\"$\n" +
 	"\fThinkPayload\x12\x14\n" +
 	"\x05think\x18\x01 \x01(\tR\x05think\"\\\n" +
 	"\bToolCall\x12\x0e\n" +
@@ -833,36 +922,40 @@ func file_chant_chat_v1_event_proto_rawDescGZIP() []byte {
 }
 
 var file_chant_chat_v1_event_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_chant_chat_v1_event_proto_goTypes = []any{
 	(ResultStatus)(0),         // 0: chant.chat.v1.ResultStatus
 	(ToolStatus)(0),           // 1: chant.chat.v1.ToolStatus
-	(*MessageSent)(nil),       // 2: chant.chat.v1.MessageSent
-	(*ThinkPayload)(nil),      // 3: chant.chat.v1.ThinkPayload
-	(*ToolCall)(nil),          // 4: chant.chat.v1.ToolCall
-	(*ToolCallPayload)(nil),   // 5: chant.chat.v1.ToolCallPayload
-	(*ToolResult)(nil),        // 6: chant.chat.v1.ToolResult
-	(*ToolResultPayload)(nil), // 7: chant.chat.v1.ToolResultPayload
-	(*ResultPayload)(nil),     // 8: chant.chat.v1.ResultPayload
-	(*AiTurnStep)(nil),        // 9: chant.chat.v1.AiTurnStep
-	(*structpb.Value)(nil),    // 10: google.protobuf.Value
+	(*ContentPart)(nil),       // 2: chant.chat.v1.ContentPart
+	(*MessageSent)(nil),       // 3: chant.chat.v1.MessageSent
+	(*ThinkPayload)(nil),      // 4: chant.chat.v1.ThinkPayload
+	(*ToolCall)(nil),          // 5: chant.chat.v1.ToolCall
+	(*ToolCallPayload)(nil),   // 6: chant.chat.v1.ToolCallPayload
+	(*ToolResult)(nil),        // 7: chant.chat.v1.ToolResult
+	(*ToolResultPayload)(nil), // 8: chant.chat.v1.ToolResultPayload
+	(*ResultPayload)(nil),     // 9: chant.chat.v1.ResultPayload
+	(*AiTurnStep)(nil),        // 10: chant.chat.v1.AiTurnStep
+	(*structpb.Struct)(nil),   // 11: google.protobuf.Struct
+	(*structpb.Value)(nil),    // 12: google.protobuf.Value
 }
 var file_chant_chat_v1_event_proto_depIdxs = []int32{
-	10, // 0: chant.chat.v1.ToolCall.input:type_name -> google.protobuf.Value
-	4,  // 1: chant.chat.v1.ToolCallPayload.calls:type_name -> chant.chat.v1.ToolCall
-	10, // 2: chant.chat.v1.ToolResult.payload:type_name -> google.protobuf.Value
-	1,  // 3: chant.chat.v1.ToolResult.status:type_name -> chant.chat.v1.ToolStatus
-	6,  // 4: chant.chat.v1.ToolResultPayload.results:type_name -> chant.chat.v1.ToolResult
-	0,  // 5: chant.chat.v1.ResultPayload.status:type_name -> chant.chat.v1.ResultStatus
-	3,  // 6: chant.chat.v1.AiTurnStep.think:type_name -> chant.chat.v1.ThinkPayload
-	5,  // 7: chant.chat.v1.AiTurnStep.tool_call:type_name -> chant.chat.v1.ToolCallPayload
-	7,  // 8: chant.chat.v1.AiTurnStep.tool_result:type_name -> chant.chat.v1.ToolResultPayload
-	8,  // 9: chant.chat.v1.AiTurnStep.result:type_name -> chant.chat.v1.ResultPayload
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	11, // 0: chant.chat.v1.ContentPart.metadata:type_name -> google.protobuf.Struct
+	2,  // 1: chant.chat.v1.MessageSent.parts:type_name -> chant.chat.v1.ContentPart
+	12, // 2: chant.chat.v1.ToolCall.input:type_name -> google.protobuf.Value
+	5,  // 3: chant.chat.v1.ToolCallPayload.calls:type_name -> chant.chat.v1.ToolCall
+	12, // 4: chant.chat.v1.ToolResult.payload:type_name -> google.protobuf.Value
+	1,  // 5: chant.chat.v1.ToolResult.status:type_name -> chant.chat.v1.ToolStatus
+	7,  // 6: chant.chat.v1.ToolResultPayload.results:type_name -> chant.chat.v1.ToolResult
+	0,  // 7: chant.chat.v1.ResultPayload.status:type_name -> chant.chat.v1.ResultStatus
+	4,  // 8: chant.chat.v1.AiTurnStep.think:type_name -> chant.chat.v1.ThinkPayload
+	6,  // 9: chant.chat.v1.AiTurnStep.tool_call:type_name -> chant.chat.v1.ToolCallPayload
+	8,  // 10: chant.chat.v1.AiTurnStep.tool_result:type_name -> chant.chat.v1.ToolResultPayload
+	9,  // 11: chant.chat.v1.AiTurnStep.result:type_name -> chant.chat.v1.ResultPayload
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_chant_chat_v1_event_proto_init() }
@@ -870,7 +963,7 @@ func file_chant_chat_v1_event_proto_init() {
 	if File_chant_chat_v1_event_proto != nil {
 		return
 	}
-	file_chant_chat_v1_event_proto_msgTypes[7].OneofWrappers = []any{
+	file_chant_chat_v1_event_proto_msgTypes[8].OneofWrappers = []any{
 		(*AiTurnStep_Think)(nil),
 		(*AiTurnStep_ToolCall)(nil),
 		(*AiTurnStep_ToolResult)(nil),
@@ -882,7 +975,7 @@ func file_chant_chat_v1_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chant_chat_v1_event_proto_rawDesc), len(file_chant_chat_v1_event_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

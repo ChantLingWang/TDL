@@ -16,7 +16,7 @@ sequenceDiagram
     participant AI as ai_service
     participant LLM as DeepSeek
 
-    FE->>GW: {type:"chat", content:{conversation_id,text,message_id}}
+    FE->>GW: {type:"chat", content:{conversation_id,parts,message_id}}
     GW->>GW: 单 goroutine 分配 round
     GW->>K: MessageSent（key=conversation_id）
     K->>AI: MessageSent
@@ -41,7 +41,9 @@ sequenceDiagram
   "type": "chat",
   "content": {
     "conversation_id": "AI 会话 ID",
-    "text": "消息文本",
+    "parts": [
+      { "type": "text", "text": "消息文本" }
+    ],
     "message_id": "客户端生成的 UUID",
     "message_type": "text"
   }
@@ -52,9 +54,21 @@ sequenceDiagram
 |---|---|
 | `type` | `chat` / `ping` |
 | `content.conversation_id` | 为空时 gateway 生成 UUID |
-| `content.text` | 正文；为空丢弃 |
+| `content.parts` | 内容数组；文本最多一个且放最后，媒体可多个 |
 | `content.message_id` | 为空时 gateway 生成 UUID |
 | `content.message_type` | 默认 `text` |
+
+每个 part：
+
+| 字段 | 说明 |
+|---|---|
+| `type` | `text` / `image` / `audio` / `video` |
+| `text` | `type=text` 时的文本 |
+| `data` | `type=image/audio/video` 时的 base64；gateway 解码成 bytes |
+| `mime_type` | 媒体类型，如 `image/png` |
+| `metadata` | 任意 JSON 对象，透传用（宽高、时长、追踪探针等） |
+
+当前前端只发 text；image/audio/video 结构已预留，ai_service 收到媒体 part 会先返回失败 RESULT。
 
 前端发送后本地乐观追加用户消息；gateway 不回推用户消息。
 
@@ -106,10 +120,20 @@ Kafka value 是 **EventEnvelope 的 protobuf 二进制**，`data` 是具体事�
 | `sender_id` | 发送者用户 ID |
 | `target_user_id` | AI 用户 ID |
 | `conversation_id` | 会话 ID |
-| `content` | 正文 |
+| `parts` | 内容数组，`ContentPart` 见下 |
 | `message_id` | 用户消息 ID |
 | `message_type` | `text` 等 |
 | `round` | 第几轮，gateway 分配 |
+
+`ContentPart`：
+
+| 字段 | 说明 |
+|---|---|
+| `type` | `text` / `image` / `audio` / `video` |
+| `text` | 文本内容 |
+| `data` | 二进制内容（bytes） |
+| `mime_type` | 媒体 MIME |
+| `metadata` | `google.protobuf.Struct`，任意 JSON 对象，仅透传 |
 
 ## 6. ai_service 消费
 
@@ -122,9 +146,10 @@ Kafka value 是 **EventEnvelope 的 protobuf 二进制**，`data` 是具体事�
 
 [apps/chat/service.py](../services/ai_service/apps/chat/service.py)：
 
-1. 从 MessageSent 取 `sender_id`、`conversation_id`、`content`、`message_id`、`round`；
-2. 建 `Toolbox`，拼 system prompt + 工具目录；
-3. `assemble_context` 组装上下文（当前 history 为空）；
+1. 从 MessageSent 取 `sender_id`、`conversation_id`、`parts`、`message_id`、`round`；
+2. 提取 text part；如果含 image/audio/video，先返回失败 RESULT（多模态链路未接）；
+3. 建 `Toolbox`，拼 system prompt + 工具目录；
+4. `assemble_context` 组装上下文（当前 history 为空）；
 4. `AgentLoop(..., on_step=on_step)`；
 5. 每产生一步，`on_step` 把 `AiTurnStep` 发到 Kafka（key=conversation_id）。
 
