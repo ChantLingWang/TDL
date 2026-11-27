@@ -26,3 +26,10 @@
   }
   &:disabled { cursor: default; opacity: 0.6; }
 }
+
+.streamBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}

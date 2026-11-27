@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "proto" / "gen" / "python"))
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from google.protobuf import json_format
 
 from apps.chat.service import handle_message
 from config.settings import settings
@@ -40,18 +41,28 @@ async def dispatch(producer: AIOKafkaProducer, envelope) -> None:
         if msg.target_user_id != AI_USER_ID:
             return
 
+        parts = []
+        for part in msg.parts:
+            metadata = json_format.MessageToDict(part.metadata) if part.HasField("metadata") else {}
+            parts.append(
+                {
+                    "type": part.type,
+                    "text": part.text,
+                    "data": part.data,
+                    "mime_type": part.mime_type,
+                    "metadata": metadata,
+                }
+            )
+
         data = {
             "sender_id": msg.sender_id,
             "target_user_id": msg.target_user_id or AI_USER_ID,
             "conversation_id": msg.conversation_id,
-            "content": msg.content,
+            "parts": parts,
             "message_id": msg.message_id,
+            "round": msg.round,
         }
         await handle_message(producer, data)
-
-    elif event_type == "chant.chat.v1.AiReplyGenerated":
-        # AI 自己的回复，忽略避免循环
-        pass
 
     else:
         logger.debug("忽略事件类型: %s", event_type)

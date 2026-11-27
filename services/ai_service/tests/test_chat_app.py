@@ -8,11 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from apps.chat import service  # noqa: E402
+from chant.chat.v1 import event_pb2 as chat_event  # noqa: E402
 from llm_relay.types import LLMResult, Message, Usage  # noqa: E402
 
 
 class FakeLLM:
-    """返回一个完整的最终回答，并记录每次请求的 tools。"""
+    """返回一个完整回答，并记录每次请求的 tools。"""
 
     def __init__(self):
         self.calls: list[dict] = []
@@ -29,9 +30,15 @@ class FakeLLM:
         )
 
 
-def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
-    sent: list[tuple] = []
-    fake_llm = FakeLLM()
+class BoomLLM:
+    async def complete(self, messages, **kwargs):
+        raise RuntimeError("boom")
+
+
+def _run(monkeypatch, llm, parts=None):
+    steps = []
+    costs = []
+    input_parts = parts or [{"type": "text", "text": "hi"}]
 
     async def fake_assemble(conversation_id, system_prompt, history, content, current_msg_id=""):
         assert conversation_id == "conv-1"
@@ -40,22 +47,15 @@ def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
         assert "工具目录" in system_prompt
         return [Message("user", "hi")]
 
-    async def fake_delta(
-        producer, user_id, msg_id, reply_id, seq, kind, content,
-        conversation_id="",
-    ):
-        sent.append(("delta", kind, content, seq, conversation_id))
-
-    async def fake_reply(producer, user_id, content, message_id, **kwargs):
-        sent.append(("final", content, kwargs.get("metadata", {}), kwargs.get("conversation_id", "")))
+    async def fake_send_step(producer, step):
+        steps.append(step)
 
     async def fake_insert(**kwargs):
-        sent.append(("cost", kwargs["total_tokens"]))
+        costs.append(kwargs)
 
     monkeypatch.setattr(service, "assemble_context", fake_assemble)
-    monkeypatch.setattr(service, "llm", fake_llm)
-    monkeypatch.setattr(service, "send_ai_reply_delta", fake_delta)
-    monkeypatch.setattr(service, "send_ai_reply", fake_reply)
+    monkeypatch.setattr(service, "llm", llm)
+    monkeypatch.setattr(service, "send_turn_step", fake_send_step)
     monkeypatch.setattr(service, "insert_cost", fake_insert)
 
     asyncio.run(
@@ -65,29 +65,55 @@ def test_handle_message_runs_agent_loop_and_sends_final(monkeypatch):
                 "sender_id": "u1",
                 "target_user_id": "ai-assistant",
                 "conversation_id": "conv-1",
-                "content": "hi",
+                "parts": input_parts,
                 "message_id": "m1",
+                "round": 3,
             },
         )
     )
+    return steps, costs
 
-    kinds = [item[1] for item in sent if item[0] == "delta"]
-    assert "progress" in kinds
-    assert "thinking" in kinds
-    assert "content" in kinds
-    assert "done" in kinds
-    assert "".join(item[1] for item in sent if item[0] == "final") == "你好"
-    assert any(item[0] == "cost" and item[1] == 12 for item in sent)
 
-    # 所有 delta 都携带同一个 conversation_id
-    assert {item[4] for item in sent if item[0] == "delta"} == {"conv-1"}
+def test_handle_message_emits_step_stream(monkeypatch):
+    fake_llm = FakeLLM()
+    steps, costs = _run(monkeypatch, fake_llm)
 
-    # AgentLoop 第一次请求带的是常驻工具 load_tools
-    tools = fake_llm.calls[0]["tools"]
-    assert [item.name for item in tools] == ["load_tools"]
+    assert [step.WhichOneof("payload") for step in steps] == ["think", "result"]
+    assert [step.step for step in steps] == [1, 2]
+    assert steps[0].round == 3
+    assert steps[0].conversation_id == "conv-1"
+    assert steps[0].reply_to_msg_id == "m1"
+    assert steps[0].message_id == "ai-m1"
+    assert steps[0].think.think == "想一下"
 
-    metadata = next(item[2] for item in sent if item[0] == "final")
-    assert metadata["reasoning"] == "想一下"
+    assert steps[1].result.result == "你好"
+    assert steps[1].result.status == chat_event.RESULT_STATUS_COMPLETED
+    assert steps[1].result.reason == ""
 
-    final_conversation = next(item[3] for item in sent if item[0] == "final")
-    assert final_conversation == "conv-1"
+    assert costs and costs[0]["total_tokens"] == 12
+    assert [item.name for item in fake_llm.calls[0]["tools"]] == ["load_tools"]
+
+
+def test_handle_message_reports_failure_as_result_step(monkeypatch):
+    steps, _ = _run(monkeypatch, BoomLLM())
+
+    assert len(steps) == 1
+    assert steps[0].WhichOneof("payload") == "result"
+    assert steps[0].step == 1
+    assert steps[0].result.status == chat_event.RESULT_STATUS_FAILED
+    assert "boom" in steps[0].result.reason
+
+
+def test_handle_message_rejects_media_until_multimodal(monkeypatch):
+    fake_llm = FakeLLM()
+    steps, _ = _run(
+        monkeypatch,
+        fake_llm,
+        parts=[{"type": "image", "data": b"x", "mime_type": "image/png"}],
+    )
+
+    assert fake_llm.calls == []
+    assert len(steps) == 1
+    assert steps[0].WhichOneof("payload") == "result"
+    assert steps[0].result.status == chat_event.RESULT_STATUS_FAILED
+    assert "暂不支持" in steps[0].result.reason

@@ -21,13 +21,14 @@
 | `src/api/chat.ts` | chat_service REST 封装（axios 实例 `chatRequest`，baseURL `/api/v1`，自动带 Bearer token） |
 | `src/api/auth.ts` | auth REST 封装 |
 | `src/hooks/useChatSocket.ts` | WS 连接/2 秒重连/统一消息出口。**WS 逻辑只在此文件与 ChatPage 回调** |
-| `src/pages/ChatPage.tsx` | 装配层：全部状态与数据流（groups/messages/streams/progressSteps），渲染委托组件。WS 消息分发在 `handleWsMessage` |
+| `src/pages/ChatPage.tsx` | 装配层：全部状态与数据流（groups/messages/streams），渲染委托组件。WS 消息分发在 `handleWsMessage` |
 | `src/pages/ChatPage.module.scss` | 聊天页布局（wrapper/main/header） |
 | `src/pages/LoginPage.tsx` `RegisterPage.tsx` + `LoginPage.module.scss` | 登录/注册（共用样式） |
 | `src/components/Sidebar.tsx` | 侧栏：AI 会话列表 + 用户区。创建逻辑回调到 ChatPage |
-| `src/components/MessageList.tsx` | 消息分组（同发送者 3 分钟合并）+ 加载更多 + 流式条目渲染。导出 `StreamEntry` 类型 |
+| `src/components/MessageList.tsx` | 消息分组（同发送者 3 分钟合并）+ 加载更多 + AI step 流渲染 |
+| `src/components/StepTimeline.tsx` | 按 step 渲染 THINK / TOOL_CALL / TOOL_RESULT，按 tool id 配对调用与返回 |
 | `src/components/MessageBubble.tsx` | 单条消息：头像/名称/气泡/时间/Markdown（AI 消息走 react-markdown+GFM，用户消息纯文本） |
-| `src/components/ThinkingBlock.tsx` | 思考块：steps（progress 分块）+ reasoning（final 消息 metadata.reasoning）+ streamingText（thinking 分块）。streaming 时自动展开 |
+| `src/components/ThinkingBlock.tsx` | 思考块：StepTimeline 把多个 THINK 拼成 reasoning 传入；streaming 时自动展开 |
 | `src/components/ChatInput.tsx` | 输入区：Enter 发送 / Shift+Enter 换行 / 自动增高 |
 | `src/components/NewChatModal.tsx` | 新建 AI 会话弹窗（只有一个入口） |
 | `src/App.tsx` | 路由与 token 自动刷新（每分钟） |
@@ -39,17 +40,17 @@
 3. **协议字段**：`WsMessage` / `Group` / `SendPayload` 只增不改名；后端字段以 `docs/message-chain.md` 为准
 4. **状态归属**：ChatPage 持状态，组件只收 props + 回调；组件内部状态仅限 UI 局部（弹窗开关等）
 5. **文案**：界面文案统一中文；英文保留项：状态 `online`
-6. **兼容旧协议**：`metadata.kind === 'progress'` 的旧式进度消息仍必须支持（新协议为 delta `kind/seq` 字段）
+6. **协议**：AI 只推 `type === 'ai_step'` 的 step 事件，前端按 `message_id + step` 归组渲染
 
 ## 4. 关键协议事实（改动涉及消息时必须知道）
 
-- WS 接收：最终消息 `{sender, content, message_id, reply_to_msg_id, metadata, time, type, group_id, conversation_id}`
-- WS 接收：流式分块 `AiReplyDelta` 带 `kind`（thinking/progress/content/done）+ `seq`，**所有分块与最终消息共用同一 `message_id`**
-- 前端流式累积：`streams: Record<message_id, StreamEntry>`，done 分块置 `done=true`；最终消息到达后**按 message_id 与 reply_to_msg_id 双键清理**流式条目
+- WS 接收：AI step `{type:"ai_step", conversation_id, reply_to_msg_id, message_id, round, step, attempt, kind, payload, time}`
+- `kind` 取值：THINK / TOOL_CALL / TOOL_RESULT / RESULT；`payload` 是该步的 JSON
+- 前端累积：`streams: Record<message_id, StepStream>`，按 `step` 排序；收到 RESULT 置 `done=true`，有 result 就渲染最终回答，取消/失败渲染 status + reason
 - 历史接口尚未实现；接入后若返回**新 → 旧**，前端必须 `reverse()`
 - 历史消息思考全文在 `metadata.reasoning`，映射到 `WsMessage.reasoning`
-- 发送：`SendPayload` 结构见 `types/chat.ts`，只带 text / message_id / message_type / conversation_id
-- 去重：`seenMessageIdsRef` 按 message_id 去重；**delta 分块不进该集合、不计未读**
+- 发送：`SendPayload` 结构见 `types/chat.ts`，带 parts / message_id / message_type / conversation_id；文本是 `{type:"text",text}`
+- 去重：按 `message_id + step` 覆盖同一 step；旧 `attempt` / 旧 `round` 的迟到事件直接忽略
 
 ## 5. 常见修改的标准步骤
 

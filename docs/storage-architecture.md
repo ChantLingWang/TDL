@@ -24,14 +24,14 @@
 
 | Topic | 事件格式 | 用途 |
 | --- | --- | --- |
-| `chat_group_message` | Proto `EventEnvelope`（protojson） | 聊天消息与 AI 回复 |
+| `chat_group_message` | Proto `EventEnvelope`（protobuf 二进制） | 聊天消息与 AI step |
 | `saga-events` | JSON `BusinessEvent` | Saga 编排 |
 | `saga-dlq` | JSON DLQ 载荷 | Saga 死信队列 |
 
 `chat_group_message` 的 key：
 
 - `MessageSent`：`conversation_id`
-- `AiReplyDelta` / `AiReplyGenerated`：`target_user_id`
+- `AiTurnStep`：`conversation_id`
 
 ## 3. MongoDB
 

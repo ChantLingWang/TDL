@@ -2,7 +2,40 @@ syntax = "proto3";
 
 package chant.chat.v1;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "github.com/chant/chant/gen/go/chant/chat/v1;chatv1";
+
+// ==================== 枚举 ====================
+
+enum ResultStatus {
+  RESULT_STATUS_UNSPECIFIED = 0;
+  RESULT_STATUS_COMPLETED = 1;
+  RESULT_STATUS_CANCELED = 2;
+  RESULT_STATUS_FAILED = 3;
+}
+
+enum ToolStatus {
+  TOOL_STATUS_UNSPECIFIED = 0;
+  TOOL_STATUS_COMPLETED = 1;
+  TOOL_STATUS_FAILED = 2;
+  TOOL_STATUS_TIMEOUT = 3;
+}
+
+// ==================== 用户消息 ====================
+
+// ContentPart 用户消息里的一段内容。
+// type = text / image / audio / video；文本最多一个，媒体可以多个。
+message ContentPart {
+  string type = 1;
+  // type=text 时使用
+  string text = 2;
+  // type=image/audio/video 时使用；前端 base64，gateway 解码成 bytes
+  bytes data = 3;
+  string mime_type = 4;
+  // 透传用：宽高、时长、文件名、追踪探针等，任意 JSON 对象
+  google.protobuf.Struct metadata = 5;
+}
 
 // MessageSent 用户向 AI 发送了一条消息。
 // 生产者: gateway(chat_service)
@@ -13,7 +46,11 @@ message MessageSent {
   string target_user_id = 2;
   // AI 会话 ID，由 gateway 生成的 UUID
   string conversation_id = 3;
-  string content = 4;
+
+  // 4 曾是 content 字符串，改为下面的 parts
+  reserved 4;
+  reserved "content";
+
   string message_id = 5;
   // text / image / file 等
   string message_type = 6;
@@ -21,63 +58,80 @@ message MessageSent {
   // 7/8 曾是 timestamp_ms / metadata，未使用，保留字段号
   reserved 7, 8;
   reserved "timestamp_ms", "metadata";
+
+  // 第几轮，由 gateway 分配
+  int64 round = 9;
+
+  // 内容列表：文本一个，媒体多个
+  repeated ContentPart parts = 10;
 }
 
-// AiReplyGenerated AI 生成了一条完整回复。
-// 生产者: ai_service
-// 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
-message AiReplyGenerated {
-  // AI 用户 ID，如 "ai-assistant"
-  string sender_id = 1;
-  // 回复的目标用户
-  string target_user_id = 2;
-  // AI 会话 ID，与 MessageSent.conversation_id 一致
-  string conversation_id = 3;
-  string content = 4;
-  // 回复的是哪条用户消息
-  string reply_to_msg_id = 5;
-  string message_id = 6;
+// ==================== step payload ====================
 
-  // 7 曾是 timestamp_ms，未使用，保留字段号
-  reserved 7;
-  reserved "timestamp_ms";
-
-  // 可扩展元数据（当前只用 reasoning 存思考全文）
-  map<string, string> metadata = 8;
+// THINK：AI 的思考
+message ThinkPayload {
+  string think = 1;
 }
 
-// AiReplyDelta AI 回复的流式增量分块。
+// 单个工具调用
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Value input = 3;
+}
+
+message ToolCallPayload {
+  repeated ToolCall calls = 1;
+}
+
+// 单个工具返回
+message ToolResult {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Value payload = 3;
+  ToolStatus status = 4;
+  int64 duration_ms = 5;
+  string error = 6;
+}
+
+message ToolResultPayload {
+  repeated ToolResult results = 1;
+}
+
+// RESULT：最终回答 + 本轮终止
+message ResultPayload {
+  string result = 1;
+  ResultStatus status = 2;
+  string reason = 3;
+}
+
+// ==================== 一步 ====================
+
+// AiTurnStep AI 处理过程中的一步。
 // 生产者: ai_service
-// 消费者: gateway（WS 推送）、storage（直接按该结构落库）
-//
-// 一条回复对应一个固定的 message_id（流开始即确定，与最终
-// AiReplyGenerated 的 message_id 一致），分块按 seq 从 0 递增；
-// 前端按 (message_id, seq) 累积排序，收到最终整块消息时以服务端为准。
-//
-// kind 取值：
-//   "thinking"  思考链文本增量
-//   "progress"  阶段进度文字
-//   "content"   正文文本增量
-//   "done"      流结束标记（content 为空，之后必有最终 AiReplyGenerated）
-message AiReplyDelta {
-  // AI 用户 ID，如 "ai-assistant"
+// 消费者: gateway（WS 推送）、storage（后续按 step 落库）
+message AiTurnStep {
   string sender_id = 1;
-  // 回复的目标用户
   string target_user_id = 2;
-  // AI 会话 ID，与 MessageSent.conversation_id 一致
   string conversation_id = 3;
   // 回复的是哪条用户消息
   string reply_to_msg_id = 4;
-  // 最终回复的消息 ID（该回复的所有分块一致）
+  // 最终回复 ID（ai-<用户消息ID>）
   string message_id = 5;
-  // 分块序号，从 0 递增，前端据此排序
-  int64 seq = 6;
-  // thinking / progress / content / done
-  string kind = 7;
-  // 增量文本；kind=done 时为空
-  string content = 8;
+  int64 round = 6;
+  // 步号，轮内从 1 递增
+  int64 step = 7;
+  // 重试次数，默认 0
+  int32 attempt = 8;
 
-  // 9/10 曾是 timestamp_ms / metadata，未使用，保留字段号
+  // 9/10 曾是 kind / payload 字符串，改为下面的 typed oneof
   reserved 9, 10;
-  reserved "timestamp_ms", "metadata";
+  reserved "kind", "payload";
+
+  oneof payload {
+    ThinkPayload think = 11;
+    ToolCallPayload tool_call = 12;
+    ToolResultPayload tool_result = 13;
+    ResultPayload result = 14;
+  }
 }

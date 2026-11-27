@@ -9,6 +9,7 @@ package chatv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,6 +22,191 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ResultStatus int32
+
+const (
+	ResultStatus_RESULT_STATUS_UNSPECIFIED ResultStatus = 0
+	ResultStatus_RESULT_STATUS_COMPLETED   ResultStatus = 1
+	ResultStatus_RESULT_STATUS_CANCELED    ResultStatus = 2
+	ResultStatus_RESULT_STATUS_FAILED      ResultStatus = 3
+)
+
+// Enum value maps for ResultStatus.
+var (
+	ResultStatus_name = map[int32]string{
+		0: "RESULT_STATUS_UNSPECIFIED",
+		1: "RESULT_STATUS_COMPLETED",
+		2: "RESULT_STATUS_CANCELED",
+		3: "RESULT_STATUS_FAILED",
+	}
+	ResultStatus_value = map[string]int32{
+		"RESULT_STATUS_UNSPECIFIED": 0,
+		"RESULT_STATUS_COMPLETED":   1,
+		"RESULT_STATUS_CANCELED":    2,
+		"RESULT_STATUS_FAILED":      3,
+	}
+)
+
+func (x ResultStatus) Enum() *ResultStatus {
+	p := new(ResultStatus)
+	*p = x
+	return p
+}
+
+func (x ResultStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResultStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_chant_chat_v1_event_proto_enumTypes[0].Descriptor()
+}
+
+func (ResultStatus) Type() protoreflect.EnumType {
+	return &file_chant_chat_v1_event_proto_enumTypes[0]
+}
+
+func (x ResultStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResultStatus.Descriptor instead.
+func (ResultStatus) EnumDescriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{0}
+}
+
+type ToolStatus int32
+
+const (
+	ToolStatus_TOOL_STATUS_UNSPECIFIED ToolStatus = 0
+	ToolStatus_TOOL_STATUS_COMPLETED   ToolStatus = 1
+	ToolStatus_TOOL_STATUS_FAILED      ToolStatus = 2
+	ToolStatus_TOOL_STATUS_TIMEOUT     ToolStatus = 3
+)
+
+// Enum value maps for ToolStatus.
+var (
+	ToolStatus_name = map[int32]string{
+		0: "TOOL_STATUS_UNSPECIFIED",
+		1: "TOOL_STATUS_COMPLETED",
+		2: "TOOL_STATUS_FAILED",
+		3: "TOOL_STATUS_TIMEOUT",
+	}
+	ToolStatus_value = map[string]int32{
+		"TOOL_STATUS_UNSPECIFIED": 0,
+		"TOOL_STATUS_COMPLETED":   1,
+		"TOOL_STATUS_FAILED":      2,
+		"TOOL_STATUS_TIMEOUT":     3,
+	}
+)
+
+func (x ToolStatus) Enum() *ToolStatus {
+	p := new(ToolStatus)
+	*p = x
+	return p
+}
+
+func (x ToolStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ToolStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_chant_chat_v1_event_proto_enumTypes[1].Descriptor()
+}
+
+func (ToolStatus) Type() protoreflect.EnumType {
+	return &file_chant_chat_v1_event_proto_enumTypes[1]
+}
+
+func (x ToolStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ToolStatus.Descriptor instead.
+func (ToolStatus) EnumDescriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
+}
+
+// ContentPart 用户消息里的一段内容。
+// type = text / image / audio / video；文本最多一个，媒体可以多个。
+type ContentPart struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// type=text 时使用
+	Text string `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// type=image/audio/video 时使用；前端 base64，gateway 解码成 bytes
+	Data     []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	MimeType string `protobuf:"bytes,4,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	// 透传用：宽高、时长、文件名、追踪探针等，任意 JSON 对象
+	Metadata      *structpb.Struct `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ContentPart) Reset() {
+	*x = ContentPart{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContentPart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContentPart) ProtoMessage() {}
+
+func (x *ContentPart) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContentPart.ProtoReflect.Descriptor instead.
+func (*ContentPart) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ContentPart) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ContentPart) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *ContentPart) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ContentPart) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+func (x *ContentPart) GetMetadata() *structpb.Struct {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 // MessageSent 用户向 AI 发送了一条消息。
 // 生产者: gateway(chat_service)
 // 消费者: ai_service
@@ -31,17 +217,20 @@ type MessageSent struct {
 	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	// AI 会话 ID，由 gateway 生成的 UUID
 	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	MessageId      string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	// text / image / file 等
-	MessageType   string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	MessageType string `protobuf:"bytes,6,opt,name=message_type,json=messageType,proto3" json:"message_type,omitempty"`
+	// 第几轮，由 gateway 分配
+	Round int64 `protobuf:"varint,9,opt,name=round,proto3" json:"round,omitempty"`
+	// 内容列表：文本一个，媒体多个
+	Parts         []*ContentPart `protobuf:"bytes,10,rep,name=parts,proto3" json:"parts,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MessageSent) Reset() {
 	*x = MessageSent{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -53,7 +242,7 @@ func (x *MessageSent) String() string {
 func (*MessageSent) ProtoMessage() {}
 
 func (x *MessageSent) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[0]
+	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,7 +255,7 @@ func (x *MessageSent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageSent.ProtoReflect.Descriptor instead.
 func (*MessageSent) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{0}
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *MessageSent) GetSenderId() string {
@@ -90,13 +279,6 @@ func (x *MessageSent) GetConversationId() string {
 	return ""
 }
 
-func (x *MessageSent) GetContent() string {
-	if x != nil {
-		return x.Content
-	}
-	return ""
-}
-
 func (x *MessageSent) GetMessageId() string {
 	if x != nil {
 		return x.MessageId
@@ -111,265 +293,619 @@ func (x *MessageSent) GetMessageType() string {
 	return ""
 }
 
-// AiReplyGenerated AI 生成了一条完整回复。
-// 生产者: ai_service
-// 消费者: gateway（WS 推送）、storage（按 delta/final 落库）
-type AiReplyGenerated struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// AI 用户 ID，如 "ai-assistant"
-	SenderId string `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	// 回复的目标用户
-	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	// AI 会话 ID，与 MessageSent.conversation_id 一致
-	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Content        string `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
-	// 回复的是哪条用户消息
-	ReplyToMsgId string `protobuf:"bytes,5,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
-	MessageId    string `protobuf:"bytes,6,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// 可扩展元数据（当前只用 reasoning 存思考全文）
-	Metadata      map[string]string `protobuf:"bytes,8,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AiReplyGenerated) Reset() {
-	*x = AiReplyGenerated{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AiReplyGenerated) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AiReplyGenerated) ProtoMessage() {}
-
-func (x *AiReplyGenerated) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[1]
+func (x *MessageSent) GetRound() int64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AiReplyGenerated.ProtoReflect.Descriptor instead.
-func (*AiReplyGenerated) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *AiReplyGenerated) GetSenderId() string {
-	if x != nil {
-		return x.SenderId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetTargetUserId() string {
-	if x != nil {
-		return x.TargetUserId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetConversationId() string {
-	if x != nil {
-		return x.ConversationId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetContent() string {
-	if x != nil {
-		return x.Content
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetReplyToMsgId() string {
-	if x != nil {
-		return x.ReplyToMsgId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetMessageId() string {
-	if x != nil {
-		return x.MessageId
-	}
-	return ""
-}
-
-func (x *AiReplyGenerated) GetMetadata() map[string]string {
-	if x != nil {
-		return x.Metadata
-	}
-	return nil
-}
-
-// AiReplyDelta AI 回复的流式增量分块。
-// 生产者: ai_service
-// 消费者: gateway（WS 推送）、storage（直接按该结构落库）
-//
-// 一条回复对应一个固定的 message_id（流开始即确定，与最终
-// AiReplyGenerated 的 message_id 一致），分块按 seq 从 0 递增；
-// 前端按 (message_id, seq) 累积排序，收到最终整块消息时以服务端为准。
-//
-// kind 取值：
-//
-//	"thinking"  思考链文本增量
-//	"progress"  阶段进度文字
-//	"content"   正文文本增量
-//	"done"      流结束标记（content 为空，之后必有最终 AiReplyGenerated）
-type AiReplyDelta struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// AI 用户 ID，如 "ai-assistant"
-	SenderId string `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	// 回复的目标用户
-	TargetUserId string `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
-	// AI 会话 ID，与 MessageSent.conversation_id 一致
-	ConversationId string `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	// 回复的是哪条用户消息
-	ReplyToMsgId string `protobuf:"bytes,4,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
-	// 最终回复的消息 ID（该回复的所有分块一致）
-	MessageId string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	// 分块序号，从 0 递增，前端据此排序
-	Seq int64 `protobuf:"varint,6,opt,name=seq,proto3" json:"seq,omitempty"`
-	// thinking / progress / content / done
-	Kind string `protobuf:"bytes,7,opt,name=kind,proto3" json:"kind,omitempty"`
-	// 增量文本；kind=done 时为空
-	Content       string `protobuf:"bytes,8,opt,name=content,proto3" json:"content,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AiReplyDelta) Reset() {
-	*x = AiReplyDelta{}
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AiReplyDelta) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AiReplyDelta) ProtoMessage() {}
-
-func (x *AiReplyDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AiReplyDelta.ProtoReflect.Descriptor instead.
-func (*AiReplyDelta) Descriptor() ([]byte, []int) {
-	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *AiReplyDelta) GetSenderId() string {
-	if x != nil {
-		return x.SenderId
-	}
-	return ""
-}
-
-func (x *AiReplyDelta) GetTargetUserId() string {
-	if x != nil {
-		return x.TargetUserId
-	}
-	return ""
-}
-
-func (x *AiReplyDelta) GetConversationId() string {
-	if x != nil {
-		return x.ConversationId
-	}
-	return ""
-}
-
-func (x *AiReplyDelta) GetReplyToMsgId() string {
-	if x != nil {
-		return x.ReplyToMsgId
-	}
-	return ""
-}
-
-func (x *AiReplyDelta) GetMessageId() string {
-	if x != nil {
-		return x.MessageId
-	}
-	return ""
-}
-
-func (x *AiReplyDelta) GetSeq() int64 {
-	if x != nil {
-		return x.Seq
+		return x.Round
 	}
 	return 0
 }
 
-func (x *AiReplyDelta) GetKind() string {
+func (x *MessageSent) GetParts() []*ContentPart {
 	if x != nil {
-		return x.Kind
+		return x.Parts
+	}
+	return nil
+}
+
+// THINK：AI 的思考
+type ThinkPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Think         string                 `protobuf:"bytes,1,opt,name=think,proto3" json:"think,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ThinkPayload) Reset() {
+	*x = ThinkPayload{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ThinkPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ThinkPayload) ProtoMessage() {}
+
+func (x *ThinkPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ThinkPayload.ProtoReflect.Descriptor instead.
+func (*ThinkPayload) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ThinkPayload) GetThink() string {
+	if x != nil {
+		return x.Think
 	}
 	return ""
 }
 
-func (x *AiReplyDelta) GetContent() string {
+// 单个工具调用
+type ToolCall struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Input         *structpb.Value        `protobuf:"bytes,3,opt,name=input,proto3" json:"input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCall) Reset() {
+	*x = ToolCall{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCall) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCall) ProtoMessage() {}
+
+func (x *ToolCall) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[3]
 	if x != nil {
-		return x.Content
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCall.ProtoReflect.Descriptor instead.
+func (*ToolCall) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ToolCall) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
+
+func (x *ToolCall) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolCall) GetInput() *structpb.Value {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+type ToolCallPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Calls         []*ToolCall            `protobuf:"bytes,1,rep,name=calls,proto3" json:"calls,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolCallPayload) Reset() {
+	*x = ToolCallPayload{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolCallPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolCallPayload) ProtoMessage() {}
+
+func (x *ToolCallPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolCallPayload.ProtoReflect.Descriptor instead.
+func (*ToolCallPayload) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ToolCallPayload) GetCalls() []*ToolCall {
+	if x != nil {
+		return x.Calls
+	}
+	return nil
+}
+
+// 单个工具返回
+type ToolResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Payload       *structpb.Value        `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	Status        ToolStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=chant.chat.v1.ToolStatus" json:"status,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,5,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolResult) Reset() {
+	*x = ToolResult{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolResult) ProtoMessage() {}
+
+func (x *ToolResult) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolResult.ProtoReflect.Descriptor instead.
+func (*ToolResult) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ToolResult) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ToolResult) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ToolResult) GetPayload() *structpb.Value {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *ToolResult) GetStatus() ToolStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ToolStatus_TOOL_STATUS_UNSPECIFIED
+}
+
+func (x *ToolResult) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *ToolResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type ToolResultPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []*ToolResult          `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ToolResultPayload) Reset() {
+	*x = ToolResultPayload{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ToolResultPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ToolResultPayload) ProtoMessage() {}
+
+func (x *ToolResultPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ToolResultPayload.ProtoReflect.Descriptor instead.
+func (*ToolResultPayload) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ToolResultPayload) GetResults() []*ToolResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+// RESULT：最终回答 + 本轮终止
+type ResultPayload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        string                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	Status        ResultStatus           `protobuf:"varint,2,opt,name=status,proto3,enum=chant.chat.v1.ResultStatus" json:"status,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResultPayload) Reset() {
+	*x = ResultPayload{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResultPayload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResultPayload) ProtoMessage() {}
+
+func (x *ResultPayload) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResultPayload.ProtoReflect.Descriptor instead.
+func (*ResultPayload) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ResultPayload) GetResult() string {
+	if x != nil {
+		return x.Result
+	}
+	return ""
+}
+
+func (x *ResultPayload) GetStatus() ResultStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ResultStatus_RESULT_STATUS_UNSPECIFIED
+}
+
+func (x *ResultPayload) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+// AiTurnStep AI 处理过程中的一步。
+// 生产者: ai_service
+// 消费者: gateway（WS 推送）、storage（后续按 step 落库）
+type AiTurnStep struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SenderId       string                 `protobuf:"bytes,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	TargetUserId   string                 `protobuf:"bytes,2,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
+	ConversationId string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	// 回复的是哪条用户消息
+	ReplyToMsgId string `protobuf:"bytes,4,opt,name=reply_to_msg_id,json=replyToMsgId,proto3" json:"reply_to_msg_id,omitempty"`
+	// 最终回复 ID（ai-<用户消息ID>）
+	MessageId string `protobuf:"bytes,5,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Round     int64  `protobuf:"varint,6,opt,name=round,proto3" json:"round,omitempty"`
+	// 步号，轮内从 1 递增
+	Step int64 `protobuf:"varint,7,opt,name=step,proto3" json:"step,omitempty"`
+	// 重试次数，默认 0
+	Attempt int32 `protobuf:"varint,8,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*AiTurnStep_Think
+	//	*AiTurnStep_ToolCall
+	//	*AiTurnStep_ToolResult
+	//	*AiTurnStep_Result
+	Payload       isAiTurnStep_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AiTurnStep) Reset() {
+	*x = AiTurnStep{}
+	mi := &file_chant_chat_v1_event_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AiTurnStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AiTurnStep) ProtoMessage() {}
+
+func (x *AiTurnStep) ProtoReflect() protoreflect.Message {
+	mi := &file_chant_chat_v1_event_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AiTurnStep.ProtoReflect.Descriptor instead.
+func (*AiTurnStep) Descriptor() ([]byte, []int) {
+	return file_chant_chat_v1_event_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AiTurnStep) GetSenderId() string {
+	if x != nil {
+		return x.SenderId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetTargetUserId() string {
+	if x != nil {
+		return x.TargetUserId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetReplyToMsgId() string {
+	if x != nil {
+		return x.ReplyToMsgId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *AiTurnStep) GetRound() int64 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetStep() int64 {
+	if x != nil {
+		return x.Step
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetAttempt() int32 {
+	if x != nil {
+		return x.Attempt
+	}
+	return 0
+}
+
+func (x *AiTurnStep) GetPayload() isAiTurnStep_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *AiTurnStep) GetThink() *ThinkPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*AiTurnStep_Think); ok {
+			return x.Think
+		}
+	}
+	return nil
+}
+
+func (x *AiTurnStep) GetToolCall() *ToolCallPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*AiTurnStep_ToolCall); ok {
+			return x.ToolCall
+		}
+	}
+	return nil
+}
+
+func (x *AiTurnStep) GetToolResult() *ToolResultPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*AiTurnStep_ToolResult); ok {
+			return x.ToolResult
+		}
+	}
+	return nil
+}
+
+func (x *AiTurnStep) GetResult() *ResultPayload {
+	if x != nil {
+		if x, ok := x.Payload.(*AiTurnStep_Result); ok {
+			return x.Result
+		}
+	}
+	return nil
+}
+
+type isAiTurnStep_Payload interface {
+	isAiTurnStep_Payload()
+}
+
+type AiTurnStep_Think struct {
+	Think *ThinkPayload `protobuf:"bytes,11,opt,name=think,proto3,oneof"`
+}
+
+type AiTurnStep_ToolCall struct {
+	ToolCall *ToolCallPayload `protobuf:"bytes,12,opt,name=tool_call,json=toolCall,proto3,oneof"`
+}
+
+type AiTurnStep_ToolResult struct {
+	ToolResult *ToolResultPayload `protobuf:"bytes,13,opt,name=tool_result,json=toolResult,proto3,oneof"`
+}
+
+type AiTurnStep_Result struct {
+	Result *ResultPayload `protobuf:"bytes,14,opt,name=result,proto3,oneof"`
+}
+
+func (*AiTurnStep_Think) isAiTurnStep_Payload() {}
+
+func (*AiTurnStep_ToolCall) isAiTurnStep_Payload() {}
+
+func (*AiTurnStep_ToolResult) isAiTurnStep_Payload() {}
+
+func (*AiTurnStep_Result) isAiTurnStep_Payload() {}
 
 var File_chant_chat_v1_event_proto protoreflect.FileDescriptor
 
 const file_chant_chat_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\"\xf9\x01\n" +
+	"\x19chant/chat/v1/event.proto\x12\rchant.chat.v1\x1a\x1cgoogle/protobuf/struct.proto\"\x9b\x01\n" +
+	"\vContentPart\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12\x1b\n" +
+	"\tmime_type\x18\x04 \x01(\tR\bmimeType\x123\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\"\xb6\x02\n" +
 	"\vMessageSent\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
-	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x18\n" +
-	"\acontent\x18\x04 \x01(\tR\acontent\x12\x1d\n" +
+	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x05 \x01(\tR\tmessageId\x12!\n" +
-	"\fmessage_type\x18\x06 \x01(\tR\vmessageTypeJ\x04\b\a\x10\bJ\x04\b\b\x10\tR\ftimestamp_msR\bmetadata\"\xfa\x02\n" +
-	"\x10AiReplyGenerated\x12\x1b\n" +
-	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
-	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
-	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12\x18\n" +
-	"\acontent\x18\x04 \x01(\tR\acontent\x12%\n" +
-	"\x0freply_to_msg_id\x18\x05 \x01(\tR\freplyToMsgId\x12\x1d\n" +
+	"\fmessage_type\x18\x06 \x01(\tR\vmessageType\x12\x14\n" +
+	"\x05round\x18\t \x01(\x03R\x05round\x120\n" +
+	"\x05parts\x18\n" +
+	" \x03(\v2\x1a.chant.chat.v1.ContentPartR\x05partsJ\x04\b\x04\x10\x05J\x04\b\a\x10\bJ\x04\b\b\x10\tR\acontentR\ftimestamp_msR\bmetadata\"$\n" +
+	"\fThinkPayload\x12\x14\n" +
+	"\x05think\x18\x01 \x01(\tR\x05think\"\\\n" +
+	"\bToolCall\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12,\n" +
+	"\x05input\x18\x03 \x01(\v2\x16.google.protobuf.ValueR\x05input\"@\n" +
+	"\x0fToolCallPayload\x12-\n" +
+	"\x05calls\x18\x01 \x03(\v2\x17.chant.chat.v1.ToolCallR\x05calls\"\xcc\x01\n" +
 	"\n" +
-	"message_id\x18\x06 \x01(\tR\tmessageId\x12I\n" +
-	"\bmetadata\x18\b \x03(\v2-.chant.chat.v1.AiReplyGenerated.MetadataEntryR\bmetadata\x1a;\n" +
-	"\rMetadataEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\a\x10\bR\ftimestamp_ms\"\xa4\x02\n" +
-	"\fAiReplyDelta\x12\x1b\n" +
+	"ToolResult\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x120\n" +
+	"\apayload\x18\x03 \x01(\v2\x16.google.protobuf.ValueR\apayload\x121\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x19.chant.chat.v1.ToolStatusR\x06status\x12\x1f\n" +
+	"\vduration_ms\x18\x05 \x01(\x03R\n" +
+	"durationMs\x12\x14\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\"H\n" +
+	"\x11ToolResultPayload\x123\n" +
+	"\aresults\x18\x01 \x03(\v2\x19.chant.chat.v1.ToolResultR\aresults\"t\n" +
+	"\rResultPayload\x12\x16\n" +
+	"\x06result\x18\x01 \x01(\tR\x06result\x123\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x1b.chant.chat.v1.ResultStatusR\x06status\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x99\x04\n" +
+	"\n" +
+	"AiTurnStep\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\tR\bsenderId\x12$\n" +
 	"\x0etarget_user_id\x18\x02 \x01(\tR\ftargetUserId\x12'\n" +
 	"\x0fconversation_id\x18\x03 \x01(\tR\x0econversationId\x12%\n" +
 	"\x0freply_to_msg_id\x18\x04 \x01(\tR\freplyToMsgId\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x10\n" +
-	"\x03seq\x18\x06 \x01(\x03R\x03seq\x12\x12\n" +
-	"\x04kind\x18\a \x01(\tR\x04kind\x12\x18\n" +
-	"\acontent\x18\b \x01(\tR\acontentJ\x04\b\t\x10\n" +
+	"message_id\x18\x05 \x01(\tR\tmessageId\x12\x14\n" +
+	"\x05round\x18\x06 \x01(\x03R\x05round\x12\x12\n" +
+	"\x04step\x18\a \x01(\x03R\x04step\x12\x18\n" +
+	"\aattempt\x18\b \x01(\x05R\aattempt\x123\n" +
+	"\x05think\x18\v \x01(\v2\x1b.chant.chat.v1.ThinkPayloadH\x00R\x05think\x12=\n" +
+	"\ttool_call\x18\f \x01(\v2\x1e.chant.chat.v1.ToolCallPayloadH\x00R\btoolCall\x12C\n" +
+	"\vtool_result\x18\r \x01(\v2 .chant.chat.v1.ToolResultPayloadH\x00R\n" +
+	"toolResult\x126\n" +
+	"\x06result\x18\x0e \x01(\v2\x1c.chant.chat.v1.ResultPayloadH\x00R\x06resultB\t\n" +
+	"\apayloadJ\x04\b\t\x10\n" +
 	"J\x04\b\n" +
-	"\x10\vR\ftimestamp_msR\bmetadataB\xa9\x01\n" +
+	"\x10\vR\x04kindR\apayload*\x80\x01\n" +
+	"\fResultStatus\x12\x1d\n" +
+	"\x19RESULT_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17RESULT_STATUS_COMPLETED\x10\x01\x12\x1a\n" +
+	"\x16RESULT_STATUS_CANCELED\x10\x02\x12\x18\n" +
+	"\x14RESULT_STATUS_FAILED\x10\x03*u\n" +
+	"\n" +
+	"ToolStatus\x12\x1b\n" +
+	"\x17TOOL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15TOOL_STATUS_COMPLETED\x10\x01\x12\x16\n" +
+	"\x12TOOL_STATUS_FAILED\x10\x02\x12\x17\n" +
+	"\x13TOOL_STATUS_TIMEOUT\x10\x03B\xa9\x01\n" +
 	"\x11com.chant.chat.v1B\n" +
 	"EventProtoP\x01Z2github.com/chant/chant/gen/go/chant/chat/v1;chatv1\xa2\x02\x03CCX\xaa\x02\rChant.Chat.V1\xca\x02\rChant\\Chat\\V1\xe2\x02\x19Chant\\Chat\\V1\\GPBMetadata\xea\x02\x0fChant::Chat::V1b\x06proto3"
 
@@ -385,20 +921,41 @@ func file_chant_chat_v1_event_proto_rawDescGZIP() []byte {
 	return file_chant_chat_v1_event_proto_rawDescData
 }
 
-var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_chant_chat_v1_event_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_chant_chat_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_chant_chat_v1_event_proto_goTypes = []any{
-	(*MessageSent)(nil),      // 0: chant.chat.v1.MessageSent
-	(*AiReplyGenerated)(nil), // 1: chant.chat.v1.AiReplyGenerated
-	(*AiReplyDelta)(nil),     // 2: chant.chat.v1.AiReplyDelta
-	nil,                      // 3: chant.chat.v1.AiReplyGenerated.MetadataEntry
+	(ResultStatus)(0),         // 0: chant.chat.v1.ResultStatus
+	(ToolStatus)(0),           // 1: chant.chat.v1.ToolStatus
+	(*ContentPart)(nil),       // 2: chant.chat.v1.ContentPart
+	(*MessageSent)(nil),       // 3: chant.chat.v1.MessageSent
+	(*ThinkPayload)(nil),      // 4: chant.chat.v1.ThinkPayload
+	(*ToolCall)(nil),          // 5: chant.chat.v1.ToolCall
+	(*ToolCallPayload)(nil),   // 6: chant.chat.v1.ToolCallPayload
+	(*ToolResult)(nil),        // 7: chant.chat.v1.ToolResult
+	(*ToolResultPayload)(nil), // 8: chant.chat.v1.ToolResultPayload
+	(*ResultPayload)(nil),     // 9: chant.chat.v1.ResultPayload
+	(*AiTurnStep)(nil),        // 10: chant.chat.v1.AiTurnStep
+	(*structpb.Struct)(nil),   // 11: google.protobuf.Struct
+	(*structpb.Value)(nil),    // 12: google.protobuf.Value
 }
 var file_chant_chat_v1_event_proto_depIdxs = []int32{
-	3, // 0: chant.chat.v1.AiReplyGenerated.metadata:type_name -> chant.chat.v1.AiReplyGenerated.MetadataEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	11, // 0: chant.chat.v1.ContentPart.metadata:type_name -> google.protobuf.Struct
+	2,  // 1: chant.chat.v1.MessageSent.parts:type_name -> chant.chat.v1.ContentPart
+	12, // 2: chant.chat.v1.ToolCall.input:type_name -> google.protobuf.Value
+	5,  // 3: chant.chat.v1.ToolCallPayload.calls:type_name -> chant.chat.v1.ToolCall
+	12, // 4: chant.chat.v1.ToolResult.payload:type_name -> google.protobuf.Value
+	1,  // 5: chant.chat.v1.ToolResult.status:type_name -> chant.chat.v1.ToolStatus
+	7,  // 6: chant.chat.v1.ToolResultPayload.results:type_name -> chant.chat.v1.ToolResult
+	0,  // 7: chant.chat.v1.ResultPayload.status:type_name -> chant.chat.v1.ResultStatus
+	4,  // 8: chant.chat.v1.AiTurnStep.think:type_name -> chant.chat.v1.ThinkPayload
+	6,  // 9: chant.chat.v1.AiTurnStep.tool_call:type_name -> chant.chat.v1.ToolCallPayload
+	8,  // 10: chant.chat.v1.AiTurnStep.tool_result:type_name -> chant.chat.v1.ToolResultPayload
+	9,  // 11: chant.chat.v1.AiTurnStep.result:type_name -> chant.chat.v1.ResultPayload
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_chant_chat_v1_event_proto_init() }
@@ -406,18 +963,25 @@ func file_chant_chat_v1_event_proto_init() {
 	if File_chant_chat_v1_event_proto != nil {
 		return
 	}
+	file_chant_chat_v1_event_proto_msgTypes[8].OneofWrappers = []any{
+		(*AiTurnStep_Think)(nil),
+		(*AiTurnStep_ToolCall)(nil),
+		(*AiTurnStep_ToolResult)(nil),
+		(*AiTurnStep_Result)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chant_chat_v1_event_proto_rawDesc), len(file_chant_chat_v1_event_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      2,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_chant_chat_v1_event_proto_goTypes,
 		DependencyIndexes: file_chant_chat_v1_event_proto_depIdxs,
+		EnumInfos:         file_chant_chat_v1_event_proto_enumTypes,
 		MessageInfos:      file_chant_chat_v1_event_proto_msgTypes,
 	}.Build()
 	File_chant_chat_v1_event_proto = out.File

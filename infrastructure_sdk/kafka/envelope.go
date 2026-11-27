@@ -7,26 +7,14 @@ import (
 	"time"
 
 	commonv1 "github.com/chant/chant/gen/go/chant/common/v1"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
-
-// marshalOpts 序列化选项：使用 snake_case 字段名，保持与现有前端兼容。
-var marshalOpts = protojson.MarshalOptions{
-	EmitUnpopulated: false,
-	UseProtoNames:   true,
-}
-
-// unmarshalOpts 反序列化选项：忽略未知字段。
-var unmarshalOpts = protojson.UnmarshalOptions{
-	DiscardUnknown: true,
-}
 
 // NewEventEnvelope 用 proto 消息创建一个事件信封。
 // eventType 如 "chant.chat.v1.MessageSent"
 // source 如 "chat-service"
 func NewEventEnvelope(eventType, source string, msg proto.Message) (*commonv1.EventEnvelope, error) {
-	data, err := marshalOpts.Marshal(msg)
+	data, err := proto.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal proto event: %w", err)
 	}
@@ -42,7 +30,7 @@ func NewEventEnvelope(eventType, source string, msg proto.Message) (*commonv1.Ev
 
 // SendEnvelope 通过底层 KafkaProducer 发送事件信封。
 func (kp *KafkaProducer) SendEnvelope(ctx context.Context, topic, key string, envelope *commonv1.EventEnvelope) error {
-	msgBytes, err := marshalOpts.Marshal(envelope)
+	msgBytes, err := proto.Marshal(envelope)
 	if err != nil {
 		return fmt.Errorf("marshal envelope: %w", err)
 	}
@@ -52,7 +40,7 @@ func (kp *KafkaProducer) SendEnvelope(ctx context.Context, topic, key string, en
 // ParseEnvelope 从 Kafka 消息 bytes 解析事件信封。
 func ParseEnvelope(raw []byte) (*commonv1.EventEnvelope, error) {
 	env := new(commonv1.EventEnvelope)
-	if err := unmarshalOpts.Unmarshal(raw, env); err != nil {
+	if err := proto.Unmarshal(raw, env); err != nil {
 		return nil, fmt.Errorf("unmarshal envelope: %w", err)
 	}
 	return env, nil
@@ -60,7 +48,7 @@ func ParseEnvelope(raw []byte) (*commonv1.EventEnvelope, error) {
 
 // UnmarshalData 将信封的 data 字段反序列化为目标 proto 消息。
 func UnmarshalData(env *commonv1.EventEnvelope, target proto.Message) error {
-	return unmarshalOpts.Unmarshal(env.Data, target)
+	return proto.Unmarshal(env.Data, target)
 }
 
 // ProtoHandlerFunc proto 版事件处理函数

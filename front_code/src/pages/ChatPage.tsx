@@ -4,11 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { chatApi } from '../api/chat';
-import type { Group, WsMessage, SendPayload } from '../types/chat';
+import type { Group, StepMessage, StepStream, WsMessage, SendPayload } from '../types/chat';
 import { useChatSocket } from '../hooks/useChatSocket';
 import Sidebar from '../components/Sidebar';
 import MessageList from '../components/MessageList';
-import type { StreamEntry } from '../components/MessageList';
 import ChatInput from '../components/ChatInput';
 import NewChatModal from '../components/NewChatModal';
 import styles from './ChatPage.module.scss';
@@ -37,12 +36,10 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<WsMessage[]>([]);
   const [input, setInput] = useState('');
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [progressSteps, setProgressSteps] = useState<Record<string, string[]>>({});
-  const [streams, setStreams] = useState<Record<string, StreamEntry>>({});
+  const [streams, setStreams] = useState<Record<string, StepStream>>({});
   const [newChatOpen, setNewChatOpen] = useState(false);
 
   const currentGidRef = useRef<string>('');
-  const seenMessageIdsRef = useRef<Set<string>>(new Set());
 
   const currentGid = selectedGroupId;
   const currentGroup = groups.find((g) => g.group_id === currentGid);
@@ -58,90 +55,63 @@ const ChatPage: React.FC = () => {
     currentGidRef.current = currentGid;
   }, [currentGid]);
 
-  // ── WS 消息统一入口 ──
+  // ── WS 消息统一入口：只处理 AI step 事件 ──
   const handleWsMessage = useCallback((msg: WsMessage) => {
-    const convId = msg.conversation_id || msg.group_id || '';
-    const normalized: WsMessage = { ...msg, group_id: convId };
+    if (msg.type !== 'ai_step') return;
 
-    if (msg.sender === userId) return;
+    const stepMsg = msg as StepMessage;
+    const mid = stepMsg.message_id;
+    if (!mid) return;
 
-    // delta 分块：累积到流式条目，不进消息流、不计数未读
-    if (msg.kind && msg.message_id) {
-      const mid = msg.message_id;
-      setStreams((prev) => {
-        const cur = prev[mid] || {
-          group_id: convId,
-          sender: msg.sender || 'ai-assistant',
-          reasoning: '',
-          content: '',
-          steps: [],
-          done: false,
-          time: msg.time,
-          reply_to_msg_id: msg.reply_to_msg_id,
-        };
-        const next: StreamEntry = { ...cur, group_id: convId, steps: [...cur.steps] };
-        if (msg.kind === 'thinking') next.reasoning += msg.content || '';
-        else if (msg.kind === 'progress') {
-          if (msg.content && !next.steps.includes(msg.content)) next.steps.push(msg.content);
-        }
-        else if (msg.kind === 'content') next.content += msg.content || '';
-        else if (msg.kind === 'done') next.done = true;
-        return { ...prev, [mid]: next };
-      });
-      return;
-    }
+    const convId = stepMsg.conversation_id || '';
+    const attempt = stepMsg.attempt ?? 0;
+    const round = stepMsg.round ?? 0;
 
-    // 旧协议进度消息：挂靠到原始输入
-    if (msg.metadata?.kind === 'progress' && msg.reply_to_msg_id) {
-      const key = msg.reply_to_msg_id;
-      setProgressSteps((prev) => {
-        const texts = prev[key] || [];
-        if (msg.content && texts.includes(msg.content)) return prev;
-        return { ...prev, [key]: [...texts, msg.content || ''] };
-      });
-      return;
-    }
-
-    // 最终回复 / 错误到达：清除对应输入的进度点
-    if (msg.reply_to_msg_id) {
-      setProgressSteps((prev) => {
-        if (!(msg.reply_to_msg_id! in prev)) return prev;
-        const next = { ...prev };
-        delete next[msg.reply_to_msg_id!];
-        return next;
-      });
-    }
-
-    // 按 message_id 去重，防 Kafka 重投
-    if (msg.message_id) {
-      if (seenMessageIdsRef.current.has(msg.message_id)) return;
-      seenMessageIdsRef.current.add(msg.message_id);
-    }
-    // 最终整块消息到达：以服务端全文为准，清掉对应流式条目
-    if (msg.message_id) {
-      setStreams((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const [id, s] of Object.entries(prev)) {
-          if (id === msg.message_id
-            || (msg.reply_to_msg_id && s.reply_to_msg_id === msg.reply_to_msg_id)) {
-            delete next[id];
-            changed = true;
+    setStreams((prev) => {
+      const cur = prev[mid];
+      // 忽略旧 attempt / 旧 round 的迟到事件
+      if (cur && (attempt < cur.attempt || round < cur.round)) return prev;
+      const reset = !cur || attempt > cur.attempt || round > cur.round;
+      const base: StepStream = reset
+        ? {
+            conversation_id: convId,
+            reply_to_msg_id: stepMsg.reply_to_msg_id,
+            message_id: mid,
+            sender: stepMsg.sender,
+            round,
+            attempt,
+            steps: [],
+            done: false,
           }
-        }
-        return changed ? next : prev;
-      });
-    }
-    setMessages((prev) => [...prev, normalized]);
+        : cur;
 
-    // 非当前会话计入未读角标
-    if (convId && convId !== currentGidRef.current) {
+      const steps = base.steps.filter((item) => item.step !== stepMsg.step);
+      steps.push({
+        kind: stepMsg.kind,
+        step: stepMsg.step,
+        payload: stepMsg.payload || {},
+        time: stepMsg.time,
+      });
+      steps.sort((a, b) => a.step - b.step);
+
+      return {
+        ...prev,
+        [mid]: {
+          ...base,
+          steps,
+          done: base.done || stepMsg.kind === 'RESULT',
+        },
+      };
+    });
+
+    // 非当前会话的完成事件计入未读
+    if (stepMsg.kind === 'RESULT' && convId && convId !== currentGidRef.current) {
       setUnreadCounts((prev) => ({
         ...prev,
         [convId]: (prev[convId] || 0) + 1,
       }));
     }
-  }, [userId]);
+  }, []);
 
   const { connected, statusMsg, send } = useChatSocket({ token, onMessage: handleWsMessage });
 
@@ -162,6 +132,7 @@ const ChatPage: React.FC = () => {
       setGroups((prev) => [conversation, ...prev]);
       setSelectedGroupId(conversation.group_id);
       setMessages([]);
+      setStreams({});
       setNewChatOpen(false);
     } catch { /* ignore */ }
   };
@@ -176,7 +147,7 @@ const ChatPage: React.FC = () => {
     const payload: SendPayload = {
       type: 'chat',
       content: {
-        text,
+        parts: [{ type: 'text', text }],
         message_id: msgId,
         message_type: 'text',
         conversation_id: currentGid,
@@ -238,7 +209,7 @@ const ChatPage: React.FC = () => {
             <MessageList
               messages={filteredMessages}
               userId={userId}
-              progressSteps={progressSteps}
+              conversationId={currentGid}
               streams={streams}
               hasMoreHistory={false}
               loadingHistory={false}
